@@ -1,0 +1,24 @@
+{
+  "accounts": [
+    {
+      "name": "账号1-MX",
+      "login_email": "tiktokshopinfoundtest@gmail.com",
+      "login_password": "fyvbyn-hyctu0-Rafqyp",
+      "gmail_username": "tiktokshopinfoundtest@gmail.com",
+      "gmail_app_password": "cfhlfedjqhfbbbhb",
+      "region": "MX",
+      "enabled": true,
+      "notes": "MX区域账号"
+    },
+    {
+      "name": "账号2-FR",
+      "login_email": "tiktokinfoundfrance@gmail.com",
+      "login_password": "dyvvac-coqnYp-sespo0",
+      "gmail_username": "tiktokinfoundfrance@gmail.com",
+      "gmail_app_password": "gnseoovwafbstjbt",
+      "region": "FR",
+      "enabled": true,
+      "notes": "FR区域账号"
+    }
+  ]
+}

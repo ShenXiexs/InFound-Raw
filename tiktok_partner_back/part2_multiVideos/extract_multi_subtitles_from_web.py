@@ -1,0 +1,625 @@
+# -*- coding: utf-8 -*-
+# 依赖: pip install faster-whisper srt rich deep-translator pandas numpy yt-dlp playwright torch torchaudio
+import os, re, math, datetime, argparse, subprocess, json, sys, time
+from typing import List, Dict, Optional, Tuple
+import numpy as np, srt, pandas as pd
+from urllib.parse import urlparse
+from rich.console import Console
+from faster_whisper import WhisperModel
+
+try:
+    from deep_translator import GoogleTranslator
+except Exception:
+    GoogleTranslator = None
+
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    print("⚠️ Playwright未安装，将使用直接URL访问")
+
+# --- 语音VAD（Silero） ---
+import torch, torchaudio
+try:
+    _silero_model, _silero_utils = torch.hub.load(
+        repo_or_dir='snakers4/silero-vad', model='silero_vad',
+        force_reload=False, trust_repo=True
+    )
+    (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = _silero_utils
+    HAVE_SILERO = True
+except Exception:
+    HAVE_SILERO = False
+    print("⚠️ Silero VAD 加载失败，将不做BGM过滤")
+
+console = Console()
+
+# ===== 可调参数（仍可在文件顶部改）=====
+LANG = "auto"
+TRANSLATE_TO = None  # 例如 "zh"
+USE_WHISPER_TRANSLATE = False  # True 用 Whisper 内建翻译; False 用 Google 翻译
+
+MODEL_PATH = r"/Users/samxie/Research/Infound_Influencer/tiktok_partner_back/models/faster-whisper-small"
+DEVICE = "cpu"  # "cpu" | "cuda"
+COMPUTE_TYPE = "int8"  # cpu: "int8"; cuda: "int8_float16"
+VAD_SIL_MS, VAD_PAD_MS = 180, 120
+
+POST_MIN_GAP = 0.15
+POST_MIN_DUR, POST_MAX_DUR = 1.2, 6.0
+LINE_CHARS, MAX_LINES = 42, 2
+EXPORT_CSV = True
+
+FFMPEG = os.environ.get("FFMPEG", "/opt/homebrew/bin/ffmpeg")
+
+# 浏览器配置
+USE_BROWSER = False  # 是否使用浏览器打开页面
+
+
+# ---------- 工具 ----------
+def td(sec: float) -> datetime.timedelta:
+    return datetime.timedelta(seconds=max(0.0, float(sec or 0.0)))
+
+
+def layout_lines(text: str, max_chars: int = 42, max_lines: int = 2) -> str:
+    t = " ".join(text.strip().split())
+    if not t: return ""
+    chunks = re.split(r"(\.|,|!|\?|;|:|\u2026|\-|—)", t)
+    parts = ["".join(chunks[i:i + 2]).strip() for i in range(0, len(chunks), 2)]
+    lines, cur = [], ""
+    for p in parts:
+        for token in p.split(" "):
+            token = token.strip()
+            if not token: continue
+            if not cur:
+                cur = token
+            elif len(cur) + 1 + len(token) <= max_chars:
+                cur += " " + token
+            else:
+                lines.append(cur); cur = token
+    if cur: lines.append(cur)
+    while len(lines) > max_lines:
+        idx = min(range(len(lines) - 1), key=lambda i: len(lines[i]) + 1 + len(lines[i + 1]))
+        lines[idx] = lines[idx] + " " + lines[idx + 1]
+        del lines[idx + 1]
+    return "\n".join(lines)
+
+
+def compose_srt(segments: List[Dict], out_path: str, max_chars: int = 42, max_lines: int = 2):
+    subs = []
+    for i, seg in enumerate(segments, 1):
+        subs.append(srt.Subtitle(index=i, start=td(seg["start"]), end=td(seg["end"]),
+                                 content=layout_lines(seg["text"], max_chars, max_lines)))
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(srt.compose(subs))
+
+
+def merge_small_gaps(segs: List[Dict], min_gap: float = 0.15) -> List[Dict]:
+    if not segs: return []
+    out = [dict(segs[0])]
+    for s in segs[1:]:
+        if s["start"] - out[-1]["end"] < min_gap:
+            out[-1]["end"] = s["end"]
+            out[-1]["text"] = (out[-1]["text"] + " " + s["text"]).strip()
+        else:
+            out.append(dict(s))
+    return out
+
+
+def split_long_segment(seg: Dict, max_dur: float = 6.0, min_piece: float = 1.2) -> List[Dict]:
+    dur = seg["end"] - seg["start"]
+    if dur <= max_dur or len(seg["text"].strip()) <= 1: return [seg]
+    text = " ".join(seg["text"].split())
+    tokens = re.split(r"([.!?;,:])", text)
+    parts = ["".join(tokens[i:i + 2]).strip() for i in range(0, len(tokens), 2)]
+    if len(parts) == 1:
+        words, n = text.split(), max(2, math.ceil(dur / max_dur))
+        bins = [[] for _ in range(n)]
+        for i, w in enumerate(words): bins[i % n].append(w)
+        parts = [" ".join(b).strip() for b in bins if b]
+    total_len = sum(len(p) for p in parts) or 1
+    t0, res = seg["start"], []
+    for i, p in enumerate(parts):
+        share = max(min_piece, dur * (len(p) / total_len))
+        t1 = min(seg["end"], t0 + min(max_dur, share))
+        if i == len(parts) - 1: t1 = seg["end"]
+        res.append({"start": t0, "end": t1, "text": p})
+        t0 = t1
+    return res
+
+
+def enforce_duration(segs: List[Dict], min_dur: float = 1.0, max_dur: float = 6.0) -> List[Dict]:
+    tmp = []
+    [tmp.extend(split_long_segment(s, max_dur, min_dur)) for s in segs]
+    out, buf = [], None
+    for s in tmp:
+        if buf is None:
+            buf = dict(s); continue
+        if (buf["end"] - buf["start"]) < min_dur:
+            buf["end"] = s["end"]
+            buf["text"] = (buf["text"] + " " + s["text"]).strip()
+        else:
+            out.append(buf); buf = dict(s)
+    if buf: out.append(buf)
+    return out
+
+
+def resegment_nice(segs: List[Dict], min_gap: float, min_dur: float, max_dur: float) -> List[Dict]:
+    return enforce_duration(merge_small_gaps(segs, min_gap), min_dur, max_dur)
+
+
+def translate_segments(segs: List[Dict], target_lang: str) -> List[Dict]:
+    if not GoogleTranslator: return segs
+    tr = GoogleTranslator(source="auto", target=target_lang)
+    out = []
+    for s in segs:
+        txt = s["text"].strip()
+        try:
+            t = tr.translate(txt) if txt else ""
+        except Exception:
+            t = txt
+        out.append({**s, "text": t})
+    return out
+
+
+def is_url(s: str) -> bool:
+    return isinstance(s, str) and s.startswith(("http://", "https://"))
+
+
+def infer_name_from_source(source: str) -> str:
+    if not is_url(source):
+        return os.path.splitext(os.path.basename(source))[0]
+    p = urlparse(source)
+    base = os.path.basename(p.path) or "remote"
+    return os.path.splitext(base)[0] or "remote"
+
+
+# ---------- 浏览器辅助函数 ----------
+def get_video_url_via_browser(page_url: str, edge_user_data_dir: str = None) -> Optional[str]:
+    """通过浏览器获取视频的真实URL"""
+    if not PLAYWRIGHT_AVAILABLE:
+        console.print("[yellow]⚠[/] Playwright不可用，跳过浏览器获取")
+        return None
+    try:
+        with sync_playwright() as p:
+            if edge_user_data_dir and os.path.exists(edge_user_data_dir):
+                console.print(f"[cyan]使用Edge用户数据目录: {edge_user_data_dir}[/]")
+                browser = p.chromium.launch_persistent_context(
+                    user_data_dir=edge_user_data_dir,
+                    headless=False,
+                    args=["--disable-blink-features=AutomationControlled"]
+                )
+                page = browser.pages[0] if browser.pages else browser.new_page()
+            else:
+                console.print("[cyan]启动新的Edge浏览器[/]")
+                browser = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
+                page = browser.new_page()
+
+            try:
+                page.set_extra_http_headers({
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Referer": "https://www.tiktok.com/"
+                })
+            except Exception as e:
+                console.print(f"[yellow]⚠[/] 设置HTTP头失败: {e}")
+
+            console.print(f"[cyan]正在打开页面: {page_url}[/]")
+            page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(3000)
+
+            try:
+                login_btn = page.query_selector('button:has-text("登录")')
+                if login_btn:
+                    console.print("[yellow]⚠[/] 检测到需要登录，请在浏览器中登录后按回车继续...")
+                    input("按回车继续...")
+                    page.wait_for_timeout(2000)
+            except:
+                pass
+
+            try:
+                page.wait_for_selector('video', timeout=10000)
+                console.print("[green]✓[/] 视频元素已加载")
+            except:
+                console.print("[yellow]⚠[/] 未找到视频元素")
+
+            video_url = None
+            try:
+                video_element = page.query_selector('video')
+                if video_element:
+                    src = video_element.get_attribute('src')
+                    if src:
+                        video_url = src
+                        console.print(f"[green]✓[/] 从video标签获取到URL: {src[:100]}...")
+
+                if not video_url:
+                    video_requests = []
+                    def handle_request(request):
+                        if any(ext in request.url.lower() for ext in ['.mp4', '.m3u8', 'video']):
+                            video_requests.append(request.url)
+                    page.on("request", handle_request)
+                    page.wait_for_timeout(5000)
+                    if video_requests:
+                        video_url = video_requests[-1]
+                        console.print(f"[green]✓[/] 从网络请求获取到URL: {video_url[:100]}...")
+
+                if not video_url:
+                    js_result = page.evaluate("""
+                        () => {
+                            const video = document.querySelector('video');
+                            if (video && video.src) return video.src;
+                            const scripts = document.querySelectorAll('script');
+                            for (let script of scripts) {
+                                const text = script.textContent;
+                                if (text && text.includes('video')) {
+                                    const match = text.match(/"(https?:\/\/[^"]*\.mp4[^"]*)"/);
+                                    if (match) return match[1];
+                                }
+                            }
+                            return null;
+                        }
+                    """)
+                    if js_result:
+                        video_url = js_result
+                        console.print(f"[green]✓[/] 从JavaScript获取到URL: {video_url[:100]}...")
+            except Exception as e:
+                console.print(f"[red]❌[/] 获取视频URL失败: {e}")
+
+            browser.close()
+            return video_url
+    except Exception as e:
+        console.print(f"[red]❌[/] 浏览器操作失败: {e}")
+        return None
+
+
+# ---------- 拉流（强制走管道，更稳） ----------
+def _ytdlp_base(args: list, cookies: Optional[str], proxy: Optional[str], ua: Optional[str],
+                referer: Optional[str]) -> list:
+    cmd = [sys.executable, "-m", "yt_dlp"]
+    cmd += ["--extractor-args", "tiktok:app_id=1233"]
+    if cookies: cmd += ["--cookies", cookies]
+    if proxy: cmd += ["--proxy", proxy]
+    if ua: cmd += ["--user-agent", ua]
+    if referer: cmd += ["--referer", referer]
+    cmd += args
+    return cmd
+
+
+def iter_audio_from_page_via_pipe(page_url: str, sample_rate: int, channels: int, chunk_sec: int,
+                                  cookies: Optional[str], proxy: Optional[str], ua: Optional[str],
+                                  referer: Optional[str]):
+    y_cmd = _ytdlp_base(["-f", "ba/bestaudio/best", "-o", "-", page_url], cookies, proxy, ua, referer)
+    console.print(f"[dim]yt-dlp 命令: {' '.join(y_cmd)}[/]")
+
+    y = subprocess.Popen(y_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    f_cmd = [FFMPEG, "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
+             "-vn", "-f", "s16le", "-ac", str(channels), "-ar", str(sample_rate), "pipe:1"]
+    console.print(f"[dim]ffmpeg 命令: {' '.join(f_cmd)}[/]")
+
+    env = os.environ.copy()
+    if proxy:
+        env["HTTP_PROXY"] = proxy
+        env["HTTPS_PROXY"] = proxy
+    f = subprocess.Popen(f_cmd, stdin=y.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+
+    bytes_per_sample = 2
+    bytes_per_sec = sample_rate * channels * bytes_per_sample
+    block_size = max(bytes_per_sec * chunk_sec, 4096)
+
+    chunk_count = 0
+    total_bytes = 0
+
+    try:
+        while True:
+            buf = f.stdout.read(block_size)
+            if not buf:
+                console.print(f"[dim]音频流结束，共读取 {chunk_count} 个块，{total_bytes} 字节[/]")
+                break
+            arr = np.frombuffer(buf, dtype=np.int16)
+            if arr.size == 0: break
+            chunk_count += 1
+            total_bytes += len(buf)
+            yield (arr.astype(np.float32) / 32768.0)
+    finally:
+        try:
+            if y.stdout: y.stdout.close()
+        except Exception:
+            pass
+        for p in (f, y):
+            try:
+                p.terminate()
+            except Exception:
+                pass
+            try:
+                p.wait(timeout=5)
+            except Exception:
+                pass
+        for tag, proc in (("yt-dlp", y), ("ffmpeg", f)):
+            try:
+                err_txt = proc.stderr.read().decode("utf-8", "ignore")
+                if err_txt:
+                    console.print(f"[red]{tag} 错误[/]: {err_txt.strip()[:500]}")
+            except Exception:
+                pass
+
+
+def build_audio_input(source: str, cookies: Optional[str], proxy: Optional[str], ua: Optional[str],
+                      referer: Optional[str], edge_user_data_dir: Optional[str] = None):
+    if not is_url(source):
+        console.print("[cyan]输入为本地文件路径[/]")
+        if not os.path.exists(source):
+            raise RuntimeError(f"本地文件不存在: {source}")
+        return source
+
+    if USE_BROWSER and edge_user_data_dir:
+        console.print("[cyan]尝试通过浏览器获取视频URL...[/]")
+        real_video_url = get_video_url_via_browser(source, edge_user_data_dir)
+        if real_video_url:
+            console.print(f"[green]✓[/] 获取到真实视频URL: {real_video_url[:100]}...")
+            source = real_video_url
+        else:
+            console.print("[yellow]⚠[/] 浏览器获取失败，使用原始URL")
+
+    console.print("[cyan]强制使用 yt-dlp → ffmpeg 管道[/]")
+    return iter_audio_from_page_via_pipe(source, sample_rate=16000, channels=1, chunk_sec=2,
+                                         cookies=cookies, proxy=proxy, ua=ua, referer=referer)
+
+
+def to_numpy_or_path(audio):
+    if isinstance(audio, (str, bytes, os.PathLike)):
+        console.print(f"[dim]使用本地音频文件: {audio}[/]")
+        return audio
+    if isinstance(audio, np.ndarray):
+        console.print(f"[dim]使用numpy数组，形状: {audio.shape}[/]")
+        return audio.astype(np.float32, copy=False)
+
+    console.print("[dim]处理音频流...[/]")
+    chunks = []
+    for i, chunk in enumerate(audio):
+        if not isinstance(chunk, np.ndarray):
+            raise TypeError("音频分块类型必须是 numpy.ndarray")
+        chunks.append(chunk.astype(np.float32, copy=False))
+        if i % 10 == 0:
+            console.print(f"[dim]已处理 {i + 1} 个音频块[/]")
+
+    if not chunks:
+        raise RuntimeError("未能从音频流读取到任何数据（可能需要 cookies/代理/UA）")
+
+    console.print(f"[dim]合并 {len(chunks)} 个音频块[/]")
+    result = np.concatenate(chunks, axis=0)
+    console.print(f"[dim]最终音频形状: {result.shape}[/]")
+
+    if result.size > 0:
+        rms = float(np.sqrt(np.mean(np.square(result))))
+        console.print(f"[dim]音频RMS: {rms:.6f}[/]")
+        if rms < 0.001:
+            console.print("[yellow]⚠[/] 警告：音频RMS很低，可能是静音")
+
+    return result
+
+
+# --- 仅保留“说话”片段（Silero VAD 过滤BGM） ---
+def extract_speech_only_from_any(audio_input) -> Optional[np.ndarray]:
+    """
+    入参: np.float32 一维PCM数组，或 本地文件路径
+    出参: np.float32 一维PCM（仅含语音），若无语音返回 None
+    """
+    if not HAVE_SILERO:
+        # 未加载VAD则直接回传原始
+        if isinstance(audio_input, np.ndarray):
+            return audio_input.astype("float32")
+        wav, sr = torchaudio.load(audio_input)
+        if wav.size(0) > 1:
+            wav = wav[:1]
+        if sr != 16000:
+            wav = torchaudio.functional.resample(wav, sr, 16000)
+        return wav.squeeze(0).numpy().astype("float32")
+
+    if isinstance(audio_input, np.ndarray):
+        wav = torch.from_numpy(audio_input).float().unsqueeze(0)  # [1, T]
+        sr = 16000
+    else:
+        wav, sr = torchaudio.load(audio_input)
+        if wav.size(0) > 1:
+            wav = wav[:1]
+        if sr != 16000:
+            wav = torchaudio.functional.resample(wav, sr, 16000)
+
+    mono = wav[0]
+    ts = get_speech_timestamps(
+        mono, _silero_model, sampling_rate=16000,
+        min_speech_duration_ms=200, min_silence_duration_ms=150,
+        window_size_samples=1024
+    )
+    if not ts:
+        return None
+    speech = collect_chunks(ts, mono)
+    return speech.numpy().astype("float32")
+
+
+# ---------- 核心：单视频转写（可被 workflow 直接调用） ----------
+def transcribe_one(
+        source: str,
+        outdir: str,
+        cookies: Optional[str] = None,
+        proxy: Optional[str] = None,
+        ua: Optional[str] = None,
+        referer: Optional[str] = None,
+        edge_user_data_dir: Optional[str] = None
+) -> Tuple[str, str, Optional[str]]:
+    """
+    返回: (txt_path, srt_path, csv_path或None)
+    """
+    console.print(f"[bold cyan]开始处理视频: {source}[/]")
+
+    if not os.path.isfile(FFMPEG):
+        raise RuntimeError(f"FFMPEG 不可用: {FFMPEG}")
+    console.print(f"[green]✓[/] FFMPEG 可用: {FFMPEG}")
+
+    is_local = os.path.isdir(MODEL_PATH)
+    if not is_local:
+        console.print(f"[yellow]⚠[/] 模型路径不存在，将下载: {MODEL_PATH}")
+    else:
+        console.print(f"[green]✓[/] 使用本地模型: {MODEL_PATH}")
+
+    console.rule(f"[bold cyan]Load model[/] {MODEL_PATH} ({DEVICE}/{COMPUTE_TYPE})")
+    try:
+        model = WhisperModel(MODEL_PATH, device=DEVICE, compute_type=COMPUTE_TYPE,
+                             num_workers=2, download_root="/Users/samxie/Research/Infound_Influencer/tiktok_partner_back/models", local_files_only=is_local)
+        console.print("[green]✓[/] 模型加载成功")
+    except Exception as e:
+        console.print(f"[red]❌[/] 模型加载失败: {e}")
+        raise
+
+    os.makedirs(outdir, exist_ok=True)
+    name = infer_name_from_source(source)
+    console.rule(f"[bold cyan]Transcribe[/] {name}")
+
+    console.print("[cyan]开始音频提取...[/]")
+    try:
+        audio_input = build_audio_input(source, cookies=cookies, proxy=proxy, ua=ua, referer=referer,
+                                        edge_user_data_dir=edge_user_data_dir)
+        audio_input = to_numpy_or_path(audio_input)
+        console.print(f"[green]✓[/] 音频提取成功")
+        console.print(f"[dim]音频长度（样本数）[/]: {audio_input.shape[0] if isinstance(audio_input, np.ndarray) else 'file'}")
+    except Exception as e:
+        console.print(f"[red]❌[/] 音频提取失败: {e}")
+        raise
+
+    # 语音-only 过滤（屏蔽BGM）
+    console.print("[cyan]进行语音VAD过滤（屏蔽背景音乐）...[/]")
+    speech_only = extract_speech_only_from_any(audio_input)
+    if speech_only is None or speech_only.size == 0:
+        console.print("[yellow]⚠[/] 未检测到“说话”语音，输出空字幕（可仅做评论/图像分析）")
+        lang_suffix = "en" if (LANG in ("en", "auto")) else LANG
+        srt_path = os.path.join(outdir, f"{name}.{lang_suffix}.srt")
+        txt_path = os.path.join(outdir, f"{name}.{lang_suffix}.txt")
+        with open(srt_path, "w", encoding="utf-8") as f: f.write("")
+        with open(txt_path, "w", encoding="utf-8") as f: f.write("")
+        return txt_path, srt_path, None
+
+    # Whisper转写（输入仅含语音）
+    console.print("[cyan]开始Whisper转写...[/]")
+    try:
+        segments, info = model.transcribe(
+            speech_only,                       # 仅语音
+            language=None if LANG == "auto" else LANG,
+            task="translate" if (USE_WHISPER_TRANSLATE and TRANSLATE_TO) else "transcribe",
+            vad_filter=True,
+            vad_parameters={"min_silence_duration_ms": 200, "speech_pad_ms": 80},
+            beam_size=5,
+            temperature=[0.0, 0.2],
+            word_timestamps=False,
+        )
+
+        raw_segments = [{"start": float(s.start), "end": float(s.end), "text": s.text} for s in segments]
+        console.print(f"[green]✓[/] Whisper转写完成，原始段落数: {len(raw_segments)}")
+
+        if not raw_segments:
+            console.print("[yellow]⚠[/] 没有可用语音文本，输出空字幕")
+            lang_suffix = "en" if (LANG in ("en", "auto")) else LANG
+            srt_path = os.path.join(outdir, f"{name}.{lang_suffix}.srt")
+            txt_path = os.path.join(outdir, f"{name}.{lang_suffix}.txt")
+            with open(srt_path, "w", encoding="utf-8") as f: f.write("")
+            with open(txt_path, "w", encoding="utf-8") as f: f.write("")
+            return txt_path, srt_path, None
+
+        for i, seg in enumerate(raw_segments[:3]):
+            console.print(f"[dim]段落 {i + 1}: [{seg['start']:.2f}-{seg['end']:.2f}] {seg['text'][:50]}...[/]")
+
+    except Exception as e:
+        console.print(f"[red]❌[/] Whisper转写失败: {e}")
+        raise
+
+    # 后处理
+    console.print("[cyan]开始后处理...[/]")
+    nice = resegment_nice(raw_segments, POST_MIN_GAP, POST_MIN_DUR, POST_MAX_DUR)
+    console.print(f"[green]✓[/] 后处理完成，最终段落数: {len(nice)}")
+
+    # 输出文件
+    lang_suffix = "en" if (LANG in ("en", "auto")) else LANG
+    srt_path = os.path.join(outdir, f"{name}.{lang_suffix}.srt")
+    txt_path = os.path.join(outdir, f"{name}.{lang_suffix}.txt")
+
+    compose_srt(nice, srt_path, LINE_CHARS, MAX_LINES)
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(s['text'].strip() for s in nice))
+    console.print(f"[green]✓[/] SRT: {srt_path}")
+    console.print(f"[green]✓[/] TXT: {txt_path}")
+
+    # 检查文件大小
+    srt_size = os.path.getsize(srt_path)
+    txt_size = os.path.getsize(txt_path)
+    console.print(f"[dim]文件大小: SRT={srt_size}字节, TXT={txt_size}字节[/]")
+
+    csv_path = None
+    if EXPORT_CSV:
+        csv_path = os.path.join(outdir, f"{name}.segments.csv")
+        pd.DataFrame([{
+            "index": i + 1,
+            "start": round(s["start"], 3),
+            "end": round(s["end"], 3),
+            "duration": round(s["end"] - s["start"], 3),
+            "text": s["text"].strip(),
+        } for i, s in enumerate(nice)]).to_csv(csv_path, index=False, encoding="utf-8-sig")
+        console.print(f"[green]✓[/] CSV: {csv_path}")
+
+    if TRANSLATE_TO:
+        zh_srt = os.path.join(outdir, f"{name}.{TRANSLATE_TO}.srt")
+        zh_txt = os.path.join(outdir, f"{name}.{TRANSLATE_TO}.txt")
+        if USE_WHISPER_TRANSLATE:
+            compose_srt(nice, zh_srt, LINE_CHARS, MAX_LINES)
+            with open(zh_txt, "w", encoding="utf-8") as f:
+                f.write("\n".join(s['text'].strip() for s in nice))
+            console.print(f"[green]✓[/] Whisper 翻译 SRT: {zh_srt}")
+        else:
+            trans = translate_segments(nice, TRANSLATE_TO)
+            compose_srt(trans, zh_srt, LINE_CHARS, MAX_LINES)
+            with open(zh_txt, "w", encoding="utf-8") as f:
+                f.write("\n".join(s['text'].strip() for s in trans))
+            console.print(f"[green]✓[/] Google 翻译 SRT: {zh_srt}")
+
+    return txt_path, srt_path, csv_path
+
+
+# ---------- CLI 入口（统一接口） ----------
+def main(args=None):
+    ap = argparse.ArgumentParser(description="提取/转写 TikTok 视频字幕（语音VAD过滤BGM）")
+    ap.add_argument("--video", action="append", required=True, help="可多次传入页面/媒体URL")
+    ap.add_argument("--outdir", required=True, help="输出目录")
+    ap.add_argument("--cookies", help="Netscape cookies.txt 路径（TikTok 常需）")
+    ap.add_argument("--proxy", help="代理，如 http://127.0.0.1:7890")
+    ap.add_argument("--ua", help="User-Agent 覆盖")
+    ap.add_argument("--referer", help="Referer 覆盖（如 https://www.tiktok.com/）")
+    ap.add_argument("--edge-user-data-dir", help="Edge用户数据目录，用于浏览器访问")
+    ap.add_argument("--no-browser", action="store_true", help="禁用浏览器访问")
+    if args is None:
+        args = ap.parse_args()
+
+    global USE_BROWSER
+    if args.no_browser:
+        USE_BROWSER = False
+
+    results = []
+    for src in args.video:
+        try:
+            txt_path, srt_path, csv_path = transcribe_one(
+                source=src,
+                outdir=args.outdir,
+                cookies=args.cookies,
+                proxy=args.proxy,
+                ua=args.ua,
+                referer=args.referer,
+                edge_user_data_dir=args.edge_user_data_dir
+            )
+            results.append({"video": src, "txt": txt_path, "srt": srt_path, "csv": csv_path})
+        except Exception as e:
+            console.print(f"[red]❌[/] 处理失败 {src}: {e}")
+            continue
+
+    console.print("[bold green]字幕提取完成[/]")
+    for r in results:
+        console.print(f" - {r['video']}\n   TXT: {r['txt']}\n   SRT: {r['srt']}\n   CSV: {r['csv']}")
+
+
+if __name__ == "__main__":
+    main()

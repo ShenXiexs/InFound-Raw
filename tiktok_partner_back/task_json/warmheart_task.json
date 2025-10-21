@@ -1,0 +1,28 @@
+{
+  "region": "MX",
+  "brand": {
+    "name": "WARMHEART",
+    "only_first": "0",
+    "key_word": ""
+  },
+  "search_strategy": {
+    "search_keywords": "",
+    "product_category": "Womenswear & Underwear, Sports & Outdoor",
+    "fans_age_range": "",
+    "fans_gender": "",
+    "min_fans": 1000,
+    "content_type": "",
+    "min_GMV": 100,
+    "min_sales": [],
+    "avg_views": 300,
+    "min_engagement_rate": 0
+  },
+  "email_first": {
+    "subject": "[WARMHEART Comision Alta] ¡Hola! 😁 Espero te encuentres muy bien.",
+    "email_body": "Mi nombre es Regina Villarreal, responsable de colaboraciones en INFound Mexico, una agencia de marketing certificada por TikTok. INFound colabora con marcas reconocidas como SHEIN y otras firmas internacionales.  \n\nRecientemente, WARMHEART se ha asociado con INFound para impulsar su línea de fajas moldeadoras, ropa cómoda y conjuntos femeninos, y creemos que tu estilo y tu comunidad encajan perfectamente con esta colaboración. 🌸  \n\n✨ Ventajas para ti:  \n🎁 Muestras gratuitas  \n💰 11 % de comisión (1 % más alta que una colaboración abierta)  \n\nSolo necesitas compartir tu experiencia con el producto — ¡y comenzarás a generar comisiones! 💰  \n\nSi te interesa unirte a los creadores que ya están ganando con WARMHEART, solo responde a este mensaje.  \n\n¡Estoy segura de que juntos haremos un gran contenido y te ayudaremos a ganar más dinero! 🚀  \n\n¡Un abrazo y gracias por tu tiempo!  \nRegina Villarreal,  \nResponsable de colaboraciones en INFound Mexico"
+  },
+  "email_later": {
+    "subject": "¡Hola! 👋",
+    "email_body": "Solo quería volver a contactarte para contarte que seguimos colaborando con WARMHEART, una marca enfocada en fajas moldeadoras, ropa cómoda y conjuntos casuales para mujer. 🌸  \n\nNos encantaría contar contigo en esta campaña — tu estilo encaja perfectamente con el tipo de contenido que buscamos.  \n\n🎁 Muestras gratuitas  \n💰 11 % de comisión (1 % más alta que una colaboración abierta)  \n\nSi te interesa, puedo enviarte el enlace para solicitar tu muestra y comenzar la colaboración. 🚀  \n\n¿Te gustaría que te lo comparta?"
+  }
+}
