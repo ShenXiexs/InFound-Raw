@@ -1,0 +1,39 @@
+{
+  "task_name": "稚宝科技挑战赛",
+  "region": "MX",
+  "brand": {
+    "name": "稚宝科技挑战赛",
+    "only_first": 0,
+    "key_word": ""
+  },
+  "product_name": "",
+  "product_id": "",
+  "campaign_id": "",
+  "campaign_name": "",
+  "search_strategy": {
+    "search_keywords": "",
+    "product_category": [
+      "Computers & Office Equipment"
+    ],
+    "fans_age_range": ["18-24", "25-34", "35-44", "55+"],
+    "fans_gender": "",
+    "min_fans": 1000,
+    "content_type": ["video", "live"],
+    "gmv": ["0-100", "100-1k", "1k-10k", "10k+"],
+    "sales": ["0-10", "10-100", "100-1k", "1k-10k+"],
+    "avg_views": 500,
+    "min_engagement_rate": 0
+  },
+  "email_first": {
+    "subject": "[💸Gana más con videos virales y altas comisiones]",
+    "email_body": "[💸Gana más con videos virales y altas comisiones]\n\n¡Hola creador/a! 👋\n\n🎯 Monster Family Challenge ya está aquí — una gran oportunidad para ganar altas comisiones y premios en efectivo.\n\n🦾 Tenemos auriculares, ratones y teclados de alta calidad, ¡todos con excelente tasa de conversión y alto potencial de ventas!\n👉 Puedes elegir 1–2 productos para colaborar.\n\n📸 Solo necesitas publicar 2-4 video de alta calidad (si haces live streaming, ¡aún mejor!).\nINFound te proporcionará una guía de grabación de videos virales, para ayudarte a crear contenido que realmente venda.\n\n🚀 Los mejores videos serán seleccionados por la marca para campañas GMV Max Ads (¡exposición masiva y más comisiones!).\n💰 Además, si tus pedidos superan 20 unidades, recibirás una recompensa en efectivo adicional.\n\n🤝 Si ya has colaborado con nosotros antes, ¡puedes volver a subir contenido con tus productos anteriores!\nTenemos muchos productos nuevos y de alto rendimiento esperándote.\n\n📩 ¿Te unes al reto?\n¡Envía tu selección de productos y comencemos hoy!\n\n#MonsterFamilyChallenge #INFound #TikTokMadeMeBuyIt #AltaComisión #VideoViral #GMVMax #CreatorsMX #ExploraTikTok"
+  },
+  "email_later": {
+    "subject": "[💸Gana más con videos virales y altas comisiones]",
+    "email_body": "[💸Gana más con videos virales y altas comisiones]\n\n¡Hola creador/a! 👋\n\n🎯 Monster Family Challenge ya está aquí — una gran oportunidad para ganar altas comisiones y premios en efectivo.\n\n🦾 Tenemos auriculares, ratones y teclados de alta calidad, ¡todos con excelente tasa de conversión y alto potencial de ventas!\n👉 Puedes elegir 1–2 productos para colaborar.\n\n📸 Solo necesitas publicar 2-4 video de alta calidad (si haces live streaming, ¡aún mejor!).\nINFound te proporcionará una guía de grabación de videos virales, para ayudarte a crear contenido que realmente venda.\n\n🚀 Los mejores videos serán seleccionados por la marca para campañas GMV Max Ads (¡exposición masiva y más comisiones!).\n💰 Además, si tus pedidos superan 20 unidades, recibirás una recompensa en efectivo adicional.\n\n🤝 Si ya has colaborado con nosotros antes, ¡puedes volver a subir contenido con tus productos anteriores!\nTenemos muchos productos nuevos y de alto rendimiento esperándote.\n\n📩 ¿Te unes al reto?\n¡Envía tu selección de productos y comencemos hoy!\n\n#MonsterFamilyChallenge #INFound #TikTokMadeMeBuyIt #AltaComisión #VideoViral #GMVMax #CreatorsMX #ExploraTikTok"
+  },
+  "target_new_creators": 1000,
+  "max_creators": 500,
+  "status": "completed",
+  "new_creators": 255
+}
