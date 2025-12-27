@@ -1,0 +1,59 @@
+{
+  "accounts": [
+    {
+      "name": "MX1",
+      "login_email": "mx1@example.com",
+      "login_password": "<ACCOUNT_PASSWORD>",
+      "gmail_username": "mx1@example.com",
+      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "region": "MX",
+      "creator_id": "00000000-0000-0000-0000-000000000001",
+      "enabled": true,
+      "notes": "MX region account"
+    },
+    {
+      "name": "MX2",
+      "login_email": "mx2@example.com",
+      "login_password": "<ACCOUNT_PASSWORD>",
+      "gmail_username": "mx2@example.com",
+      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "region": "MX",
+      "creator_id": "00000000-0000-0000-0000-000000000002",
+      "enabled": true,
+      "notes": "MX region account"
+    },
+    {
+      "name": "MX3",
+      "login_email": "mx3@example.com",
+      "login_password": "<ACCOUNT_PASSWORD>",
+      "gmail_username": "mx3@example.com",
+      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "region": "MX",
+      "creator_id": "00000000-0000-0000-0000-000000000003",
+      "enabled": true,
+      "notes": "MX region account"
+    },
+    {
+      "name": "EU1",
+      "login_email": "eu1@example.com",
+      "login_password": "<ACCOUNT_PASSWORD>",
+      "gmail_username": "eu1@example.com",
+      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "region": "MX",
+      "creator_id": "00000000-0000-0000-0000-000000000004",
+      "enabled": false,
+      "notes": "MX region account"
+    },
+    {
+      "name": "FR1",
+      "login_email": "fr1@example.com",
+      "login_password": "<ACCOUNT_PASSWORD>",
+      "gmail_username": "fr1@example.com",
+      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "region": "FR",
+      "creator_id": "00000000-0000-0000-0000-000000000005",
+      "enabled": true,
+      "notes": "FR region account"
+    }
+  ]
+}

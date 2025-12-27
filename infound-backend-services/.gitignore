@@ -1,0 +1,69 @@
+# ----------------------------------------------------
+# 1. IDE and editor config (PyCharm / macOS / VS Code)
+# ----------------------------------------------------
+
+# PyCharm/IntelliJ IDEA settings (always ignore)
+.idea/
+# Ignore .idea/, but keep run configs if your team shares them.
+# !.idea/runConfigurations/
+
+# macOS metadata
+.DS_Store
+
+# VS Code settings (for mixed IDE teams)
+.vscode/
+
+# ----------------------------------------------------
+# 2. Virtual environments (Venvs)
+# ----------------------------------------------------
+
+# Common virtual environment directories (do not commit environments)
+venv/
+env/
+.venv/
+build/
+develop-eggs/
+dist/
+
+# ----------------------------------------------------
+# 3. Python build and runtime artifacts
+# ----------------------------------------------------
+
+# Compiled Python bytecode and shared objects
+__pycache__/
+*.pyc
+*.pyd
+*.so
+*.egg-info/
+
+# ----------------------------------------------------
+# 4. Tooling and test caches
+# ----------------------------------------------------
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage reports
+.coverage
+
+# MyPy cache (common in Pydantic/FastAPI projects)
+.mypy_cache/
+
+# Flake8 cache
+.flake8
+
+# ----------------------------------------------------
+# 5. Sensitive files, logs, and databases
+# ----------------------------------------------------
+
+# Env files (contain API keys, DB passwords, etc. - never commit)
+.env
+.flaskenv
+*.secret
+
+# Logs
+*.log
+logs/
+
+# Local DB files (SQLite)
+*.sqlite3

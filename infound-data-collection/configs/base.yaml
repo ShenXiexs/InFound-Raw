@@ -1,0 +1,35 @@
+# Global base config (shared by all services)
+APP_NAME: "infound-data-collection"
+
+# MySQL base config
+MYSQL_CHARSET: "utf8mb4"
+MYSQL_PORT: 3306
+MYSQL_USER: "<MYSQL_USER>"
+MYSQL_HOST: "<MYSQL_HOST>"
+
+# Redis base config
+REDIS_DB: 0
+REDIS_URL: "redis://<REDIS_HOST>:<REDIS_PORT>/<REDIS_DB>"
+
+# Logging base config
+LOG_LEVEL: "INFO"
+LOG_FILE_MAX_SIZE: 10  # MB
+LOG_FILE_BACKUP_COUNT: 30  # keep 30 days
+LOG_DIR: "logs"
+
+
+# Shared RabbitMQ config (overridden by consumer-specific config)
+RABBITMQ:
+  HOST: "<RABBITMQ_HOST>"
+  PORT: 5672
+  USERNAME: "<RABBITMQ_USER>"
+  PASSWORD: "<RABBITMQ_PASSWORD>"
+  VHOST: "/<RABBITMQ_VHOST>"
+  PREFETCH_COUNT: 1
+  RECONNECT_DELAY: 5
+  MAX_RECONNECT_ATTEMPTS: 1
+
+CONSUMERS:
+  - "portal_tiktok_sample_crawler"
+  - "portal_tiktok_sample_crawler_html"
+  - "sample_chatbot"

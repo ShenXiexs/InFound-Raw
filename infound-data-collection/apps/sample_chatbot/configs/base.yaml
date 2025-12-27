@@ -1,0 +1,31 @@
+# Chatbot service defaults
+CHATBOT_ENABLED: true
+CHATBOT_POLL_INTERVAL_SECONDS: 15   # poll sample table every 15s for incremental updates
+CHATBOT_BATCH_SIZE: 20              # max 20 records per batch
+CHATBOT_PLATFORM: "tiktok"
+CHATBOT_DEFAULT_REGION: "MX"
+CHATBOT_ACCOUNT_NAME: null          # explicit account name; defaults to first available in region
+CHATBOT_MIN_PREFIX_LENGTH: 3        # username prefix length must be >= 3
+CHATBOT_MESSAGE_RETRY_LIMIT: 3
+CHATBOT_VERIFY_TIMEOUT_SECONDS: 8
+CHATBOT_INPUT_WAIT_TIMEOUT_SECONDS: 150  # wait up to 150s for chat input before skipping
+
+# Can be overridden at runtime
+PLAYWRIGHT_HEADLESS: true
+
+# Service token config (used for request filtering)
+INNER_API_AUTH:
+  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"
+  TOKEN: "<INNER_API_TOKEN>"
+
+INNER_API:
+  BASE_URL: "https://inner-api.example.com"
+  SAMPLE_PATH: "/samples/ingest"
+  TIMEOUT: 30
+
+RABBITMQ:
+  EXCHANGE_NAME: "chatbot.topic"
+  ROUTING_KEY: "chatbot.sample.*"
+  QUEUE_NAME: "chatbot.sample.queue.topic"
+  PREFETCH_COUNT: 1
+  AT_MOST_ONCE: true  # no retry: even failures are not reprocessed (still go to DLQ)

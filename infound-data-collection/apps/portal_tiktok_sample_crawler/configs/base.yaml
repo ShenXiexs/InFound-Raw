@@ -1,0 +1,42 @@
+# Service token config (used for request filtering)
+INNER_API_AUTH:
+  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"  # custom header name
+  VALID_TOKENS: [ "<INNER_API_TOKEN>" ]  # allowed token list
+
+INNER_API:
+  BASE_URL: "https://inner-api.example.com"
+  SAMPLE_PATH: "/samples/ingest"
+  TIMEOUT: 30
+
+RABBITMQ:
+  EXCHANGE_NAME: "crawler.direct"
+  PREFETCH_COUNT: 5  # allow multiple in-flight messages for concurrent Playwright sessions
+  AT_MOST_ONCE: true  # consume only once: no retry on crash/kill
+  COMPLETED:
+    ROUTING_KEY: "crawler.tiktok.sample.completed.key"
+    QUEUE_NAME: "crawler.tiktok.sample.completed.queue"
+  OTHER:
+    ROUTING_KEY: "crawler.tiktok.sample.other.key"
+    QUEUE_NAME: "crawler.tiktok.sample.other.queue"
+
+# Sample crawler specific configuration
+SAMPLE_TARGET_URL: "https://partner.tiktokshop.com/affiliate-campaign/sample-requests?tab=to_review"
+SAMPLE_LOGIN_URL: "https://partner-sso.tiktok.com/account/login?from=ttspc_logout&redirectURL=%2F%2Fpartner.tiktokshop.com%2Fhome&lang=en"
+SAMPLE_SEARCH_INPUT_SELECTOR: 'input[data-tid="m4b_input_search"]'
+SAMPLE_DEFAULT_REGION: "MX"
+SAMPLE_DEFAULT_OPERATOR_ID: "00000000-0000-0000-0000-000000000000"
+SAMPLE_LOGIN_EMAIL: ""
+SAMPLE_LOGIN_PASSWORD: ""
+SAMPLE_GMAIL_USERNAME: ""
+SAMPLE_GMAIL_APP_PASSWORD: ""
+SAMPLE_ACCOUNT_CONFIG_PATH: "configs/accounts.json"
+SAMPLE_DEFAULT_TAB: "all"
+SAMPLE_EXPAND_VIEW_CONTENT: true
+SAMPLE_ENABLE_EXCEL_EXPORT: false
+SAMPLE_EXPORT_DIR: "data/manage_sample"
+SAMPLE_VIEW_LOGISTICS_ENABLED: false
+SAMPLE_BROWSER_POOL_SIZE: 1  # number of warm browser instances at startup
+SAMPLE_BROWSER_POOL_MAX: 10   # max browsers; keep reuse and queue when busy
+SAMPLE_REUSE_MAIN_PAGE: true   # reuse the warm main page (avoid new windows)
+
+PLAYWRIGHT_HEADLESS: false

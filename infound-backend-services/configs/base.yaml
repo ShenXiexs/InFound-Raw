@@ -1,0 +1,51 @@
+# Global base config (shared by all services)
+APP_NAME: "infound-backend-service"
+DEBUG: true
+HOST: "0.0.0.0"
+
+# JWT base config
+JWT_ALGORITHM: "HS256"
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
+JWT_SECRET_KEY: "<JWT_SECRET_KEY>"
+
+# MySQL base config
+MYSQL_HOST: "<MYSQL_HOST>"
+MYSQL_PORT: 3306
+MYSQL_USER: "<MYSQL_USER>"
+MYSQL_PASSWORD: "<MYSQL_PASSWORD>"
+MYSQL_DB: "<MYSQL_DB>"  # update for your environment
+
+
+# Redis base config
+REDIS_HOST: "<REDIS_HOST>"
+REDIS_PORT: 6379
+REDIS_PASSWORD: "<REDIS_PASSWORD>"
+REDIS_DB: 0
+REDIS_PREFIX: "if.local"
+
+# Logging base config
+LOG_LEVEL: "INFO"
+LOG_FILE_MAX_SIZE: 10  # MB
+LOG_FILE_BACKUP_COUNT: 30  # keep 30 days
+LOG_DIR: "logs"
+
+# CORS base config
+CORS:
+  ALLOW_ORIGINS:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+  ALLOW_CREDENTIALS: true
+
+# Common business config
+COMMON_TIMEOUT: 30
+MAX_REQUEST_SIZE: 10485760  # 10MB
+
+# RabbitMQ config
+RABBITMQ_HOST: "<RABBITMQ_HOST>"
+RABBITMQ_PORT: 5672
+RABBITMQ_USER: "<RABBITMQ_USER>"
+RABBITMQ_PASSWORD: "<RABBITMQ_PASSWORD>"
+RABBITMQ_VHOST: "/<RABBITMQ_VHOST>"
+RABBITMQ_EXCHANGE: "chatbot.topic"
+RABBITMQ_QUEUE: "chatbot.sample.queue.topic"
+RABBITMQ_ROUTING_KEY_PREFIX: "chatbot.sample"

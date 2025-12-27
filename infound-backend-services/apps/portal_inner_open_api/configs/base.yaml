@@ -1,0 +1,13 @@
+# Service token config (used for request filtering)
+AUTH:
+  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"  # custom header name
+  VALID_TOKENS: [ "<INNER_API_TOKEN>" ]  # allowed token list
+
+# Chatbot message content config
+CHATBOT_SAMPLE_LINK_TEMPLATE: "https://creator.example.com/samples/{sampleId}"
+
+# Chatbot schedule publisher (inner API polls sample_chatbot_schedules and publishes to MQ)
+CHATBOT_SCHEDULE_PUBLISHER_ENABLED: true
+CHATBOT_SCHEDULE_POLL_INTERVAL_SECONDS: 15
+CHATBOT_SCHEDULE_BATCH_SIZE: 20
+CHATBOT_SCHEDULE_SUPPORTED_REGION: "MX"

@@ -1,0 +1,12 @@
+PLAYWRIGHT_HEADLESS: false
+
+# MySQL connection config (update for your env)
+MYSQL_HOST: "<MYSQL_HOST>"
+MYSQL_PORT: 3306
+MYSQL_USER: "<MYSQL_USER>"
+MYSQL_PASSWORD: "<MYSQL_PASSWORD>"
+MYSQL_DB: "<MYSQL_DB>"
+
+# Allow manual code input if IMAP fails (local debugging)
+MANUAL_EMAIL_CODE_INPUT: true
+MANUAL_EMAIL_CODE_INPUT_TIMEOUT_SECONDS: 300

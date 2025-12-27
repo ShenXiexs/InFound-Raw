@@ -1,0 +1,18 @@
+{
+    "from": "00000000-0000-0000-0000-000000000000",
+    "account_name": "MX1",
+    "region": "MX",
+    "sample_id": "00000000-0000-0000-0000-000000000000",
+    "scenario": "auto_ship_no_whatsapp",
+    "to": "<CREATOR_USERNAME>",  # non-exact match in creators table
+    "messages": [
+        {
+            "type": "text",
+            "messages": "<TEXT_MESSAGE>"
+        },
+        {
+            "type": "link",
+            "messages": "https://example.com"
+        }
+    ]
+}
