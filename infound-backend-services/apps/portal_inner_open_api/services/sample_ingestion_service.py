@@ -69,14 +69,14 @@ class SampleIngestionService:
         for row in rows:
             product_id = row.get("platform_product_id")
             if not product_id:
-                logger.warning("Skipping row missing platform_product_id: %s", row)
+                logger.warning("跳过缺少 platform_product_id 的行: %s", row)
                 continue
             products[product_id] = row
             if row.get("type"):
                 contents.append(row)
 
         if not products:
-            raise ValueError("No valid sample product data found")
+            raise ValueError("无法找到有效的样品商品数据")
 
         sample_snapshots: list[tuple[SampleSnapshot | None, SampleSnapshot]] = []
         for product_id, row in products.items():
@@ -92,6 +92,7 @@ class SampleIngestionService:
                 platform_product_id=existing.platform_product_id,
                 platform_creator_username=existing.platform_creator_username,
                 platform_creator_id=existing.platform_creator_id,
+                platform_creator_display_name=existing.platform_creator_display_name,
             )
             sample_snapshots.append((previous_snapshot, current_snapshot))
         for row in rows:
@@ -132,7 +133,7 @@ class SampleIngestionService:
                 )
 
         logger.info(
-            "Sample data persisted",
+            "样品数据入库完成",
             source=request.source,
             rows=len(rows),
             products=len(products),
@@ -218,7 +219,7 @@ class SampleIngestionService:
         operator_id: str,
         utc_now: datetime,
     ) -> Dict[str, Any]:
-        # Backward compatibility: accept 'video'/'live' and '1'/'2'
+        # 兼容历史数据：既支持 'video'/'live'，也支持 '1'/'2'
         content_type = self._safe_str(row.get("type"))
         normalized_type = None
         if content_type in {"video", "live"}:
@@ -285,6 +286,7 @@ class SampleIngestionService:
                 platform_product_id=existing.platform_product_id,
                 platform_creator_username=existing.platform_creator_username,
                 platform_creator_id=existing.platform_creator_id,
+                platform_creator_display_name=existing.platform_creator_display_name,
             )
             for key, value in payload.items():
                 if key in {"creator_id", "creation_time"}:
@@ -321,7 +323,7 @@ class SampleIngestionService:
         existing = matches[0] if matches else None
         if len(matches) > 1:
             logger.warning(
-                "Duplicate sample_contents detected; only the latest will be updated",
+                "sample_contents 检测到重复记录，将只更新最新一条",
                 platform_product_id=payload.get("platform_product_id"),
                 promotion_name=payload.get("promotion_name"),
                 promotion_time=payload.get("promotion_time"),

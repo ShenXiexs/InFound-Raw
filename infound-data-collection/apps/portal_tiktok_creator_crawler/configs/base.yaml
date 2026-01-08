@@ -1,0 +1,52 @@
+RABBITMQ:
+  EXCHANGE_NAME: "crawler.direct"
+  ROUTING_KEY: "crawler.tiktok.creator.key"
+  QUEUE_NAME: "crawler.tiktok.creator.queue"
+  PREFETCH_COUNT: 0
+  AT_MOST_ONCE: true
+
+# Inner API (creator ingestion)
+INNER_API_AUTH:
+  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"
+  VALID_TOKENS: [ "<INNER_API_TOKEN>" ]
+
+INNER_API:
+  BASE_URL: "<INNER_API_BASE_URL>"
+  CREATOR_PATH: "/creators/ingest"
+  OUTREACH_TASK_PATH: "/outreach_tasks/ingest"
+  CHATBOT_PATH: "/chatbot/messages"
+  OUTREACH_CHATBOT_PATH: "/chatbot/outreach/messages"
+  OUTREACH_CONTROL_PATH: "/chatbot/outreach/control"
+  CREATOR_HISTORY_PATH: "/creators/history"
+  OUTREACH_PROGRESS_PATH: "/outreach_tasks/progress"
+  TIMEOUT: 30
+
+# Creator crawler configuration
+CREATOR_TARGET_URL: "https://partner.tiktokshop.com/affiliate-cmp/creator?market=19"
+CREATOR_LOGIN_URL: "https://partner-sso.tiktok.com/account/login?from=ttspc_logout&redirectURL=%2F%2Fpartner.tiktokshop.com%2Fhome&lang=en&local_id=localID_Portal_88574979_1758691471679&userID=51267627&is_through_login=1"
+CREATOR_ACCOUNT_CONFIG_PATH: "configs/accounts.json"
+CREATOR_DEFAULT_REGION: "MX"
+CREATOR_LOGIN_EMAIL: ""
+CREATOR_LOGIN_PASSWORD: ""
+CREATOR_GMAIL_USERNAME: ""
+CREATOR_GMAIL_APP_PASSWORD: ""
+CREATOR_MAX_CREATORS_TO_LOAD: 400
+CREATOR_MAX_SCROLL_ATTEMPTS: 50
+
+# Search strategy defaults (override via env or MQ payload)
+CREATOR_SEARCH_KEYWORDS: ""
+CREATOR_PRODUCT_CATEGORY: []
+CREATOR_FANS_AGE_RANGE: []
+CREATOR_FANS_GENDER: ""
+CREATOR_MIN_FANS: 800
+CREATOR_CONTENT_TYPE: []
+CREATOR_GMV: []
+CREATOR_SALES: []
+CREATOR_AVG_VIEWS: 800
+CREATOR_MIN_ENGAGEMENT_RATE: 0
+
+# Login fallback
+MANUAL_EMAIL_CODE_INPUT: true
+MANUAL_EMAIL_CODE_INPUT_TIMEOUT_SECONDS: 180
+
+PLAYWRIGHT_HEADLESS: false

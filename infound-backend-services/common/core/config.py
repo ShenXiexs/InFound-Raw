@@ -7,20 +7,20 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# --- 1. Singleton state and custom errors ---
+# --- 1. 单例状态管理和自定义异常 ---
 
 class InitializationError(Exception):
     """Raised when trying to access settings before they are initialized."""
     pass
 
 
-# Global settings instance (singleton)
+# 全局配置实例，默认为 None
 _SETTINGS_INSTANCE: Optional['Settings'] = None
-# Whether settings have been initialized
+# 标记配置是否已成功初始化
 _SETTINGS_INITIALIZED: bool = False
 
 
-# --- 2. Helper functions ---
+# --- 2. 辅助函数（保持不变） ---
 
 def flatten_nested_config(config: Dict[str, Any], parent_key: str = "", separator: str = "__") -> Dict[str, Any]:
     """Flattens nested YAML configuration (e.g., CORS: {ALLOW_ORIGINS: [...]})"""
@@ -37,13 +37,13 @@ def flatten_nested_config(config: Dict[str, Any], parent_key: str = "", separato
 def load_yaml_config(file_path: Path) -> Dict[str, Any]:
     """Loads YAML configuration, handling nested structure."""
     if not file_path.exists():
-        return {}  # return empty if config is missing
+        return {}  # 配置文件不存在时返回空字典，而不是抛出 FileNotFoundError
     with open(file_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     return flatten_nested_config(config)
 
 
-# --- 3. Settings model ---
+# --- 3. 配置模型定义（Settings） ---
 
 class Settings(BaseSettings):
     """
@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     Note: Fields use flattened names (e.g., LOG__LEVEL).
     """
     # --------------------------
-    # Global base configuration
+    # Global Base Configuration
     # --------------------------
     DEBUG: bool = Field(default=True, validation_alias="DEBUG")
     APP_NAME: str = Field(default="FastAPI Service", validation_alias="APP_NAME")
@@ -61,19 +61,12 @@ class Settings(BaseSettings):
     HOST: str = Field(default="0.0.0.0", validation_alias="HOST")
     API_DOC_PREFIX: str = Field(default="/2025", validation_alias="API_DOC_PREFIX")
 
-    # JWT configuration
-    JWT_ALGORITHM: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
-        default=30, validation_alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES"
-    )
-    JWT_SECRET_KEY: str = Field(default="CHANGE_ME", validation_alias="JWT_SECRET_KEY")
-
     # MySQL Configuration
     MYSQL_HOST: str = Field(default="localhost", validation_alias="MYSQL_HOST")
     MYSQL_PORT: int = Field(default=3306, validation_alias="MYSQL_PORT")
     MYSQL_USER: str = Field(default="root", validation_alias="MYSQL_USER")
     MYSQL_PASSWORD: str = Field(default="", validation_alias="MYSQL_PASSWORD")
-    MYSQL_DB: str = Field(default="app_db", validation_alias="MYSQL_DB")
+    MYSQL_DB: str = Field(default="infound.stg", validation_alias="MYSQL_DB")
     MYSQL_CHARSET: str = Field(default="utf8mb4", validation_alias="MYSQL_CHARSET")
 
     # Redis Configuration
@@ -95,7 +88,7 @@ class Settings(BaseSettings):
     COMMON_TIMEOUT: int = Field(default=30, validation_alias="COMMON_TIMEOUT")
     MAX_REQUEST_SIZE: int = Field(default=10485760, validation_alias="MAX_REQUEST_SIZE")
 
-    # RabbitMQ Configuration
+    # RabbitMQ Configuration todo
     RABBITMQ_HOST: str = Field(default="", validation_alias="RABBITMQ_HOST")
     RABBITMQ_PORT: int = Field(default=5672, validation_alias="RABBITMQ_PORT")
     RABBITMQ_USER: str = Field(default="", validation_alias="RABBITMQ_USER")
@@ -104,6 +97,35 @@ class Settings(BaseSettings):
     RABBITMQ_EXCHANGE: str = Field(default="", validation_alias="RABBITMQ_EXCHANGE")
     RABBITMQ_QUEUE: str = Field(default="", validation_alias="RABBITMQ_QUEUE")
     RABBITMQ_ROUTING_KEY_PREFIX: str = Field(default="", validation_alias="RABBITMQ_ROUTING_KEY_PREFIX")
+    RABBITMQ_OUTREACH_QUEUE: str = Field(default="", validation_alias="RABBITMQ_OUTREACH_QUEUE")
+    RABBITMQ_OUTREACH_ROUTING_KEY_PREFIX: str = Field(
+        default="",
+        validation_alias="RABBITMQ_OUTREACH_ROUTING_KEY_PREFIX",
+    )
+    RABBITMQ_OUTREACH_QUEUE_PREFIX: str = Field(
+        default="",
+        validation_alias="RABBITMQ_OUTREACH_QUEUE_PREFIX",
+    )
+    RABBITMQ_OUTREACH_CONTROL_QUEUE: str = Field(
+        default="",
+        validation_alias="RABBITMQ_OUTREACH_CONTROL_QUEUE",
+    )
+    RABBITMQ_OUTREACH_CONTROL_ROUTING_KEY_PREFIX: str = Field(
+        default="",
+        validation_alias="RABBITMQ_OUTREACH_CONTROL_ROUTING_KEY_PREFIX",
+    )
+    RABBITMQ_CRAWLER_EXCHANGE: str = Field(
+        default="",
+        validation_alias="RABBITMQ_CRAWLER_EXCHANGE",
+    )
+    RABBITMQ_CRAWLER_ROUTING_KEY: str = Field(
+        default="",
+        validation_alias="RABBITMQ_CRAWLER_ROUTING_KEY",
+    )
+    RABBITMQ_CRAWLER_QUEUE: str = Field(
+        default="",
+        validation_alias="RABBITMQ_CRAWLER_QUEUE",
+    )
 
     # SQLAlchemy Asynchronous Connection URL
     @property
@@ -131,7 +153,7 @@ class Settings(BaseSettings):
         return v
 
 
-# --- 4. Initialize and access singleton ---
+# --- 4. 初始化和获取单例函数 ---
 
 def initialize_settings() -> 'Settings':
     """
@@ -144,20 +166,21 @@ def initialize_settings() -> 'Settings':
     if _SETTINGS_INITIALIZED:
         return _SETTINGS_INSTANCE
 
-    # 1. Resolve ENV and SERVICE_NAME (CLI > env vars > default)
+    # 1. 确定 ENV 和 SERVICE_NAME 的最终值（CLI > Env Var > Default）
+    # 在您的 main.py 中，consumer_arg 就是服务名 (SERVICE_NAME)
     final_env = os.getenv("ENV") or os.getenv("env") or "dev"
     final_service_name = os.getenv("SERVICE_NAME") or os.getenv("service_name")
 
     if not final_service_name:
         raise ValueError("Service name must be specified via --consumer argument or SERVICE_NAME environment variable.")
 
-    # 2. Define config file paths
+    # 2. 定义配置文件路径
     base_yaml_path = Path("configs/base.yaml")
     service_config_dir = Path(f"apps/{final_service_name}/configs")
     service_base_yaml_path = service_config_dir / f"base.yaml"
     service_yaml_path = service_config_dir / f"{final_env}.yaml"
 
-    # 3. Load and merge configs: base -> service base -> service env
+    # 3. 加载并合并配置：基础 → 服务基础 → 服务环境（后面覆盖前面）
     base_config = load_yaml_config(base_yaml_path)
     service_base_config = load_yaml_config(service_base_yaml_path)
     service_config = load_yaml_config(service_yaml_path)
@@ -165,13 +188,16 @@ def initialize_settings() -> 'Settings':
     merged_config = {**base_config, **service_base_config, **service_config, 'SERVICE_NAME': final_service_name,
                      'ENV': final_env}
 
-    # 4. Instantiate Settings (env vars override)
+    # 4. 动态添加 SERVICE_NAME 和 ENV 到配置中
+    # Pydantic Settings 需要这些值，即使它们不来自 YAML 或 ENV。
+
+    # 5. 实例化 Settings，Pydantic 会自动处理环境变量覆盖
     try:
         instance = Settings(**merged_config)
     except Exception as e:
         raise InitializationError(f"Failed to validate and instantiate settings: {e}") from e
 
-    # 5. Store singleton instance
+    # 6. 存储实例并标记初始化完成
     _SETTINGS_INSTANCE = instance
     _SETTINGS_INITIALIZED = True
 

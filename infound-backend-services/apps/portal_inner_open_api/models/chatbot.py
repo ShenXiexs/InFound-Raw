@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,3 +50,40 @@ class ChatbotDispatchResult(BaseModel):
     )
 
     count: int = Field(..., description="Number of tasks published")
+
+
+class OutreachChatbotTask(BaseModel):
+    """Outreach chatbot task payload (message content decided by chatbot)."""
+
+    model_config = ConfigDict(
+        extra="allow",
+        alias_generator=_to_camel,
+        populate_by_name=True,
+    )
+
+    task_id: Optional[str] = None
+    outreach_task_id: Optional[str] = None
+    region: Optional[str] = None
+    platform_creator_id: str = Field(..., min_length=1)
+    platform_creator_username: Optional[str] = None
+    platform_creator_display_name: Optional[str] = None
+    creator_name: Optional[str] = None
+    creator_username: Optional[str] = None
+    account_name: Optional[str] = None
+    operator_id: Optional[str] = None
+    brand_name: Optional[str] = None
+    only_first: Optional[Any] = None
+    task_metadata: Optional[Dict[str, Any]] = None
+
+
+class OutreachChatbotControlRequest(BaseModel):
+    """Control message to start/stop per-task outreach chatbot consumer."""
+
+    model_config = ConfigDict(
+        extra="allow",
+        alias_generator=_to_camel,
+        populate_by_name=True,
+    )
+
+    action: Literal["start", "end"] = Field(..., min_length=1)
+    task_id: str = Field(..., min_length=1)

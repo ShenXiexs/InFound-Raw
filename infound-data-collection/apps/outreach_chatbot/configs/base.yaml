@@ -1,0 +1,30 @@
+# Outreach chatbot service defaults
+CHATBOT_ENABLED: true
+CHATBOT_DEFAULT_REGION: "MX"
+CHATBOT_INPUT_WAIT_TIMEOUT_SECONDS: 150
+OUTREACH_CHATBOT_WORKER_COUNT: 3
+
+# Reuse account config used by crawler/chatbot
+SAMPLE_ACCOUNT_CONFIG_PATH: "configs/accounts.json"
+
+# 运行时可覆盖
+PLAYWRIGHT_HEADLESS: true
+
+INNER_API_AUTH:
+  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"
+  TOKEN: "<INNER_API_TOKEN>"
+
+INNER_API:
+  BASE_URL: "<INNER_API_BASE_URL>"
+  CREATOR_PATH: "/creators/ingest"
+  CREATOR_HISTORY_PATH: "/creators/history"
+  OUTREACH_TASK_PATH: "/outreach_tasks/ingest"
+  OUTREACH_PROGRESS_PATH: "/outreach_tasks/progress"
+  TIMEOUT: 30
+
+RABBITMQ:
+  EXCHANGE_NAME: "chatbot.topic"
+  ROUTING_KEY: "chatbot.outreach.*"
+  QUEUE_NAME: "chatbot.outreach.queue.topic"
+  PREFETCH_COUNT: 3
+  AT_MOST_ONCE: false

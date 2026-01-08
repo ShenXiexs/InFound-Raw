@@ -323,7 +323,7 @@ class ChatbotDispatcherService:
 
     def _base_domain_for_region(self, region: str) -> str:
         region_upper = str(region or "").upper()
-        if region_upper in {"FR"}:
+        if region_upper in {"FR", "ES"}:
             return "partner.eu.tiktokshop.com"
         return "partner.tiktokshop.com"
 
@@ -352,6 +352,7 @@ class ChatbotDispatcherService:
         market_mapping = {
             "MX": "19",
             "FR": "17",
+            "ES": "14",
         }
         market_id = market_mapping.get(region_upper, "19")
 
@@ -421,12 +422,34 @@ class ChatbotDispatcherService:
             'div[contenteditable="true"]',
         ]
 
+    async def _dismiss_verify_bar(self, page) -> None:
+        if not page or page.is_closed():
+            return
+        selectors = [
+            "#verify-bar-close",
+            "a.verify-bar-close",
+            'a[aria-label="Close"][id="verify-bar-close"]',
+        ]
+        for selector in selectors:
+            try:
+                close_btn = page.locator(selector).first
+                if await close_btn.count() == 0:
+                    continue
+                if not await close_btn.is_visible():
+                    continue
+                await close_btn.click(timeout=1000)
+                await page.wait_for_timeout(200)
+                return
+            except Exception:
+                continue
+
     async def _wait_for_chat_input(self, page, *, timeout_seconds: int) -> bool:
         if not page or page.is_closed():
             return False
         deadline = asyncio.get_running_loop().time() + max(int(timeout_seconds), 0)
         selectors = self._chat_input_selectors()
         while asyncio.get_running_loop().time() < deadline:
+            await self._dismiss_verify_bar(page)
             for selector in selectors:
                 try:
                     locator = page.locator(selector).first
@@ -450,6 +473,7 @@ class ChatbotDispatcherService:
         selectors = self._chat_input_selectors()
         for selector in selectors:
             try:
+                await self._dismiss_verify_bar(page)
                 locator = page.locator(selector).first
                 if await page.locator(selector).count() == 0:
                     continue
@@ -467,6 +491,7 @@ class ChatbotDispatcherService:
             except Exception:
                 continue
         try:
+            await self._dismiss_verify_bar(page)
             await page.evaluate(
                 """(value) => {
                     const ta = document.querySelector(

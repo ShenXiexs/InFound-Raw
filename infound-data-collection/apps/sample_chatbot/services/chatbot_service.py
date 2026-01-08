@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.core.config import get_settings
 from common.core.database import get_db
 from common.core.logger import get_logger
-from common.models.all import Samples
+from common.models.all import Samples, SampleCrawlLogs
 from common.mq.connection import RabbitMQConnection
 
 logger = get_logger()
@@ -74,6 +74,22 @@ def _is_ad_code_empty(ad_code: Any) -> bool:
         return len(ad_code) == 0
     if isinstance(ad_code, dict):
         return len(ad_code) == 0
+    return False
+
+
+def _has_video_in_content_summary(content_summary: Any) -> bool:
+    """检查 content_summary 中是否有 type 为 video 的数据"""
+    if not content_summary:
+        return False
+    if isinstance(content_summary, dict):
+        content_summary = [content_summary]
+    if isinstance(content_summary, list):
+        for item in content_summary:
+            if not isinstance(item, dict):
+                continue
+            item_type = item.get("type")
+            if item_type == "video":
+                return True
     return False
 
 
@@ -231,7 +247,7 @@ class SampleChatbotService:
             await self._deactivate(session, row.id)
             return
 
-        if not self._is_schedule_valid(row.scenario, sample):
+        if not await self._is_schedule_valid(session, row.scenario, sample):
             await self._deactivate(session, row.id)
             return
 
@@ -252,7 +268,7 @@ class SampleChatbotService:
         result = await session.execute(select(Samples).where(Samples.id == sample_id).limit(1))
         return result.scalars().first()
 
-    def _is_schedule_valid(self, scenario: str, sample: Samples) -> bool:
+    async def _is_schedule_valid(self, session: AsyncSession, scenario: str, sample: Samples) -> bool:
         status = _normalize_status(getattr(sample, "status", None))
         if scenario == self.SCENARIO_SHIPPED:
             return status == self.STATUS_SHIPPED
@@ -261,8 +277,56 @@ class SampleChatbotService:
         if scenario == self.SCENARIO_NO_CONTENT_POSTED:
             return status == self.STATUS_COMPLETED and _is_empty_content_summary(getattr(sample, "content_summary", None))
         if scenario == self.SCENARIO_MISSING_AD_CODE:
-            return _is_ad_code_empty(getattr(sample, "ad_code", None))
+            # 检查条件：检查新入库的 sample 数据
+            # 条件1和2: 先验证 SampleCrawlLogs 表中存在对应记录
+            has_crawl_log = await self._check_crawl_log_exists(
+                session,
+                platform_product_id=getattr(sample, "platform_product_id", None),
+                platform_creator_display_name=getattr(sample, "platform_creator_display_name", None),
+            )
+            if not has_crawl_log:
+                return False
+            
+            # 条件3: Samples.content_summary 里有 type 为 video 的数据
+            # 条件4: Samples.ad_code 为 null
+            content_summary = getattr(sample, "content_summary", None)
+            ad_code = getattr(sample, "ad_code", None)
+            has_video = _has_video_in_content_summary(content_summary)
+            ad_code_empty = _is_ad_code_empty(ad_code)
+            return has_video and ad_code_empty
         return False
+
+    async def _check_crawl_log_exists(
+        self,
+        session: AsyncSession,
+        *,
+        platform_product_id: Optional[str],
+        platform_creator_display_name: Optional[str],
+    ) -> bool:
+        """
+        验证 SampleCrawlLogs 表中是否存在对应记录（通过 platform_product_id 和 platform_creator_display_name）。
+        需要满足两个条件：
+        1. SampleCrawlLogs.platform_product_id == Samples.platform_product_id
+        2. SampleCrawlLogs.platform_creator_display_name == Samples.platform_creator_display_name
+        """
+        if not platform_product_id or not platform_creator_display_name:
+            return False
+
+        # 查询最新的记录
+        stmt = select(
+            SampleCrawlLogs.id,
+        ).where(
+            SampleCrawlLogs.platform_product_id == platform_product_id,
+            SampleCrawlLogs.platform_creator_display_name == platform_creator_display_name,
+        ).order_by(
+            SampleCrawlLogs.crawl_date.desc(),
+            SampleCrawlLogs.creation_time.desc(),
+        ).limit(1)
+
+        result = await session.execute(stmt)
+        row = result.first()
+
+        return row is not None
 
     async def _publish(self, payload: Dict[str, Any]) -> None:
         await self.publisher_conn.connect()

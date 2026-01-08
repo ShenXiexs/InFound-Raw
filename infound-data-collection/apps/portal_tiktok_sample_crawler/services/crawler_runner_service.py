@@ -99,7 +99,7 @@ def _sanitize_decimal(value: Optional[str]) -> Optional[Decimal]:
         return Decimal(text)
     except (ValueError, InvalidOperation):
         try:
-            # Handle truncated amounts, e.g., "$157.93 ..." / "p... 1351.57"
+            # 兼容金额/截断展示，例如 "$157.93 ..." / "p... 1351.57"
             match = re.search(r"[-+]?\d*\.?\d+", text)
             if match:
                 return Decimal(match.group())
@@ -158,9 +158,9 @@ def _format_order_expired_time(value: Any) -> str:
         return "--"
     if raw < 0:
         raw = 0
-    # TikTok API may return seconds or milliseconds; use a conservative heuristic:
-    # - < 10_000_000 (~115 days in seconds) -> treat as seconds
-    # - otherwise -> treat as milliseconds
+    # TikTok 接口里该字段有时以秒返回，有时以毫秒返回；这里做一个保守的自适应：
+    # - 小于 10_000_000（~115 天的秒数）时按“秒”处理（常见为几天内的秒数）
+    # - 否则按“毫秒”处理
     seconds = raw // 1000 if raw >= 10_000_000 else raw
     days = seconds // (3600 * 24)
     if days >= 1:
@@ -170,15 +170,15 @@ def _format_order_expired_time(value: Any) -> str:
 
 
 def _clean_promotion_earn_text(value: Optional[str]) -> str:
-    """Normalize UI truncation (e.g., p... / p…) and extra whitespace."""
+    """兼容 UI 截断（例如 p... / p…）以及多余空白。"""
     if value is None:
         return ""
     text = str(value).strip()
     if not text:
         return ""
-    # Older UI can show prefixes like `p... 1351.57`
+    # 旧版页面会出现类似 `p... 1351.57` 的截断前缀
     text = re.sub(r"(?i)\bp(\.\.\.|…)\s*", "", text).strip()
-    # Sometimes appears in the middle; strip when possible
+    # 有些情况下会出现在中间，尽量清掉
     text = text.replace("p...", "").replace("p…", "").strip()
     return text
 
@@ -220,13 +220,13 @@ class CrawlerRunnerService:
         self._initialize_lock = asyncio.Lock()
         self._view_content_counter = 0
         self._task_deadline: Optional[float] = None
-        # Table pagination current page index (for recovery after stalls/refresh).
+        # 样品列表分页（table pagination）当前页号：用于卡死/刷新后的恢复。
         self._table_page_index = 1
-        # Reuse the warm main page to avoid opening new windows during tasks.
+        # 如需避免任务时新开窗口，可通过配置 SAMPLE_REUSE_MAIN_PAGE=True 复用预热主页面
         self.reuse_main_page_for_tasks = bool(
             getattr(settings, "SAMPLE_REUSE_MAIN_PAGE", True)
         )
-        # Task-level stop flag (can be triggered by caller)
+        # 任务级停止标记，可由上层请求终止当前任务
         self.stop_event = asyncio.Event()
         self.service_name = getattr(settings, "CONSUMER", "portal_tiktok_sample_crawler") or "portal_tiktok_sample_crawler"
         inner_api_token = (
@@ -284,28 +284,28 @@ class CrawlerRunnerService:
         self.view_logistics_default = bool(
             getattr(settings, "SAMPLE_VIEW_LOGISTICS_ENABLED", False)
         )
-        # Performance pacing (conservative defaults; override via env)
+        # 性能/节奏控制（默认偏保守，可通过环境变量覆盖）
         self.search_settle_wait_ms = int(getattr(settings, "SAMPLE_SEARCH_SETTLE_WAIT_MS", 1200) or 1200)
         self.view_content_open_timeout_ms = int(getattr(settings, "SAMPLE_VIEW_CONTENT_OPEN_TIMEOUT_MS", 6000) or 6000)
         self.view_content_tab_settle_ms = int(getattr(settings, "SAMPLE_VIEW_CONTENT_TAB_SETTLE_MS", 250) or 250)
-        # View content tabs (video/live) may render progressively; wait briefly for the second tab.
-        # Avoid missing Video when Live renders first.
+        # View content 抽屉里的 tab（video/live）可能是“渐进渲染”的：先出现一个 tab，再延迟出现第二个。
+        # 为了避免只抓到默认打开的 LIVE 而漏抓 Video，这里给出一个“二次 tab 出现等待窗口”（毫秒）。
         self.view_content_tabs_grace_ms = int(getattr(settings, "SAMPLE_VIEW_CONTENT_TABS_GRACE_MS", 5500) or 5500)
-        # View content per-tab and total timeout limits (ms)
+        # View content 抽屉的“单 tab 处理/切换”与“总耗时”上限（毫秒）
         self.view_content_tab_timeout_ms = int(
             getattr(settings, "SAMPLE_VIEW_CONTENT_TAB_TIMEOUT_MS", 8000) or 8000
         )
         self.view_content_total_timeout_ms = int(
             getattr(settings, "SAMPLE_VIEW_CONTENT_TOTAL_TIMEOUT_MS", 20000) or 20000
         )
-        # Recovery strategy for stalled pagination (refresh -> step back to target page)
+        # 分页卡死后的恢复策略（刷新后从第 1 页逐页点回目标页）
         self.table_page_recover_max_attempts = int(
             getattr(settings, "SAMPLE_TABLE_PAGE_RECOVER_MAX_ATTEMPTS", 5) or 5
         )
         self.table_page_recover_reload_timeout_ms = int(
             getattr(settings, "SAMPLE_TABLE_PAGE_RECOVER_RELOAD_TIMEOUT_MS", 60_000) or 60_000
         )
-        # Max runtime per MQ task (seconds); default 12 hours.
+        # 单条消息（MQ task）最大运行时长（秒）。默认 12 小时。
         self.message_timeout_seconds = int(
             getattr(settings, "SAMPLE_MESSAGE_TIMEOUT_SECONDS", 12 * 60 * 60) or (12 * 60 * 60)
         )
@@ -337,7 +337,24 @@ class CrawlerRunnerService:
                 self.tab_slug_lookup[alias] = slug
                 self.tab_key_lookup[alias] = key
         self.iterable_tab_keys: List[str] = ["review", "ready", "shipped", "pending", "completed", "canceled"]
-        self.manual_login_default = bool(getattr(settings, "SAMPLE_MANUAL_LOGIN", False))
+        manual_login_default = getattr(settings, "CHATBOT_MANUAL_LOGIN", None)
+        if manual_login_default is None:
+            manual_login_default = getattr(settings, "SAMPLE_MANUAL_LOGIN", False)
+        self.manual_login_default = bool(manual_login_default)
+        manual_email_code_input = getattr(settings, "CHATBOT_MANUAL_EMAIL_CODE_INPUT", None)
+        if manual_email_code_input is None:
+            manual_email_code_input = getattr(settings, "SAMPLE_MANUAL_EMAIL_CODE_INPUT", False)
+        manual_email_code_input_timeout = getattr(
+            settings, "CHATBOT_MANUAL_EMAIL_CODE_INPUT_TIMEOUT_SECONDS", None
+        )
+        if manual_email_code_input_timeout is None:
+            manual_email_code_input_timeout = getattr(
+                settings, "SAMPLE_MANUAL_EMAIL_CODE_INPUT_TIMEOUT_SECONDS", 180
+            )
+        self.manual_email_code_input = bool(manual_email_code_input)
+        self.manual_email_code_input_timeout_seconds = int(
+            manual_email_code_input_timeout or 180
+        )
 
         self.account_profile: Optional[AccountProfile] = self._select_account(
             region=self.default_region, account_name=None
@@ -347,6 +364,8 @@ class CrawlerRunnerService:
             login_url=self.login_url,
             search_input_selector=self.search_input_selector,
             manual_login_default=self.manual_login_default,
+            manual_email_code_input=self.manual_email_code_input,
+            manual_email_code_input_timeout_seconds=self.manual_email_code_input_timeout_seconds,
         )
         self._active_tab_name: Optional[str] = None
         self._active_tab_slug: Optional[str] = None
@@ -368,11 +387,10 @@ class CrawlerRunnerService:
         )
 
     def has_live_session(self) -> bool:
-        """Check whether the session is still reusable.
+        """判断会话是否仍可复用。
 
-        When the Playwright driver/transport is disconnected, Python objects may look
-        non-null but any locator/page operation will raise
-        `Connection closed while reading from the driver`. Detect early when possible.
+        Playwright driver/transport 断开时，Python 侧对象可能仍“非空”，但任何 locator/page 操作都会报
+        `Connection closed while reading from the driver`；这里尽量提前识别这类失效会话。
         """
         if not (self._playwright and self._browser and self._context):
             return False
@@ -382,7 +400,7 @@ class CrawlerRunnerService:
             return False
 
     def describe_session_state(self) -> Dict[str, Any]:
-        """Describe session state for pool reuse debugging."""
+        """提供可观测的会话状态，用于排查池复用问题。"""
         state: Dict[str, Any] = {
             "playwright": bool(self._playwright),
             "browser": bool(self._browser),
@@ -408,66 +426,66 @@ class CrawlerRunnerService:
         return any(needle in text for needle in needles)
 
     async def _reset_on_login_failure(self, reason: str, exc: Optional[Exception] = None) -> None:
-        logger.warning("Login state check failed; resetting Playwright session", reason=reason, error=str(exc) if exc else None)
+        logger.warning("登录状态验证失败，重置 Playwright 会话", reason=reason, error=str(exc) if exc else None)
         try:
             await self.close()
         except Exception:
-            logger.warning("Failed to reset Playwright session", exc_info=True)
+            logger.warning("重置 Playwright 会话失败", exc_info=True)
 
     async def ensure_ready(self, options: CrawlOptions) -> None:
         desired_profile = self._select_account(options.region, options.account_name)
         await self._ensure_profile_session(desired_profile)
 
     async def ensure_account_session(self, region: Optional[str], account_name: Optional[str]) -> None:
-        """Lightweight wrapper for login-only reuse."""
+        """轻量封装，供其他服务只依赖登录态时复用。"""
         desired_profile = self._select_account(region or self.default_region, account_name)
         await self._ensure_profile_session(desired_profile)
 
     async def _ensure_profile_session(self, desired_profile: AccountProfile) -> None:
         if not self.has_live_session():
-            raise PlaywrightError("Playwright session is missing or closed; recreate via pool manager")
+            raise PlaywrightError("Playwright 会话不存在或已被关闭，请通过池管理器重新创建")
 
         if self.account_profile and desired_profile.login_email != self.account_profile.login_email:
-            raise PlaywrightError("Current login account does not match task requirements")
+            raise PlaywrightError("当前浏览器登录账号与任务要求不一致")
 
-        # Record profile on first bind; validate consistency later
+        # 如果是第一次绑定 profile，则记录下来，后续只校验一致性
         if not self.account_profile:
             self.account_profile = desired_profile
-        # Update operator_id for persistence
+        # 更新 operator_id 以在持久化时使用
         if desired_profile and desired_profile.creator_id:
             self.operator_id = desired_profile.creator_id
 
-        # Verify login state; retry login on existing browser instead of rebuilding
+        # 确认登录态可用；使用现有浏览器重试登录而不是重建实例
         try:
             await self.ensure_main_page()
         except Exception as exc:
-            await self._reset_on_login_failure("Failed to initialize main page", exc)
-            raise PlaywrightError("Login state check failed; rebuild session") from exc
+            await self._reset_on_login_failure("初始化主页面失败", exc)
+            raise PlaywrightError("登录态检查失败，需要重建浏览器会话") from exc
 
         try:
             logged_in = await self.login_manager.is_logged_in(self._main_page)
         except Exception as exc:
-            await self._reset_on_login_failure("Login state check error", exc)
-            raise PlaywrightError("Login state check error; rebuild session") from exc
+            await self._reset_on_login_failure("登录状态检查异常", exc)
+            raise PlaywrightError("登录态检查异常，需要重建浏览器会话") from exc
 
         if not logged_in:
             try:
                 await self._perform_login(self._main_page)
                 logged_in = await self.login_manager.is_logged_in(self._main_page)
             except Exception as exc:
-                await self._reset_on_login_failure("Login failed or could not be verified", exc)
-                raise PlaywrightError("Login failed; rebuild session") from exc
+                await self._reset_on_login_failure("登录失败或无法验证登录状态", exc)
+                raise PlaywrightError("登录失败，需要重建浏览器会话") from exc
 
             if not logged_in:
-                await self._reset_on_login_failure("Login verified failed after login")
-                raise PlaywrightError("Login state cannot be verified; rebuild session")
+                await self._reset_on_login_failure("登录后仍无法验证登录状态")
+                raise PlaywrightError("登录状态无法验证，需要重建浏览器会话")
 
     async def ensure_main_page(self) -> Page:
-        """Ensure self._main_page exists and return it."""
+        """确保 self._main_page 可用并返回它。"""
         context = self.get_browser_context()
         if not self._main_page or self._main_page.is_closed():
             self._main_page = await context.new_page()
-        # Lightweight health check: fail early if driver is closed.
+        # 轻量健康检查：driver 断开时尽早失败，让外层池管理器重建会话，避免任务中途报 pipe/connection closed。
         try:
             await self._main_page.evaluate("1")
         except Exception as exc:
@@ -486,7 +504,7 @@ class CrawlerRunnerService:
         return self._context
 
     async def new_page(self) -> Page:
-        """Get a new logged-in Page for other flows."""
+        """用于其他功能快速获取一个登陆后的 Page。"""
         context = self.get_browser_context()
         return await context.new_page()
 
@@ -498,7 +516,7 @@ class CrawlerRunnerService:
             raise PlaywrightError("Gmail credentials missing for verification flow")
 
         try:
-            logger.info("Initializing Playwright", HeaderLess=self.headless)
+            logger.info("初始化 Playwright", HeaderLess=self.headless)
 
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(headless=self.headless)
@@ -535,7 +553,7 @@ class CrawlerRunnerService:
         await self.ingestion_client.aclose()
 
     async def process_campaign_task(self, payload: Dict[str, Any]) -> None:
-        logger.info("Starting sample crawler task", payload=payload)
+        logger.info("启动 sample crawler 任务", payload=payload)
 
         timeout_seconds = self._resolve_message_timeout_seconds(payload)
         self._task_deadline = time.monotonic() + timeout_seconds if timeout_seconds else None
@@ -559,7 +577,7 @@ class CrawlerRunnerService:
             else:
                 campaign_ids = [None]
             primary_tab_slug = self._tab_slug_for(options.tabs[0]) if options.tabs else None
-            # Navigate to sample page before task starts (avoid landing on home)
+            # 任务开始先统一跳转到样品页，避免停留在首页
             await self._goto_sample_dashboard(crawler_page, options.region, primary_tab_slug)
             if not self._tab_snapshot:
                 await self._capture_tab_snapshot(crawler_page)
@@ -577,11 +595,11 @@ class CrawlerRunnerService:
                             await self._search_campaign(crawler_page, campaign_id)
                         else:
                             await self._clear_search(crawler_page)
-                        # Wait for table refresh (avoid excessive fixed sleep)
+                        # 等待表格刷新：避免固定 sleep 过长造成整体任务慢
                         await crawler_page.wait_for_timeout(self.search_settle_wait_ms)
                         total_pages = await self._determine_total_pages(crawler_page)
                         logger.info(
-                            "Preparing to crawl Campaign %s, tab=%s, total_pages=%s",
+                            "准备爬取 Campaign %s, tab=%s, 检测到总页数=%s",
                             campaign_id or "(all)",
                             tab_name,
                             total_pages,
@@ -597,14 +615,14 @@ class CrawlerRunnerService:
                     except Exception:
                         logger.error("Tab crawl failed; skipping", exc_info=True, tab=tab_name, campaign_id=campaign_id)
                         continue
-                # Clear search box for next campaign
+                # 清空搜索框，为下一个 campaign 做准备
                 try:
                     await self._clear_search(crawler_page)
                 except Exception:
                     pass
 
             if not all_rows and (options.campaign_id or options.campaign_ids):
-                logger.info("No matching Campaign results found; task complete")
+                logger.info("未找到任何匹配的 Campaign 结果，任务完成")
                 return
             if not all_rows:
                 raise MessageProcessingError("No rows found for the requested task")
@@ -615,7 +633,7 @@ class CrawlerRunnerService:
             logger.error("Campaign processing failed", exc_info=True)
             return
         finally:
-            # Note: do not return to home on task errors; pool release handles it.
+            # 注意：不要在任务中途异常时回到首页；由上层会话池释放阶段统一处理回首页。
             if not reuse_main:
                 await crawler_page.close()
             self._task_deadline = None
@@ -636,7 +654,7 @@ class CrawlerRunnerService:
             return False
         if not self.stop_event.is_set():
             self.stop_event.set()
-            logger.warning("Task timed out; stopping crawl")
+            logger.warning("单条消息运行超时，停止继续爬取")
         return True
 
     async def _perform_login(self, page: Page) -> None:
@@ -722,11 +740,11 @@ class CrawlerRunnerService:
             await page.goto(target, wait_until="networkidle", timeout=60_000)
         if not await self.login_manager.is_logged_in(page):
             await self._perform_login(page)
-        # Wait for page to stabilize and confirm sample page
+        # 等待页面稳定并确认已到样品页
         try:
             await page.wait_for_selector('text="Manage samples"', timeout=60_000)
         except Exception:
-            # Final fallback: if marker missing, navigate again
+            # 最后兜底：如仍未看到标识，再跳转一次
             try:
                 async with page.expect_response(
                     lambda resp: self._is_partner_sample_records_url(resp.url),
@@ -884,7 +902,7 @@ class CrawlerRunnerService:
         region: Optional[str] = None,
         wait_ms: int = 5000,
     ) -> None:
-        """Used during release: avoid relying on home DOM to prevent wait_for_selector stalls."""
+        """释放阶段使用：尽量不依赖首页 DOM 结构判定，避免卡死在 wait_for_selector。"""
         home_url = self._home_url_for_region(region)
         try:
             await page.goto(home_url, wait_until="domcontentloaded", timeout=20_000)
@@ -949,7 +967,7 @@ class CrawlerRunnerService:
                 count = await inputs.count()
                 search_input = inputs.nth(1) if count > 1 else inputs.first
 
-                # Ensure filter is set to Campaign ID
+                # 确认筛选条件是 Campaign ID
                 try:
                     combobox = page.locator("div.m4b-input-group-select div[role='combobox']").first
                     if await combobox.count():
@@ -966,7 +984,7 @@ class CrawlerRunnerService:
                         timeout=20_000,
                     ) as resp_info:
                         await search_input.press("Enter")
-                        # Click magnifier to ensure search triggers
+                        # 额外点击放大镜以确保触发搜索
                         try:
                             suffix = search_input.locator(
                                 "xpath=ancestor::span[contains(@class,'arco-input-group')]"
@@ -1029,7 +1047,7 @@ class CrawlerRunnerService:
         *,
         target_page_index: int,
     ) -> bool:
-        """Recover from stuck pagination: refresh -> go to page 1 -> step to target page."""
+        """分页卡死/点击无响应时的恢复：刷新页面 -> 回到第 1 页 -> 逐页点回目标页。"""
         target_page_index = max(1, int(target_page_index or 1))
         tab_slug = self._tab_slug_for(tab_name)
 
@@ -1038,7 +1056,7 @@ class CrawlerRunnerService:
                 raise MessageProcessingError("Task cancelled by request")
 
             logger.warning(
-                "Pagination error; attempting refresh and recovery",
+                "分页异常，尝试刷新并恢复到目标页",
                 extra={
                     "recover_attempt": attempt + 1,
                     "recover_max": self.table_page_recover_max_attempts,
@@ -1047,7 +1065,7 @@ class CrawlerRunnerService:
                 },
             )
 
-            # Refresh resets View content tab counters; reset local counter too
+            # 刷新会导致 View content 的 arco-tabs 计数重置，因此也同步重置本地计数器
             self._view_content_counter = 0
             self._latest_sample_records_payload = None
             self._latest_sample_records_request_url = None
@@ -1055,7 +1073,7 @@ class CrawlerRunnerService:
             try:
                 await page.reload(wait_until="networkidle", timeout=self.table_page_recover_reload_timeout_ms)
             except Exception:
-                # If reload fails, fall back to goto_sample_dashboard
+                # reload 失败时，走 goto_sample_dashboard 兜底
                 pass
 
             try:
@@ -1067,16 +1085,16 @@ class CrawlerRunnerService:
                     await self._clear_search(page)
                 await page.wait_for_timeout(self.search_settle_wait_ms)
             except Exception:
-                logger.warning("Failed to recover sample page after refresh; retrying", exc_info=True)
+                logger.warning("刷新后恢复到样品页失败，重试中", exc_info=True)
                 await asyncio.sleep(1)
                 continue
 
             current_page = await self._get_current_table_page_index(page) or 1
             self._table_page_index = current_page
             if current_page != 1:
-                logger.info("Refresh did not return to page 1; resuming from current page", current_page=current_page)
+                logger.info("刷新后未回到第 1 页，将从当前页继续恢复", current_page=current_page)
 
-            # Step through pages to reach target
+            # 逐页点到目标页
             while current_page < target_page_index:
                 if self.stop_event.is_set():
                     raise MessageProcessingError("Task cancelled by request")
@@ -1089,7 +1107,7 @@ class CrawlerRunnerService:
                 self._table_page_index = current_page
 
             if current_page == target_page_index:
-                logger.info("Recovered to target page", target_page_index=target_page_index, tab_name=tab_name)
+                logger.info("已恢复到目标页", target_page_index=target_page_index, tab_name=tab_name)
                 return True
 
             await asyncio.sleep(1)
@@ -1106,7 +1124,7 @@ class CrawlerRunnerService:
     ) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
         page_index = 1
-        # If total_pages provided, iterate strictly to that count
+        # 如果提供总页数，则严格按照该数量遍历，不再额外多翻页
         total_pages_limit = total_pages or None
         status_label = self.tab_mapping.get(tab_name.lower(), tab_name)
         detected_page = await self._get_current_table_page_index(page)
@@ -1132,7 +1150,7 @@ class CrawlerRunnerService:
                     for row in page_rows
                     if target in (row.get("platform_campaign_id") or row.get("campaign_id") or "")
                 ]
-            # Persist after each page to reduce long-task risk
+            # 每页抓取后即时持久化，减少长任务风险
             if page_rows:
                 normalized = self._normalize_rows(page_rows)
                 if normalized:
@@ -1142,7 +1160,7 @@ class CrawlerRunnerService:
                         logger.error("Persist results failed; keep crawling", exc_info=True)
                     rows.extend(normalized)
 
-            # With campaign_id, page until completion or max_pages
+            # 当存在 campaign_id 时，默认翻页直到结束或达到 max_pages
             if not campaign_id and not options.scan_all_pages:
                 break
 
@@ -1150,7 +1168,7 @@ class CrawlerRunnerService:
                 break
             if total_pages_limit and page_index >= total_pages_limit:
                 logger.info(
-                    "Completed all detected pages; current=%s total=%s",
+                    "已完成全部检测到的页数, 当前页=%s total=%s",
                     page_index,
                     total_pages_limit,
                 )
@@ -1188,7 +1206,7 @@ class CrawlerRunnerService:
     ) -> List[Dict[str, Any]]:
         if view_logistics:
             logger.warning(
-                "portal_tiktok_sample_crawler only supports Partner API sample list/content; logistics disabled"
+                "portal_tiktok_sample_crawler 当前仅支持通过 Partner API 抓取样品列表/内容，暂不抓取 logistics"
             )
 
         payload = await self._ensure_sample_records_payload(page)
@@ -1296,7 +1314,8 @@ class CrawlerRunnerService:
             data["post_rate"] = ""
 
         try:
-            # Column position may shift; prefer scanning row for Yes/No, then fallback to fixed index.
+            # 该列在不同账号/页面版本里可能会变更列位置（例如在第 5 列出现 Yes/No）
+            # 优先在整行里寻找明确的 Yes/No 文本，再回退到固定列索引。
             showcase_value = ""
             cells = row_element.locator("td")
             cell_count = await cells.count()
@@ -1485,7 +1504,7 @@ class CrawlerRunnerService:
         if not await view_btn.count():
             return results
 
-        # Counter aligns with dynamic arco-tabs IDs; advance even if open fails to avoid drift.
+        # 计数器用于兼容 arco-tabs 动态 id。即使本次没打开成功，也应前进一格，避免后续错位。
         self._view_content_counter += 1
 
         overlay: Optional[Locator] = None
@@ -1511,7 +1530,7 @@ class CrawlerRunnerService:
 
             detected_tab_id = await self._detect_arco_tabs_id(overlay)
             if detected_tab_id is not None:
-                # Keep counter aligned with actual arco-tabs ID to avoid mismatches.
+                # 保持计数器与页面实际 arco-tabs id 对齐，避免后续探测失败时走错 id。
                 self._view_content_counter = max(self._view_content_counter, detected_tab_id)
 
             candidate_ids: List[int] = []
@@ -1537,7 +1556,7 @@ class CrawlerRunnerService:
                     break
 
             if not tabs_info:
-                # Fallback: capture only the active tab/panel (no waits, no forced switching)
+                # 兜底：只抓当前已激活的 tab/panel（不等待，不强求切换成功）
                 try:
                     active = overlay.locator('[role="tab"][aria-selected="true"][id^="arco-tabs-"][id*="-tab-"]').first
                     active_id = await active.get_attribute("id")
@@ -1605,8 +1624,8 @@ class CrawlerRunnerService:
 
     async def _wait_for_overlay_panel(self, page: Page, timeout: int = 15_000) -> Optional[Locator]:
         deadline = time.monotonic() + timeout / 1000
-        # TikTok drawers/modals often rely on class/animation, not inline display styles.
-        # Use is_visible() instead of style filtering.
+        # 注意：TikTok 页面上的 drawer/modal 往往不会在 style 里显式写 `display: block`，
+        # 而是依靠 class/动画；因此这里不再依赖 style 过滤，仅用 `is_visible()` 判定。
         selectors = [".arco-drawer", ".arco-modal"]
         while time.monotonic() < deadline:
             for selector in selectors:
@@ -1620,7 +1639,7 @@ class CrawlerRunnerService:
                     try:
                         if not await candidate.is_visible():
                             continue
-                        # Confirm this is the View content drawer (not other modals)
+                        # 尽量确认是 View content 的抽屉，而不是其它弹窗
                         has_tabs = False
                         try:
                             has_tabs = bool(
@@ -1630,7 +1649,7 @@ class CrawlerRunnerService:
                             has_tabs = False
                         if has_tabs:
                             return candidate
-                        # Fallback: handle brief window where text exists but tabs are not rendered
+                        # fallback: 兼容文案存在但 tab 尚未渲染的短暂窗口
                         try:
                             if await candidate.get_by_text("Content details").count():
                                 return candidate
@@ -1872,9 +1891,9 @@ class CrawlerRunnerService:
         *,
         overlay: Optional[Locator] = None,
     ) -> List[Dict[str, Any]]:
-        """Collect video/live tab metadata from the View content drawer.
+        """收集 View content 抽屉里的 video/live tab 信息。
 
-        NOTE: Hidden historical drawer DOM may remain; prefer searching within overlay.
+        注意：页面上可能残留历史 drawer DOM（隐藏态），因此优先在 overlay 范围内查找。
         """
         tabs: List[Dict[str, Any]] = []
         root: Union[Page, Locator] = overlay or page
@@ -1918,7 +1937,7 @@ class CrawlerRunnerService:
                     "tab_index": tab_index,
                     "tab_dom_id": tab_dom_id,
                     "panel_dom_id": panel_dom_id,
-                    # Use absolute xpath for promotion extraction (other helpers rely on it).
+                    # 提取 promotion 数据时仍使用绝对 xpath（其余函数拼接依赖它）
                     "tab_xpath": f'//*[@id="{tab_dom_id}"]',
                     "panel_xpath": f'//*[@id="{panel_dom_id}"]',
                 }
@@ -1927,8 +1946,8 @@ class CrawlerRunnerService:
         return tabs
 
     async def _detect_arco_tabs_id(self, overlay: Locator) -> Optional[int]:
-        """Detect the dynamic arco-tabs ID within an overlay."""
-        # Infer tab_id from the active tab to avoid hidden drawer DOM interference.
+        """从 overlay 内部探测当前 arco-tabs 组件的动态 id。"""
+        # 优先从“当前激活 tab”反推出 tab_id，避免页面上残留的隐藏 drawer DOM 干扰计数结果。
         try:
             active_id = await overlay.locator(
                 '[role="tab"][aria-selected="true"][id^="arco-tabs-"][id*="-tab-"]'
@@ -1964,7 +1983,7 @@ class CrawlerRunnerService:
             counts[number] = counts.get(number, 0) + 1
         if not counts:
             return None
-        # Multiple tabs components may exist; pick the most frequent, tie-break by larger id.
+        # 同一 overlay 内可能存在多个 tabs 组件；优先选择出现次数最多的，次数相同则取 tab_id 更大的。
         return max(counts.items(), key=lambda item: (item[1], item[0]))[0]
 
     async def _wait_for_content_tabs(
@@ -1980,7 +1999,7 @@ class CrawlerRunnerService:
         best: List[Dict[str, Any]] = []
         best_types: Set[str] = set()
         first_seen_at: Optional[int] = None
-        # tab-1 often renders later; wait briefly after first tab to catch the second.
+        # tab-1 往往会稍晚渲染；在首次看到 tab 后额外等待一小段时间，避免漏掉第二个 tab。
         grace_attempts = max(1, int(self.view_content_tabs_grace_ms / max(wait_ms, 1)))
         effective_attempts = max(attempts, grace_attempts + 2)
         root: Union[Page, Locator] = overlay or page
@@ -1996,7 +2015,7 @@ class CrawlerRunnerService:
                 if len(current_types) > len(best_types):
                     best = tabs
                     best_types = current_types
-                # If both video/live are detected, tabs are fully rendered.
+                # 若同时识别到 video/live，则认为 tab 已完整渲染
                 if "video" in current_types and "live" in current_types:
                     return tabs
                 if first_seen_at is None:
@@ -2004,7 +2023,7 @@ class CrawlerRunnerService:
                 elif attempt_index - first_seen_at >= grace_attempts:
                     return best
             else:
-                # Sometimes DOM exists before text renders; do not rely solely on tab list.
+                # 有些场景下 tab dom id 已经出现但文本未渲染，避免完全依赖 tabs 列表出现才开始 grace 计时。
                 if first_seen_at is None:
                     try:
                         exists = bool(
@@ -2029,7 +2048,7 @@ class CrawlerRunnerService:
             close_deadline: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         drawer_rows: List[Dict[str, Any]] = []
-        # Keep fixed order: video -> live (even if UI order differs).
+        # 保持固定顺序：video -> live（即使 UI tab 顺序不同）
         type_order = {"video": 0, "live": 1}
         ordered_tabs = sorted(
             tabs_info,
@@ -2099,7 +2118,7 @@ class CrawlerRunnerService:
             try:
                 await asyncio.wait_for(_run_one_tab(), timeout=tab_budget_s)
             except asyncio.TimeoutError:
-                logger.warning("View content single-tab timeout; skipping tab", tab_type=tab_info.get("type"))
+                logger.warning("View content 单 tab 处理超时，跳过该 tab", tab_type=tab_info.get("type"))
                 continue
             except Exception:
                 continue
@@ -2130,7 +2149,7 @@ class CrawlerRunnerService:
 
         max_pages = 20
         if expected_total_int:
-            # Heuristic: View content usually paginates by 10; avoid over-paging
+            # 经验值：View content 抽屉通常按 10 条分页，避免过度翻页
             max_pages = min(max_pages, max(1, (expected_total_int + 9) // 10))
 
         for _ in range(max_pages):
@@ -2174,7 +2193,7 @@ class CrawlerRunnerService:
                 timeout_ms=3_000,
             )
             if not changed and marker:
-                # Avoid waiting if page content did not change after click
+                # 点击翻页后内容没有变化，避免无意义重复等待
                 break
 
         return collected
@@ -2541,7 +2560,7 @@ class CrawlerRunnerService:
         csv_path = self.export_dir / f"{file_stem}.csv"
         export_df.to_excel(xlsx_path, index=False)
         export_df.to_csv(csv_path, index=False)
-        logger.info("Exported %s sample rows to %s and %s", len(export_df), xlsx_path, csv_path)
+        logger.info("导出 %s 行样品数据到 %s 和 %s", len(export_df), xlsx_path, csv_path)
 
     async def _click_tab(self, page: Page, tab_name: str) -> None:
         target_text = self.tab_mapping.get(tab_name.lower(), tab_name)
@@ -2612,19 +2631,19 @@ class CrawlerRunnerService:
             locator = page.locator(f"xpath={xpath}")
             if await locator.count() == 0:
                 return ""
-            # Avoid explicit waits: DOM changes and hidden nodes can cause false stalls.
+            # 不做显式 wait：DOM 结构经常变化/切 tab 后节点被隐藏，等待会造成“看似已加载但卡住”。
             return (await locator.first.inner_text()).strip()
         except Exception:
             return ""
 
     async def _extract_metric_value(self, page: Page, metrics_base: str, metric_index: int) -> str:
-        """Extract metrics from View content; supports video/live DOM variants."""
+        """从 View content 的 metrics 区块提取数值，兼容 video/live 两套 DOM 结构。"""
         candidates = [
             f"{metrics_base}/div[{metric_index}]/div[2]/div",
             f"{metrics_base}/div[{metric_index}]/div[2]/span/div",
             f"{metrics_base}/div[{metric_index}]/div[2]/div/span",
             f"{metrics_base}/div[{metric_index}]/div[2]/div/div",
-            # Some live layouts put values directly in div[2] (no child div/span)
+            # 有些 live 布局数值直接在 div[2] 上（无子 div/span）
             f"{metrics_base}/div[{metric_index}]/div[2]",
         ]
         for xpath in candidates:
@@ -2640,10 +2659,10 @@ class CrawlerRunnerService:
             disabled_attr = await next_btn.get_attribute("aria-disabled")
             class_attr = (await next_btn.get_attribute("class")) or ""
             disabled = (disabled_attr == "true") or ("arco-pagination-item-disabled" in class_attr)
-            logger.debug("Pagination check: next_btn disabled=%s class=%s attr=%s", disabled, class_attr, disabled_attr)
+            logger.debug("分页检测: next_btn disabled=%s class=%s attr=%s", disabled, class_attr, disabled_attr)
             return not disabled
         except Exception as exc:
-            logger.debug("Pagination check failed; assume no next page: %s", exc)
+            logger.debug("分页检测失败，视为无下一页: %s", exc)
             return False
 
     async def _goto_next_page(self, page: Page) -> bool:
@@ -2661,18 +2680,18 @@ class CrawlerRunnerService:
                     response = await resp_info.value
                     await self._update_sample_records_context(response)
                 except PlaywrightTimeoutError as exc:
-                    logger.debug("Timed out waiting for next page sample records: %s", exc)
+                    logger.debug("捕获下一页 sample records 请求超时: %s", exc)
                     await asyncio.sleep(1)
                     continue
                 await page.wait_for_timeout(3000)
-                # Wait for new page data to render
+                # 等待新一页数据渲染
                 try:
                     await page.wait_for_selector("tbody tr", timeout=15_000)
                 except Exception:
                     pass
                 return True
             except Exception as exc:
-                logger.debug("Failed to click next page (attempt %s): %s", attempt + 1, exc)
+                logger.debug("点击下一页失败（第 %s 次）: %s", attempt + 1, exc)
                 await asyncio.sleep(1)
         return False
 
@@ -2814,7 +2833,7 @@ class CrawlerRunnerService:
         if isinstance(campaign_ids_payload, list):
             campaign_ids = [str(cid).strip() for cid in campaign_ids_payload if str(cid).strip()]
         elif isinstance(campaign_ids_payload, str):
-            # Handle string payloads: single id or comma-separated ids
+            # 兼容脚本误传字符串：支持单个 id 或逗号分隔的多个 id
             text = campaign_ids_payload.strip()
             if text:
                 parts = [part.strip() for part in re.split(r"[,\n\r\t ]+", text) if part.strip()]

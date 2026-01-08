@@ -1,51 +1,61 @@
-# Global base config (shared by all services)
+# 全局基础配置（所有服务共用）
 APP_NAME: "infound-backend-service"
 DEBUG: true
 HOST: "0.0.0.0"
 
-# JWT base config
+# JWT 基础配置
 JWT_ALGORITHM: "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
-JWT_SECRET_KEY: "<JWT_SECRET_KEY>"
 
-# MySQL base config
+# MySQL 基础配置
 MYSQL_HOST: "<MYSQL_HOST>"
-MYSQL_PORT: 3306
+MYSQL_PORT: 8801
+# MYSQL_USER: "infound-stg"
+# MYSQL_DB: "infound.stg"
+# MYSQL_PASSWORD: "&3$BSW)mGxE(Zk"
 MYSQL_USER: "<MYSQL_USER>"
 MYSQL_PASSWORD: "<MYSQL_PASSWORD>"
-MYSQL_DB: "<MYSQL_DB>"  # update for your environment
+MYSQL_DB: "<MYSQL_DB>"  # 按实际数据库名称调整
 
 
-# Redis base config
+# Redis 基础配置
 REDIS_HOST: "<REDIS_HOST>"
-REDIS_PORT: 6379
+REDIS_PORT: 8802
 REDIS_PASSWORD: "<REDIS_PASSWORD>"
 REDIS_DB: 0
-REDIS_PREFIX: "if.local"
+REDIS_PREFIX: "if.stg"
 
-# Logging base config
+# 日志基础配置
 LOG_LEVEL: "INFO"
 LOG_FILE_MAX_SIZE: 10  # MB
-LOG_FILE_BACKUP_COUNT: 30  # keep 30 days
+LOG_FILE_BACKUP_COUNT: 30  # 保留30天
 LOG_DIR: "logs"
 
-# CORS base config
+# 跨域基础配置
 CORS:
   ALLOW_ORIGINS:
     - "http://localhost:3000"
     - "http://127.0.0.1:3000"
   ALLOW_CREDENTIALS: true
 
-# Common business config
+# 通用业务配置
 COMMON_TIMEOUT: 30
 MAX_REQUEST_SIZE: 10485760  # 10MB
 
-# RabbitMQ config
+# RabbitMQ 配置
 RABBITMQ_HOST: "<RABBITMQ_HOST>"
-RABBITMQ_PORT: 5672
+RABBITMQ_PORT: 8803
 RABBITMQ_USER: "<RABBITMQ_USER>"
 RABBITMQ_PASSWORD: "<RABBITMQ_PASSWORD>"
-RABBITMQ_VHOST: "/<RABBITMQ_VHOST>"
+RABBITMQ_VHOST: "<RABBITMQ_VHOST>"
 RABBITMQ_EXCHANGE: "chatbot.topic"
 RABBITMQ_QUEUE: "chatbot.sample.queue.topic"
 RABBITMQ_ROUTING_KEY_PREFIX: "chatbot.sample"
+RABBITMQ_OUTREACH_QUEUE: "chatbot.outreach.queue.topic"
+RABBITMQ_OUTREACH_ROUTING_KEY_PREFIX: "chatbot.outreach"
+RABBITMQ_OUTREACH_QUEUE_PREFIX: "chatbot.outreach.queue"
+RABBITMQ_OUTREACH_CONTROL_QUEUE: "chatbot.outreach.control.queue"
+RABBITMQ_OUTREACH_CONTROL_ROUTING_KEY_PREFIX: "chatbot.outreach.control"
+RABBITMQ_CRAWLER_EXCHANGE: "crawler.direct"
+RABBITMQ_CRAWLER_ROUTING_KEY: "crawler.tiktok.creator.key"
+RABBITMQ_CRAWLER_QUEUE: "crawler.tiktok.creator.queue"

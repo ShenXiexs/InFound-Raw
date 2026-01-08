@@ -219,7 +219,8 @@ class ChatbotSchedulePublisher:
         creator_whatsapp = await self._load_creator_whatsapp(
             session, getattr(sample, "platform_creator_id", None)
         )
-        messages = chatbot_message_builder.build_messages(
+        messages = await chatbot_message_builder.build_messages(
+            session=session,
             scenario=row.scenario,
             sample=sample,
             creator_whatsapp=creator_whatsapp,

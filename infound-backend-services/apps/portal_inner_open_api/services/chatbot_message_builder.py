@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from common.core.config import get_settings
+from common.models.infound import Products
 
 
 @dataclass(frozen=True)
@@ -24,32 +28,40 @@ class ChatbotMessageBuilder:
             getattr(
                 settings,
                 "CHATBOT_SAMPLE_LINK_TEMPLATE",
-                "https://creator.example.com/samples/{sampleId}",
+                "https://creator.infound.ai/samples/{sampleId}",
             )
-            or "https://creator.example.com/samples/{sampleId}"
+            or "https://creator.infound.ai/samples/{sampleId}"
         )
 
-    def build_messages(
+    async def build_messages(
         self,
         *,
+        session: AsyncSession,
         scenario: str,
         sample: Any,
         creator_whatsapp: Optional[str],
     ) -> List[dict]:
         normalized = str(scenario or "").strip().lower()
         if normalized == self.SCENARIO_SHIPPED:
-            return self._shipped(sample, creator_whatsapp)
+            return await self._shipped(session, sample, creator_whatsapp)
         if normalized == self.SCENARIO_CONTENT_PENDING:
-            return self._content_pending(sample)
+            return await self._content_pending(session, sample)
         if normalized == self.SCENARIO_NO_CONTENT_POSTED:
-            return self._no_content_posted(sample)
+            return await self._no_content_posted(session, sample)
         if normalized == self.SCENARIO_MISSING_AD_CODE:
-            return self._missing_ad_code(sample)
+            return await self._missing_ad_code(session, sample)
         return []
 
-    def _product_block(self, sample: Any) -> str:
-        product_name = str(getattr(sample, "platform_campaign_name", "") or "").strip()
+    async def _product_block(self, session: AsyncSession, sample: Any) -> str:
         product_id = str(getattr(sample, "platform_product_id", "") or "").strip()
+        product_name = ""
+        if product_id:
+            result = await session.execute(
+                select(Products.product_name)
+                .where(Products.platform_product_id == product_id)
+                .limit(1)
+            )
+            product_name = str(result.scalars().first() or "").strip()
         parts: List[str] = []
         if product_name:
             parts.append(product_name)
@@ -63,9 +75,14 @@ class ChatbotMessageBuilder:
             return ""
         return self.link_template.format(sampleId=sample_id.upper())
 
-    def _shipped(self, sample: Any, creator_whatsapp: Optional[str]) -> List[dict]:
+    async def _shipped(
+        self,
+        session: AsyncSession,
+        sample: Any,
+        creator_whatsapp: Optional[str],
+    ) -> List[dict]:
         has_whatsapp = bool((creator_whatsapp or "").strip())
-        block = self._product_block(sample)
+        block = await self._product_block(session, sample)
         if has_whatsapp:
             text = (
                 "🥰 Me complace informarte que tus muestras ya han sido enviadas.\n\n"
@@ -79,12 +96,12 @@ class ChatbotMessageBuilder:
             "Además, nos gustaría invitarte a unirte a nuestra comunidad de creadores, donde compartimos oportunidades de colaboración, briefings y tips para aumentar tus ventas.\n\n"
             "¿Me podrías compartir tu número de WhatsApp para agregarte?\n\n"
             "O, si prefieres, puedes agregarme directamente a WhatsApp y enviarme un mensaje, incluyendo tu Creator ID.\n\n"
-            "Mi WhatsApp: <WHATSAPP_NUMBER>."
+            "Mi WhatsApp: +52 55 6091 7657."
         )
         return [{"type": "text", "content": text}]
 
-    def _content_pending(self, sample: Any) -> List[dict]:
-        block = self._product_block(sample)
+    async def _content_pending(self, session: AsyncSession, sample: Any) -> List[dict]:
+        block = await self._product_block(session, sample)
         first = (
             "Hola, ¿ya recibiste las muestras? 😊\n\n"
             f"{block}\n\n"
@@ -97,8 +114,8 @@ class ChatbotMessageBuilder:
             messages.append({"type": "link", "content": link})
         return messages
 
-    def _no_content_posted(self, sample: Any) -> List[dict]:
-        block = self._product_block(sample)
+    async def _no_content_posted(self, session: AsyncSession, sample: Any) -> List[dict]:
+        block = await self._product_block(session, sample)
         first = (
             "Hola, ¿cómo estás? 😊\n\n"
             "Notamos que el contenido del producto aún no ha sido publicado y ya pasó la fecha acordada. ¿Podrías por favor confirmarme cuándo podrás subir el video?\n\n"
@@ -113,8 +130,8 @@ class ChatbotMessageBuilder:
             messages.append({"type": "link", "content": link})
         return messages
 
-    def _missing_ad_code(self, sample: Any) -> List[dict]:
-        block = self._product_block(sample)
+    async def _missing_ad_code(self, session: AsyncSession, sample: Any) -> List[dict]:
+        block = await self._product_block(session, sample)
         first = (
             "Hola, 😍 nos encantaría darle aún más visibilidad con una promoción en TikTok. ¿Podrías compartirnos tu código AD para que podamos lanzar la campaña? 🙏\n\n"
             f"{block}\n\n"

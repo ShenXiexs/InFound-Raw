@@ -21,26 +21,48 @@ from .services.chatbot_dispatcher_service import (
 class CrawlerConsumer(ConsumerBase):
     """Chatbot dispatcher consumer (sender only; supports batch tasks)."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, rabbitmq_config: Optional[dict] = None) -> None:
         self.settings = get_settings()
+        rabbitmq_config = rabbitmq_config or {}
         amqp_url = (
             f"amqp://{quote_plus(self.settings.RABBITMQ_USERNAME)}:"
             f"{quote_plus(self.settings.RABBITMQ_PASSWORD)}@"
             f"{self.settings.RABBITMQ_HOST}:{self.settings.RABBITMQ_PORT}/"
             f"{quote_plus(self.settings.RABBITMQ_VHOST)}"
         )
-        # Use topic exchange to match batched messages from inner API.
+        # 使用 topic exchange 以匹配 innerapi 发送的批量消息
         exchange_type = ExchangeType.TOPIC
         rabbitmq_conn = RabbitMQConnection(
             url=amqp_url,
-            exchange_name=self.settings.RABBITMQ_EXCHANGE_NAME,
-            routing_key=self.settings.RABBITMQ_ROUTING_KEY,
-            queue_name=self.settings.RABBITMQ_QUEUE_NAME,
-            at_most_once=getattr(self.settings, "RABBITMQ_AT_MOST_ONCE", False),
-            prefetch_count=self.settings.RABBITMQ_PREFETCH_COUNT,
-            reconnect_delay=self.settings.RABBITMQ_RECONNECT_DELAY,
-            max_reconnect_attempts=self.settings.RABBITMQ_MAX_RECONNECT_ATTEMPTS,
+            exchange_name=rabbitmq_config.get(
+                "exchange_name", self.settings.RABBITMQ_EXCHANGE_NAME
+            ),
+            routing_key=rabbitmq_config.get(
+                "routing_key", self.settings.RABBITMQ_ROUTING_KEY
+            ),
+            queue_name=rabbitmq_config.get(
+                "queue_name", self.settings.RABBITMQ_QUEUE_NAME
+            ),
+            at_most_once=rabbitmq_config.get(
+                "at_most_once", getattr(self.settings, "RABBITMQ_AT_MOST_ONCE", False)
+            ),
+            prefetch_count=rabbitmq_config.get(
+                "prefetch_count", self.settings.RABBITMQ_PREFETCH_COUNT
+            ),
+            reconnect_delay=rabbitmq_config.get(
+                "reconnect_delay", self.settings.RABBITMQ_RECONNECT_DELAY
+            ),
+            max_reconnect_attempts=rabbitmq_config.get(
+                "max_reconnect_attempts", self.settings.RABBITMQ_MAX_RECONNECT_ATTEMPTS
+            ),
             exchange_type=exchange_type,
+            queue_arguments=rabbitmq_config.get("queue_arguments"),
+            queue_durable=rabbitmq_config.get("queue_durable", True),
+            queue_auto_delete=rabbitmq_config.get("queue_auto_delete", False),
+            queue_exclusive=rabbitmq_config.get("queue_exclusive", False),
+            dlq_arguments=rabbitmq_config.get("dlq_arguments"),
+            dlq_durable=rabbitmq_config.get("dlq_durable", True),
+            dlq_auto_delete=rabbitmq_config.get("dlq_auto_delete", False),
         )
         super().__init__(rabbitmq_conn)
         self.logger = get_logger().bind(consumer="sample_chatbot")
@@ -69,10 +91,10 @@ class CrawlerConsumer(ConsumerBase):
 
     async def process_message_body(self, message_id: str, body: object) -> None:
         """
-        Handle MQ message payloads:
-        - batch: { "taskId": "...", "tasks": [ { "messages": [...] }, ... ] }
-        - single: { "messages": [...] }
-        - array: [ { "messages": [...] }, ... ]
+        处理 MQ 消息体：
+        - 批量：{ "taskId": "...", "tasks": [ { "messages": [...] }, ... ] }
+        - 单条：{ "messages": [...] }
+        - 纯数组：[ { "messages": [...] }, ... ]
         """
         import uuid
 

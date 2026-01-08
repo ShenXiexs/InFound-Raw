@@ -15,55 +15,55 @@ class Campaigns(Base):
     __table_args__ = (
         Index('IX_CampaignID', 'platform_campaign_id'),
         Index('IX_ShopID', 'platform_shop_id'),
-        {'comment': 'campaigns table'}
+        {'comment': '活动表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='campaign id')
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='creator platform: 1, TikTok')
-    platform_campaign_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='campaign id')
-    region: Mapped[str] = mapped_column(String(32), nullable=False, comment='region')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    platform_campaign_name: Mapped[Optional[str]] = mapped_column(String(128), comment='campaign name')
-    status: Mapped[Optional[str]] = mapped_column(String(64), comment='campaign status')
-    registration_period: Mapped[Optional[dict]] = mapped_column(JSON, comment='campaign registration period (JSON object)')
-    campaign_period: Mapped[Optional[dict]] = mapped_column(JSON, comment='campaign period (JSON object)')
-    pending_product_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='campaign pending product count')
-    approved_product_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='campaign approved product count')
-    date_registered: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='registration date')
-    commission_rate: Mapped[Optional[str]] = mapped_column(String(64), comment='commission rate')
-    platform_shop_name: Mapped[Optional[str]] = mapped_column(String(64), comment='shop name')
-    platform_shop_phone: Mapped[Optional[str]] = mapped_column(String(32), comment='shop phone')
-    platform_shop_id: Mapped[Optional[str]] = mapped_column(String(32), comment='shop id')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='活动 id')
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='达人所在平台：1，TikTok；')
+    platform_campaign_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='活动id')
+    region: Mapped[str] = mapped_column(String(32), nullable=False, comment='地区')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
+    platform_campaign_name: Mapped[Optional[str]] = mapped_column(String(128), comment='活动名称')
+    status: Mapped[Optional[str]] = mapped_column(String(64), comment='活动状态')
+    registration_period: Mapped[Optional[dict]] = mapped_column(JSON, comment='活动注册时间段（JSON 对象）')
+    campaign_period: Mapped[Optional[dict]] = mapped_column(JSON, comment='活动时间段（JSON 对象）')
+    pending_product_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='活动等待审核商品数')
+    approved_product_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='活动通过商品数')
+    date_registered: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='注册日期')
+    commission_rate: Mapped[Optional[str]] = mapped_column(String(64), comment='佣金比例')
+    platform_shop_name: Mapped[Optional[str]] = mapped_column(String(64), comment='店铺名称')
+    platform_shop_phone: Mapped[Optional[str]] = mapped_column(String(32), comment='店铺电话')
+    platform_shop_id: Mapped[Optional[str]] = mapped_column(String(32), comment='店铺号')
 
 
 class ChatMessages(Base):
     __tablename__ = 'chat_messages'
     __table_args__ = (
         Index('IX_Platform_AccountID', 'platform', 'platform_creator_id'),
-        {'comment': 'creator chat messages table'}
+        {'comment': '达人聊天记录表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='message id')
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='creator platform: 1, TikTok')
-    platform_creator_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='creator platform account id')
-    platform_creator_display_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='creator display name')
-    platform_message_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='platform message id')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='creator region')
-    chat_url: Mapped[Optional[str]] = mapped_column(String(1024), comment='creator chat link')
-    sender_name: Mapped[Optional[str]] = mapped_column(String(32), comment='sender type: Merchant; Creator')
-    content: Mapped[Optional[str]] = mapped_column(Text, comment='message content')
-    timestamp: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='message sent time')
-    message_type: Mapped[Optional[str]] = mapped_column(String(32), comment='message type')
-    is_from_merchant: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='sent by merchant')
-    is_reply: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='creator replied')
-    is_read: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='creator read')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='信息id')
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='达人所在平台：1，TikTok；')
+    platform_creator_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='达人所在平台的账号 Id')
+    platform_creator_display_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='达人所在平台的用户昵称')
+    platform_message_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='平台信息id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC 时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC 时间）')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区')
+    chat_url: Mapped[Optional[str]] = mapped_column(String(1024), comment='达人聊天页链接')
+    sender_name: Mapped[Optional[str]] = mapped_column(String(32), comment='发送人类型：Merchant; Creator')
+    content: Mapped[Optional[str]] = mapped_column(Text, comment='信息内容')
+    timestamp: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='发消息时间')
+    message_type: Mapped[Optional[str]] = mapped_column(String(32), comment='消息类型')
+    is_from_merchant: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否发自商家')
+    is_reply: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='达人是否回复')
+    is_read: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='达人是否已读')
 
 
 class CreatorCrawlLogs(Base):
@@ -71,64 +71,65 @@ class CreatorCrawlLogs(Base):
     __table_args__ = (
         Index('IX_Platform_AccountID', 'platform', 'platform_creator_id'),
         Index('IX_Platform_Username', 'platform', 'platform_creator_username'),
-        {'comment': 'creator crawl logs table'}
+        {'comment': '达人抓取日志表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='creator id')
-    crawl_date: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='crawl date (date only)')
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='creator platform: 1, TikTok')
-    platform_creator_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='creator platform account id')
-    platform_creator_display_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='creator display name')
-    platform_creator_username: Mapped[str] = mapped_column(String(64), nullable=False, comment='creator username')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    email: Mapped[Optional[str]] = mapped_column(String(255), comment='creator email')
-    whatsapp: Mapped[Optional[str]] = mapped_column(String(32), comment='creator WhatsApp')
-    introduction: Mapped[Optional[str]] = mapped_column(Text, comment='creator introduction')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='creator region')
-    currency: Mapped[Optional[str]] = mapped_column(String(32), comment='creator currency')
-    categories: Mapped[Optional[str]] = mapped_column(String(128), comment='creator category')
-    chat_url: Mapped[Optional[str]] = mapped_column(String(512), comment='creator chat URL')
-    search_keywords: Mapped[Optional[str]] = mapped_column(String(128), comment='creator search keywords')
-    brand_name: Mapped[Optional[str]] = mapped_column(String(255), comment='last outreach brand name')
-    followers: Mapped[Optional[int]] = mapped_column(INTEGER, comment='creator followers (parsed to number)')
-    top_brands: Mapped[Optional[str]] = mapped_column(String(255), comment='creator partnered brands')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='达人 Id')
+    crawl_date: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='抓取日期（无时分秒）')
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='达人所在平台：1，TikTok；')
+    platform_creator_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='达人所在平台的账号 Id')
+    platform_creator_display_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='达人所在平台的用户昵称')
+    platform_creator_username: Mapped[str] = mapped_column(String(64), nullable=False, comment='达人所在平台的用户名')
+    task_id: Mapped[Optional[str]] = mapped_column(CHAR(36), comment='任务 Id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC 时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC 时间）')
+    email: Mapped[Optional[str]] = mapped_column(String(255), comment='达人 Email')
+    whatsapp: Mapped[Optional[str]] = mapped_column(String(32), comment='达人 WhatsApp 账号')
+    introduction: Mapped[Optional[str]] = mapped_column(Text, comment='达人自我介绍')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区')
+    currency: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区货币类型')
+    categories: Mapped[Optional[str]] = mapped_column(String(128), comment='达人在平台的分类')
+    chat_url: Mapped[Optional[str]] = mapped_column(String(512), comment='达人在平台的聊天窗口 URL')
+    search_keywords: Mapped[Optional[str]] = mapped_column(String(128), comment='达人被搜索到的关键词')
+    brand_name: Mapped[Optional[str]] = mapped_column(String(255), comment='最后建联品牌的名称')
+    followers: Mapped[Optional[int]] = mapped_column(INTEGER, comment='达人关注数（文本转化为数字）')
+    top_brands: Mapped[Optional[str]] = mapped_column(String(255), comment='达人合作优质品牌')
     sales_revenue: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='GMV')
-    sales_units_sold: Mapped[Optional[int]] = mapped_column(INTEGER, comment='units sold')
-    sales_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='GMV per 1,000 impressions')
-    sales_revenue_per_buyer: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='average order value')
-    gmv_per_sales_channel: Mapped[Optional[str]] = mapped_column(String(32), comment='top GMV channel (with share)')
-    gmv_by_product_category: Mapped[Optional[str]] = mapped_column(String(64), comment='top GMV category (with share)')
-    avg_commission_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='average commission rate')
-    collab_products: Mapped[Optional[int]] = mapped_column(INTEGER, comment='collab product count')
-    partnered_brands: Mapped[Optional[int]] = mapped_column(INTEGER, comment='partnered brand count')
-    product_price: Mapped[Optional[str]] = mapped_column(String(64), comment='collab product price (range)')
-    video_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='video GPM')
-    videos: Mapped[Optional[int]] = mapped_column(INTEGER, comment='video count')
-    avg_video_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='average video views')
-    avg_video_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='avg video engagement rate')
-    avg_video_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg video likes')
-    avg_video_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg video comments')
-    avg_video_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg video shares')
-    live_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='live GMV per 1,000 views')
-    live_streams: Mapped[Optional[int]] = mapped_column(INTEGER, comment='video count')
-    avg_live_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live views')
-    avg_live_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='avg live engagement rate')
-    avg_live_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live likes')
-    avg_live_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live comments')
-    avg_live_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live shares')
-    followers_male: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='male follower share')
-    followers_female: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='female follower share')
-    followers_18_24: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='18-24 age share')
-    followers_25_34: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='25-34 age share')
-    followers_35_44: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='35-44 age share')
-    followers_45_54: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='45-54 age share')
-    followers_55_more: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='55+ age share')
-    connect: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='outreach completed')
-    reply: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='replied')
-    send: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='outreach task sent successfully')
+    sales_units_sold: Mapped[Optional[int]] = mapped_column(INTEGER, comment='成交件数')
+    sales_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='千次曝光成交金额')
+    sales_revenue_per_buyer: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='客单价')
+    gmv_per_sales_channel: Mapped[Optional[str]] = mapped_column(String(32), comment='最多 GMV 的渠道（包含比例）')
+    gmv_by_product_category: Mapped[Optional[str]] = mapped_column(String(64), comment='最多 GMV 的商品类目（包含比例）')
+    avg_commission_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='平均佣金率')
+    collab_products: Mapped[Optional[int]] = mapped_column(INTEGER, comment='合作商品数')
+    partnered_brands: Mapped[Optional[int]] = mapped_column(INTEGER, comment='合作品牌数')
+    product_price: Mapped[Optional[str]] = mapped_column(String(64), comment='合作商品价格（范围）')
+    video_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='视频GPM')
+    videos: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频数')
+    avg_video_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='平均视频播放量')
+    avg_video_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='视频平均互动率')
+    avg_video_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频平均点赞数')
+    avg_video_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频平均评论数')
+    avg_video_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频平均分享数')
+    live_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='直播千次观看成交金额')
+    live_streams: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频数')
+    avg_live_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均观看数')
+    avg_live_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='直播平均互动率')
+    avg_live_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均点赞数')
+    avg_live_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均评论数')
+    avg_live_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均分享数')
+    followers_male: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='粉丝男性占比')
+    followers_female: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='粉丝女性占比')
+    followers_18_24: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='18-24岁占比')
+    followers_25_34: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='25-34岁占比')
+    followers_35_44: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='35-44岁占比')
+    followers_45_54: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='45-54岁占比')
+    followers_55_more: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='大于 55 岁占比')
+    connect: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否已经建联')
+    reply: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否回复')
+    send: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='当前建联任务是否发送成功')
 
 
 class Creators(Base):
@@ -136,129 +137,130 @@ class Creators(Base):
     __table_args__ = (
         Index('IX_Platform_AccountID', 'platform', 'platform_creator_id'),
         Index('IX_Platform_Username', 'platform', 'platform_creator_username'),
-        {'comment': 'creators table'}
+        {'comment': '达人表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='creator id')
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='creator platform: 1, TikTok')
-    platform_creator_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='creator platform account id')
-    platform_creator_display_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='creator display name')
-    platform_creator_username: Mapped[str] = mapped_column(String(64), nullable=False, comment='creator username')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    email: Mapped[Optional[str]] = mapped_column(String(255), comment='creator email')
-    whatsapp: Mapped[Optional[str]] = mapped_column(String(32), comment='creator WhatsApp')
-    introduction: Mapped[Optional[str]] = mapped_column(Text, comment='creator introduction')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='creator region')
-    currency: Mapped[Optional[str]] = mapped_column(String(32), comment='creator currency')
-    categories: Mapped[Optional[str]] = mapped_column(String(128), comment='creator category')
-    chat_url: Mapped[Optional[str]] = mapped_column(String(512), comment='creator chat URL')
-    search_keywords: Mapped[Optional[str]] = mapped_column(String(128), comment='creator search keywords')
-    brand_name: Mapped[Optional[str]] = mapped_column(String(255), comment='last outreach brand name')
-    followers: Mapped[Optional[int]] = mapped_column(INTEGER, comment='creator followers (parsed to number)')
-    top_brands: Mapped[Optional[str]] = mapped_column(String(255), comment='creator partnered brands')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='达人 Id')
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='达人所在平台：1，TikTok；')
+    platform_creator_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='达人所在平台的账号 Id')
+    platform_creator_display_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='达人所在平台的用户昵称')
+    platform_creator_username: Mapped[str] = mapped_column(String(64), nullable=False, comment='达人所在平台的用户名')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC 时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC 时间）')
+    email: Mapped[Optional[str]] = mapped_column(String(255), comment='达人 Email')
+    whatsapp: Mapped[Optional[str]] = mapped_column(String(32), comment='达人 WhatsApp 账号')
+    introduction: Mapped[Optional[str]] = mapped_column(Text, comment='达人自我介绍')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区')
+    currency: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区货币类型')
+    categories: Mapped[Optional[str]] = mapped_column(String(128), comment='达人在平台的分类')
+    chat_url: Mapped[Optional[str]] = mapped_column(String(512), comment='达人在平台的聊天窗口 URL')
+    search_keywords: Mapped[Optional[str]] = mapped_column(String(128), comment='达人被搜索到的关键词')
+    brand_name: Mapped[Optional[str]] = mapped_column(String(255), comment='最后建联品牌的名称')
+    followers: Mapped[Optional[int]] = mapped_column(INTEGER, comment='达人关注数（文本转化为数字）')
+    top_brands: Mapped[Optional[str]] = mapped_column(String(255), comment='达人合作优质品牌')
     sales_revenue: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='GMV')
-    sales_units_sold: Mapped[Optional[int]] = mapped_column(INTEGER, comment='units sold')
-    sales_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='GMV per 1,000 impressions')
-    sales_revenue_per_buyer: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='average order value')
-    gmv_per_sales_channel: Mapped[Optional[str]] = mapped_column(String(32), comment='top GMV channel (with share)')
-    gmv_by_product_category: Mapped[Optional[str]] = mapped_column(String(64), comment='top GMV category (with share)')
-    avg_commission_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='average commission rate')
-    collab_products: Mapped[Optional[int]] = mapped_column(INTEGER, comment='collab product count')
-    partnered_brands: Mapped[Optional[int]] = mapped_column(INTEGER, comment='partnered brand count')
-    product_price: Mapped[Optional[str]] = mapped_column(String(64), comment='collab product price (range)')
-    video_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='video GPM')
-    videos: Mapped[Optional[int]] = mapped_column(INTEGER, comment='video count')
-    avg_video_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='average video views')
-    avg_video_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='avg video engagement rate')
-    avg_video_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg video likes')
-    avg_video_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg video comments')
-    avg_video_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg video shares')
-    live_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='live GMV per 1,000 views')
-    live_streams: Mapped[Optional[int]] = mapped_column(INTEGER, comment='video count')
-    avg_live_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live views')
-    avg_live_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='avg live engagement rate')
-    avg_live_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live likes')
-    avg_live_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live comments')
-    avg_live_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='avg live shares')
-    followers_male: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='male follower share')
-    followers_female: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='female follower share')
-    followers_18_24: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='18-24 age share')
-    followers_25_34: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='25-34 age share')
-    followers_35_44: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='35-44 age share')
-    followers_45_54: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='45-54 age share')
-    followers_55_more: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='55+ age share')
+    sales_units_sold: Mapped[Optional[int]] = mapped_column(INTEGER, comment='成交件数')
+    sales_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='千次曝光成交金额')
+    sales_revenue_per_buyer: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='客单价')
+    gmv_per_sales_channel: Mapped[Optional[str]] = mapped_column(String(32), comment='最多 GMV 的渠道（包含比例）')
+    gmv_by_product_category: Mapped[Optional[str]] = mapped_column(String(64), comment='最多 GMV 的商品类目（包含比例）')
+    avg_commission_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='平均佣金率')
+    collab_products: Mapped[Optional[int]] = mapped_column(INTEGER, comment='合作商品数')
+    partnered_brands: Mapped[Optional[int]] = mapped_column(INTEGER, comment='合作品牌数')
+    product_price: Mapped[Optional[str]] = mapped_column(String(64), comment='合作商品价格（范围）')
+    video_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='视频GPM')
+    videos: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频数')
+    avg_video_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='平均视频播放量')
+    avg_video_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='视频平均互动率')
+    avg_video_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频平均点赞数')
+    avg_video_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频平均评论数')
+    avg_video_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频平均分享数')
+    live_gpm: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='直播千次观看成交金额')
+    live_streams: Mapped[Optional[int]] = mapped_column(INTEGER, comment='视频数')
+    avg_live_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均观看数')
+    avg_live_engagement_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='直播平均互动率')
+    avg_live_likes: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均点赞数')
+    avg_live_comments: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均评论数')
+    avg_live_shares: Mapped[Optional[int]] = mapped_column(INTEGER, comment='直播平均分享数')
+    followers_male: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='粉丝男性占比')
+    followers_female: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='粉丝女性占比')
+    followers_18_24: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='18-24岁占比')
+    followers_25_34: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='25-34岁占比')
+    followers_35_44: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='35-44岁占比')
+    followers_45_54: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='45-54岁占比')
+    followers_55_more: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='大于 55 岁占比')
 
 
 class OpsUsers(Base):
     __tablename__ = 'ops_users'
-    __table_args__ = {'comment': 'user info table'}
+    __table_args__ = {'comment': '用户信息表'}
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='user id')
-    user_name: Mapped[str] = mapped_column(VARCHAR(64), nullable=False, comment='user account')
-    password: Mapped[str] = mapped_column(VARCHAR(64), nullable=False, server_default=text("''"), comment='password')
-    nick_name: Mapped[str] = mapped_column(VARCHAR(36), nullable=False, comment='user nickname')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, comment='created time')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, comment='updated time')
-    user_type: Mapped[Optional[str]] = mapped_column(VARCHAR(2), server_default=text("'00'"), comment='user type (00=system user)')
-    email: Mapped[Optional[str]] = mapped_column(VARCHAR(64), server_default=text("''"), comment='user email')
-    phone_number: Mapped[Optional[str]] = mapped_column(VARCHAR(64), server_default=text("''"), comment='mobile number')
-    sex: Mapped[Optional[int]] = mapped_column(TINYINT, server_default=text("'0'"), comment='gender: 0=male, 1=female, 2=unknown')
-    avatar: Mapped[Optional[str]] = mapped_column(VARCHAR(256), server_default=text("''"), comment='avatar URL')
-    status: Mapped[Optional[int]] = mapped_column(TINYINT, server_default=text("'0'"), comment='account status: 0=active, 1=disabled')
-    dept_id: Mapped[Optional[int]] = mapped_column(BIGINT, comment='department id')
-    login_ip: Mapped[Optional[str]] = mapped_column(VARCHAR(128), server_default=text("''"), comment='last login IP')
-    login_date: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='last login time')
-    remark: Mapped[Optional[str]] = mapped_column(VARCHAR(512), comment='notes')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='用户ID')
+    user_name: Mapped[str] = mapped_column(VARCHAR(64), nullable=False, comment='用户账号')
+    password: Mapped[str] = mapped_column(VARCHAR(64), nullable=False, server_default=text("''"), comment='密码')
+    nick_name: Mapped[str] = mapped_column(VARCHAR(36), nullable=False, comment='用户昵称')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, comment='创建时间')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, comment='更新时间')
+    user_type: Mapped[Optional[str]] = mapped_column(VARCHAR(2), server_default=text("'00'"), comment='用户类型（00系统用户）')
+    email: Mapped[Optional[str]] = mapped_column(VARCHAR(64), server_default=text("''"), comment='用户邮箱')
+    phone_number: Mapped[Optional[str]] = mapped_column(VARCHAR(64), server_default=text("''"), comment='手机号码')
+    sex: Mapped[Optional[int]] = mapped_column(TINYINT, server_default=text("'0'"), comment='用户性别：0-男, 1-女, 2-未知')
+    avatar: Mapped[Optional[str]] = mapped_column(VARCHAR(256), server_default=text("''"), comment='头像地址')
+    status: Mapped[Optional[int]] = mapped_column(TINYINT, server_default=text("'0'"), comment='帐号状态：0-正常, 1-停用')
+    dept_id: Mapped[Optional[int]] = mapped_column(BIGINT, comment='部门ID')
+    login_ip: Mapped[Optional[str]] = mapped_column(VARCHAR(128), server_default=text("''"), comment='最后登录IP')
+    login_date: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='最后登录时间')
+    remark: Mapped[Optional[str]] = mapped_column(VARCHAR(512), comment='备注')
     deleted: Mapped[Optional[Any]] = mapped_column(BIT(1))
 
 
 class OutreachTasks(Base):
     __tablename__ = 'outreach_tasks'
-    __table_args__ = {'comment': 'outreach tasks table'}
+    __table_args__ = {'comment': '建联任务表'}
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='task id')
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='task platform: 1, TikTok')
-    task_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='task name')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    platform_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), comment='campaign id')
-    platform_campaign_name: Mapped[Optional[str]] = mapped_column(String(128), comment='campaign name')
-    platform_product_id: Mapped[Optional[str]] = mapped_column(String(64), comment='product id')
-    platform_product_name: Mapped[Optional[str]] = mapped_column(String(128), comment='product name')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='region')
-    brand: Mapped[Optional[str]] = mapped_column(String(255), comment='brand')
-    message_send_strategy: Mapped[Optional[int]] = mapped_column(TINYINT, comment='message strategy: 0=all creators; 1=new creators only; 2=follow up on unreplied creators')
-    task_type: Mapped[Optional[str]] = mapped_column(String(32), comment='task type')
-    status: Mapped[Optional[str]] = mapped_column(String(32), comment='task status')
-    message: Mapped[Optional[str]] = mapped_column(String(512), comment='task info')
-    accound_email: Mapped[Optional[str]] = mapped_column(String(255), comment='TikTok account used for task')
-    search_keywords: Mapped[Optional[str]] = mapped_column(String(255), comment='search keywords')
-    product_categories: Mapped[Optional[dict]] = mapped_column(JSON, comment='product categories (JSON array)')
-    fans_age_range: Mapped[Optional[dict]] = mapped_column(JSON, comment='follower age ranges (JSON array)')
-    fans_gender: Mapped[Optional[dict]] = mapped_column(JSON, comment='follower gender (JSON object)')
-    content_types: Mapped[Optional[dict]] = mapped_column(JSON, comment='creator content types (JSON array)')
-    gmv_range: Mapped[Optional[dict]] = mapped_column(JSON, comment='creator GMV range (JSON array)')
-    sales_range: Mapped[Optional[dict]] = mapped_column(JSON, comment='creator sales range (JSON array)')
-    min_fans: Mapped[Optional[int]] = mapped_column(INTEGER, comment='min follower count')
-    min_avg_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='min average views')
-    min_engagement_rate: Mapped[Optional[int]] = mapped_column(INTEGER, comment='min participation rate')
-    first_message: Mapped[Optional[str]] = mapped_column(Text, comment='initial message content')
-    second_message: Mapped[Optional[str]] = mapped_column(Text, comment='follow-up message content')
-    new_creators_expect_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='target new creators to outreach')
-    max_creators: Mapped[Optional[int]] = mapped_column(INTEGER, comment='max creators to process')
-    plan_execute_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='scheduled start time')
-    plan_stop_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='scheduled end time')
-    spend_time: Mapped[Optional[int]] = mapped_column(INTEGER, comment='task duration (seconds)')
-    new_creators_real_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='actual new creator count')
-    real_start_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='start time')
-    real_end_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='end time')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='任务 Id')
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='任务所在平台：1，TikTok；')
+    task_name: Mapped[str] = mapped_column(String(64), nullable=False, comment='任务名称')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC 时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC 时间）')
+    platform_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), comment='活动 Id')
+    platform_campaign_name: Mapped[Optional[str]] = mapped_column(String(128), comment='活动名称')
+    platform_product_id: Mapped[Optional[str]] = mapped_column(String(64), comment='商品id')
+    platform_product_name: Mapped[Optional[str]] = mapped_column(String(128), comment='商品名称')
+    product_list: Mapped[Optional[dict]] = mapped_column(JSON, comment='商品列表（JSON 数组）')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='地区')
+    brand: Mapped[Optional[str]] = mapped_column(String(255), comment='品牌')
+    message_send_strategy: Mapped[Optional[int]] = mapped_column(TINYINT, comment='消息发送策略：0 表示新老达人都按常规策略发送消息；1 表示仅对从未建联的新达人发送首次消息；2 表示只跟进历史未回复的达人发送后续消息')
+    task_type: Mapped[Optional[str]] = mapped_column(String(32), comment='任务类型')
+    status: Mapped[Optional[str]] = mapped_column(String(32), comment='任务状态')
+    message: Mapped[Optional[str]] = mapped_column(String(512), comment='任务信息')
+    accound_email: Mapped[Optional[str]] = mapped_column(String(255), comment='任务执行的 TikTok 账号')
+    search_keywords: Mapped[Optional[str]] = mapped_column(String(255), comment='搜索关键词')
+    product_categories: Mapped[Optional[dict]] = mapped_column(JSON, comment='商品类目（JSON 数组）')
+    fans_age_range: Mapped[Optional[dict]] = mapped_column(JSON, comment='粉丝年龄范围（JSON 数组）')
+    fans_gender: Mapped[Optional[dict]] = mapped_column(JSON, comment='粉丝性别（JSON 对象）')
+    content_types: Mapped[Optional[dict]] = mapped_column(JSON, comment='达人内容类型（JSON 数组）')
+    gmv_range: Mapped[Optional[dict]] = mapped_column(JSON, comment='达人 gmv 范围（JSON 数组）')
+    sales_range: Mapped[Optional[dict]] = mapped_column(JSON, comment='达人 sales 范围（JSON 数组）')
+    min_fans: Mapped[Optional[int]] = mapped_column(INTEGER, comment='最小粉丝数')
+    min_avg_views: Mapped[Optional[int]] = mapped_column(INTEGER, comment='最小平均播放量')
+    min_engagement_rate: Mapped[Optional[int]] = mapped_column(INTEGER, comment='最小参与率')
+    first_message: Mapped[Optional[str]] = mapped_column(Text, comment='初次消息内容')
+    second_message: Mapped[Optional[str]] = mapped_column(Text, comment='二次消息内容')
+    new_creators_expect_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='期望建联新达人数量目标')
+    max_creators: Mapped[Optional[int]] = mapped_column(INTEGER, comment='最多出来处理达人数量')
+    plan_execute_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='计划启动时间')
+    plan_stop_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='计划终止时间')
+    spend_time: Mapped[Optional[int]] = mapped_column(INTEGER, comment='任务运行时长（单位：秒）')
+    new_creators_real_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='实际新增达人数量')
+    real_start_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='启动时间')
+    real_end_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, comment='结束时间')
 
 
 class Products(Base):
@@ -266,80 +268,80 @@ class Products(Base):
     __table_args__ = (
         Index('IX_CampaignID', 'platform', 'platform_campaign_id'),
         Index('IX_ProductId', 'platform', 'platform_product_id'),
-        {'comment': 'campaign products table'}
+        {'comment': '活动商品表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='product id')
-    region: Mapped[str] = mapped_column(String(32), nullable=False, comment='region')
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='creator platform: 1, TikTok')
-    platform_campaign_id: Mapped[str] = mapped_column(String(36), nullable=False, comment='campaign id')
-    platform_product_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='product id')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    platform_shop_name: Mapped[Optional[str]] = mapped_column(String(128), comment='shop name')
-    platform_shop_phone: Mapped[Optional[str]] = mapped_column(String(32), comment='shop phone')
-    platform_shop_id: Mapped[Optional[str]] = mapped_column(String(32), comment='shop id')
-    thumbnail: Mapped[Optional[str]] = mapped_column(String(512), comment='image URL')
-    product_name: Mapped[Optional[str]] = mapped_column(String(1024), comment='product name')
-    product_name_cn: Mapped[Optional[str]] = mapped_column(String(1024), comment='product name (CN)')
-    product_category_name: Mapped[Optional[str]] = mapped_column(String(128), comment='product category')
-    partner_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='partner commission rate')
-    creator_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='creator commission rate')
-    cost_product: Mapped[Optional[str]] = mapped_column(String(255), comment='estimated product cost (range)')
-    affiliate_link: Mapped[Optional[str]] = mapped_column(String(512), comment='extra links (some from tap are unused)')
-    product_link: Mapped[Optional[str]] = mapped_column(String(512), comment='product link')
-    product_rating: Mapped[Optional[int]] = mapped_column(TINYINT, comment='rating')
-    reviews_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='product review count')
-    product_sku: Mapped[Optional[str]] = mapped_column(String(64), comment='product SKU')
-    stock: Mapped[Optional[int]] = mapped_column(INTEGER, comment='stock')
-    available_sample_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='available sample count')
-    item_sold: Mapped[Optional[int]] = mapped_column(INTEGER, comment='product sales')
-    sale_price_min: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='lowest sale price')
-    sale_price_max: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='highest sale price')
-    selling_point: Mapped[Optional[str]] = mapped_column(Text, comment='selling points')
-    selling_point_cn: Mapped[Optional[str]] = mapped_column(Text, comment='selling points (CN)')
-    shooting_guide: Mapped[Optional[str]] = mapped_column(Text, comment='shooting guidelines')
-    shooting_guide_cn: Mapped[Optional[str]] = mapped_column(Text, comment='shooting guidelines (CN)')
-    examples: Mapped[Optional[dict]] = mapped_column(JSON, comment='sample images (JSON list)')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='商品 Id')
+    region: Mapped[str] = mapped_column(String(32), nullable=False, comment='地区')
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, comment='达人所在平台：1，TikTok；')
+    platform_campaign_id: Mapped[str] = mapped_column(String(36), nullable=False, comment='活动 Id')
+    platform_product_id: Mapped[str] = mapped_column(String(32), nullable=False, comment='商品 Id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
+    platform_shop_name: Mapped[Optional[str]] = mapped_column(String(128), comment='店铺名称')
+    platform_shop_phone: Mapped[Optional[str]] = mapped_column(String(32), comment='店铺电话')
+    platform_shop_id: Mapped[Optional[str]] = mapped_column(String(32), comment='店铺号')
+    thumbnail: Mapped[Optional[str]] = mapped_column(String(512), comment='图片链接')
+    product_name: Mapped[Optional[str]] = mapped_column(String(1024), comment='商品名称')
+    product_name_cn: Mapped[Optional[str]] = mapped_column(String(1024), comment='商品中文名')
+    product_category_name: Mapped[Optional[str]] = mapped_column(String(128), comment='商品类目')
+    partner_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='partner佣金比例')
+    creator_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='达人佣金比例')
+    cost_product: Mapped[Optional[str]] = mapped_column(String(255), comment='预估商品成本（是一个范围）')
+    affiliate_link: Mapped[Optional[str]] = mapped_column(String(512), comment='附属链接（实测tap给的部分没用）')
+    product_link: Mapped[Optional[str]] = mapped_column(String(512), comment='商品链接')
+    product_rating: Mapped[Optional[int]] = mapped_column(TINYINT, comment='评分')
+    reviews_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='商品评论量')
+    product_sku: Mapped[Optional[str]] = mapped_column(String(64), comment='商品SKU')
+    stock: Mapped[Optional[int]] = mapped_column(INTEGER, comment='库存')
+    available_sample_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='可用样品数量')
+    item_sold: Mapped[Optional[int]] = mapped_column(INTEGER, comment='商品销量')
+    sale_price_min: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='最低销售价格')
+    sale_price_max: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='最高销售价格')
+    selling_point: Mapped[Optional[str]] = mapped_column(Text, comment='卖点')
+    selling_point_cn: Mapped[Optional[str]] = mapped_column(Text, comment='卖点中文')
+    shooting_guide: Mapped[Optional[str]] = mapped_column(Text, comment='拍摄指南')
+    shooting_guide_cn: Mapped[Optional[str]] = mapped_column(Text, comment='拍摄指南中文')
+    examples: Mapped[Optional[dict]] = mapped_column(JSON, comment='示例图片JSON列表')
 
 
 t_products_backup_20251205 = Table(
     'products_backup_20251205', Base.metadata,
-    Column('id', CHAR(36), nullable=False, comment='product id'),
-    Column('region', String(32), nullable=False, comment='region'),
-    Column('platform', String(16), nullable=False, comment='creator platform: 1, TikTok'),
-    Column('platform_campaign_id', String(36), nullable=False, comment='campaign id'),
-    Column('platform_product_id', String(32), nullable=False, comment='product id'),
-    Column('platform_shop_name', String(128), comment='shop name'),
-    Column('platform_shop_phone', String(32), comment='shop phone'),
-    Column('platform_shop_id', String(32), comment='shop id'),
-    Column('thumbnail', String(512), comment='image URL'),
-    Column('product_name', String(1024), comment='product name'),
-    Column('product_name_cn', String(1024), comment='product name (CN)'),
-    Column('product_category_name', String(128), comment='product category'),
-    Column('partner_rate', DECIMAL(10, 2), comment='partner commission rate'),
-    Column('creator_rate', DECIMAL(10, 2), comment='creator commission rate'),
-    Column('cost_product', String(255), comment='estimated product cost (range)'),
-    Column('affiliate_link', String(512), comment='extra links (some from tap are unused)'),
-    Column('product_link', String(512), comment='product link'),
-    Column('product_rating', TINYINT, comment='rating'),
-    Column('reviews_count', INTEGER, comment='product review count'),
-    Column('product_sku', String(64), comment='product SKU'),
-    Column('stock', INTEGER, comment='stock'),
-    Column('available_sample_count', INTEGER, comment='available sample count'),
-    Column('item_sold', INTEGER, comment='product sales'),
-    Column('sale_price_min', DECIMAL(10, 2), comment='lowest sale price'),
-    Column('sale_price_max', DECIMAL(10, 2), comment='highest sale price'),
-    Column('selling_point', TINYTEXT, comment='selling points'),
-    Column('selling_point_cn', TINYTEXT, comment='selling points (CN)'),
-    Column('shooting_guide', TINYTEXT, comment='shooting guidelines'),
-    Column('shooting_guide_cn', TINYTEXT, comment='shooting guidelines (CN)'),
-    Column('creator_id', CHAR(36), nullable=False, comment='created by'),
-    Column('creation_time', DATETIME(fsp=3), nullable=False, comment='created time (UTC)'),
-    Column('last_modifier_id', CHAR(36), nullable=False, comment='updated by'),
-    Column('last_modification_time', DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
+    Column('id', CHAR(36), nullable=False, comment='商品 Id'),
+    Column('region', String(32), nullable=False, comment='地区'),
+    Column('platform', String(16), nullable=False, comment='达人所在平台：1，TikTok；'),
+    Column('platform_campaign_id', String(36), nullable=False, comment='活动 Id'),
+    Column('platform_product_id', String(32), nullable=False, comment='商品 Id'),
+    Column('platform_shop_name', String(128), comment='店铺名称'),
+    Column('platform_shop_phone', String(32), comment='店铺电话'),
+    Column('platform_shop_id', String(32), comment='店铺号'),
+    Column('thumbnail', String(512), comment='图片链接'),
+    Column('product_name', String(1024), comment='商品名称'),
+    Column('product_name_cn', String(1024), comment='商品中文名'),
+    Column('product_category_name', String(128), comment='商品类目'),
+    Column('partner_rate', DECIMAL(10, 2), comment='partner佣金比例'),
+    Column('creator_rate', DECIMAL(10, 2), comment='达人佣金比例'),
+    Column('cost_product', String(255), comment='预估商品成本（是一个范围）'),
+    Column('affiliate_link', String(512), comment='附属链接（实测tap给的部分没用）'),
+    Column('product_link', String(512), comment='商品链接'),
+    Column('product_rating', TINYINT, comment='评分'),
+    Column('reviews_count', INTEGER, comment='商品评论量'),
+    Column('product_sku', String(64), comment='商品SKU'),
+    Column('stock', INTEGER, comment='库存'),
+    Column('available_sample_count', INTEGER, comment='可用样品数量'),
+    Column('item_sold', INTEGER, comment='商品销量'),
+    Column('sale_price_min', DECIMAL(10, 2), comment='最低销售价格'),
+    Column('sale_price_max', DECIMAL(10, 2), comment='最高销售价格'),
+    Column('selling_point', TINYTEXT, comment='卖点'),
+    Column('selling_point_cn', TINYTEXT, comment='卖点中文'),
+    Column('shooting_guide', TINYTEXT, comment='拍摄指南'),
+    Column('shooting_guide_cn', TINYTEXT, comment='拍摄指南中文'),
+    Column('creator_id', CHAR(36), nullable=False, comment='创建人'),
+    Column('creation_time', DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）'),
+    Column('last_modifier_id', CHAR(36), nullable=False, comment='更新人'),
+    Column('last_modification_time', DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
 )
 
 
@@ -347,55 +349,55 @@ class SampleContentCrawlLogs(Base):
     __tablename__ = 'sample_content_crawl_logs'
     __table_args__ = (
         Index('IX_ProductID', 'platform_product_id'),
-        {'comment': 'sample content crawl logs table'}
+        {'comment': '样品内容抓取日志表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='log id (auto increment)')
-    crawl_date: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='crawl date (date only)')
-    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='product id')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='creator region')
-    type: Mapped[Optional[str]] = mapped_column(String(32), comment='promo type: 1=video; 2=live')
-    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='creator platform account id')
-    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='creator display name')
-    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(64), comment='creator username')
-    promotion_name: Mapped[Optional[str]] = mapped_column(String(255), comment='promo video/live name')
-    promotion_time: Mapped[Optional[str]] = mapped_column(String(255), comment='promo video/live time')
-    promotion_view_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live views')
-    promotion_like_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live likes')
-    promotion_comment_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live comments')
-    promotion_order_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live order count')
-    promotion_order_total_amount: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='promo video/live revenue')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='日志 Id（自增）')
+    crawl_date: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='抓取日期（无时分秒）')
+    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='商品 Id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区')
+    type: Mapped[Optional[str]] = mapped_column(String(32), comment='推广视频/直播类型：1，视频；2，直播')
+    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在平台的账号 Id')
+    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='达人所在平台的用户昵称')
+    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(64), comment='达人所在平台的用户名')
+    promotion_name: Mapped[Optional[str]] = mapped_column(String(255), comment='推广视频/直播名称')
+    promotion_time: Mapped[Optional[str]] = mapped_column(String(255), comment='推广视频/直播时间')
+    promotion_view_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播观看数')
+    promotion_like_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播点赞数')
+    promotion_comment_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播评论数')
+    promotion_order_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播订单数')
+    promotion_order_total_amount: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='推广视频/直播收入')
 
 
 class SampleContents(Base):
     __tablename__ = 'sample_contents'
     __table_args__ = (
         Index('IX_ProductID', 'platform_product_id'),
-        {'comment': 'sample content table'}
+        {'comment': '样品内容表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='sample content id (auto increment)')
-    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='product id')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='creator region')
-    type: Mapped[Optional[str]] = mapped_column(String(32), comment='promo type: 1=video; 2=live')
-    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='creator platform account id')
-    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='creator display name')
-    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(64), comment='creator username')
-    promotion_name: Mapped[Optional[str]] = mapped_column(String(255), comment='promo video/live name')
-    promotion_time: Mapped[Optional[str]] = mapped_column(String(255), comment='promo video/live time')
-    promotion_view_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live views')
-    promotion_like_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live likes')
-    promotion_comment_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live comments')
-    promotion_order_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='promo video/live order count')
-    promotion_order_total_amount: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='promo video/live revenue')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='样品内容 Id（自增）')
+    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='商品 Id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在地区')
+    type: Mapped[Optional[str]] = mapped_column(String(32), comment='推广视频/直播类型：1，视频；2，直播')
+    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在平台的账号 Id')
+    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='达人所在平台的用户昵称')
+    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(64), comment='达人所在平台的用户名')
+    promotion_name: Mapped[Optional[str]] = mapped_column(String(255), comment='推广视频/直播名称')
+    promotion_time: Mapped[Optional[str]] = mapped_column(String(255), comment='推广视频/直播时间')
+    promotion_view_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播观看数')
+    promotion_like_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播点赞数')
+    promotion_comment_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播评论数')
+    promotion_order_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='推广视频/直播订单数')
+    promotion_order_total_amount: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 2), comment='推广视频/直播收入')
 
 
 class SampleCrawlLogs(Base):
@@ -403,33 +405,33 @@ class SampleCrawlLogs(Base):
     __table_args__ = (
         Index('IX_CampaignID', 'platform_campaign_id'),
         Index('IX_ProductID', 'platform_product_id'),
-        {'comment': 'sample crawl logs table'}
+        {'comment': '样品抓取日志表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='log id (auto increment)')
-    crawl_date: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='crawl date (date only)')
-    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='product id')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='region')
-    stock: Mapped[Optional[int]] = mapped_column(INTEGER, comment='stock')
-    product_sku: Mapped[Optional[str]] = mapped_column(String(64), comment='product SKU')
-    available_sample_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='available sample count')
-    is_uncooperative: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='not cooperative')
-    is_unapprovable: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='not approvable')
-    status: Mapped[Optional[str]] = mapped_column(String(32), comment='sample status: 1=to review; 2=ready to ship; 3=shipped; 4=no content; 5=completed; 6=canceled')
-    request_time_remaining: Mapped[Optional[str]] = mapped_column(String(255), comment='remaining request time')
-    platform_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), comment='campaign id')
-    platform_campaign_name: Mapped[Optional[str]] = mapped_column(Text, comment='campaign name')
-    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='creator display name')
-    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(255), comment='creator username')
-    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='creator platform account id')
-    post_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='creator posting rate')
-    is_showcase: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='is showcase')
-    content_summary: Mapped[Optional[dict]] = mapped_column(JSON, comment='creator promo video/live summary (JSON object)')
-    ad_code: Mapped[Optional[dict]] = mapped_column(JSON, comment='AD code (JSON array)')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='日志 Id（自增）')
+    crawl_date: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='抓取日期（无时分秒）')
+    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='商品 Id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='地区')
+    stock: Mapped[Optional[int]] = mapped_column(INTEGER, comment='库存')
+    product_sku: Mapped[Optional[str]] = mapped_column(String(64), comment='商品SKU')
+    available_sample_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='可用样品数量')
+    is_uncooperative: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否不可合作')
+    is_unapprovable: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否不可同意')
+    status: Mapped[Optional[str]] = mapped_column(String(32), comment='样品管理状态：1，待审核；2，准备发货；3，已发货；4，未发布任何内容；5，已完成；6，已取消')
+    request_time_remaining: Mapped[Optional[str]] = mapped_column(String(255), comment='剩余申请时间')
+    platform_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), comment='活动id')
+    platform_campaign_name: Mapped[Optional[str]] = mapped_column(Text, comment='活动名称')
+    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='达人所在平台的用户昵称')
+    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(255), comment='达人所在平台的用户名')
+    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在平台的账号 Id')
+    post_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='达人发布率')
+    is_showcase: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否橱窗展示')
+    content_summary: Mapped[Optional[dict]] = mapped_column(JSON, comment='达人推广视频/直播类型相关数据摘要（JSON 对象）')
+    ad_code: Mapped[Optional[dict]] = mapped_column(JSON, comment='AD Code（JSON 数组）')
 
 
 class Samples(Base):
@@ -437,50 +439,50 @@ class Samples(Base):
     __table_args__ = (
         Index('IX_CampaignID', 'platform_campaign_id'),
         Index('IX_ProductID', 'platform_product_id'),
-        {'comment': 'samples table'}
+        {'comment': '样品表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='sample id')
-    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='product id')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    region: Mapped[Optional[str]] = mapped_column(String(32), comment='region')
-    stock: Mapped[Optional[int]] = mapped_column(INTEGER, comment='stock')
-    product_sku: Mapped[Optional[str]] = mapped_column(String(64), comment='product SKU')
-    available_sample_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='available sample count')
-    is_uncooperative: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='not cooperative')
-    is_unapprovable: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='not approvable')
-    status: Mapped[Optional[str]] = mapped_column(String(32), comment='sample status: 1=to review; 2=ready to ship; 3=shipped; 4=no content; 5=completed; 6=canceled')
-    request_time_remaining: Mapped[Optional[str]] = mapped_column(String(255), comment='remaining request time')
-    platform_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), comment='campaign id')
-    platform_campaign_name: Mapped[Optional[str]] = mapped_column(Text, comment='campaign name')
-    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='creator display name')
-    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(255), comment='creator username')
-    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='creator platform account id')
-    post_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='creator posting rate')
-    is_showcase: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='is showcase')
-    content_summary: Mapped[Optional[dict]] = mapped_column(JSON, comment='creator promo video/live summary (JSON object)')
-    ad_code: Mapped[Optional[dict]] = mapped_column(JSON, comment='AD code (JSON array)')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='样品 Id')
+    platform_product_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='商品 Id')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC时间）')
+    region: Mapped[Optional[str]] = mapped_column(String(32), comment='地区')
+    stock: Mapped[Optional[int]] = mapped_column(INTEGER, comment='库存')
+    product_sku: Mapped[Optional[str]] = mapped_column(String(64), comment='商品SKU')
+    available_sample_count: Mapped[Optional[int]] = mapped_column(INTEGER, comment='可用样品数量')
+    is_uncooperative: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否不可合作')
+    is_unapprovable: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否不可同意')
+    status: Mapped[Optional[str]] = mapped_column(String(32), comment='样品管理状态：1，待审核；2，准备发货；3，已发货；4，未发布任何内容；5，已完成；6，已取消')
+    request_time_remaining: Mapped[Optional[str]] = mapped_column(String(255), comment='剩余申请时间')
+    platform_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), comment='活动id')
+    platform_campaign_name: Mapped[Optional[str]] = mapped_column(Text, comment='活动名称')
+    platform_creator_display_name: Mapped[Optional[str]] = mapped_column(String(64), comment='达人所在平台的用户昵称')
+    platform_creator_username: Mapped[Optional[str]] = mapped_column(String(255), comment='达人所在平台的用户名')
+    platform_creator_id: Mapped[Optional[str]] = mapped_column(String(32), comment='达人所在平台的账号 Id')
+    post_rate: Mapped[Optional[decimal.Decimal]] = mapped_column(DECIMAL(10, 4), comment='达人发布率')
+    is_showcase: Mapped[Optional[Any]] = mapped_column(BIT(1), comment='是否橱窗展示')
+    content_summary: Mapped[Optional[dict]] = mapped_column(JSON, comment='达人推广视频/直播类型相关数据摘要（JSON 对象）')
+    ad_code: Mapped[Optional[dict]] = mapped_column(JSON, comment='AD Code（JSON 数组）')
 
 
 class UploadProductBatch(Base):
     __tablename__ = 'upload_product_batch'
     __table_args__ = (
         Index('IX_UploadID', 'id'),
-        {'comment': 'product upload files table'}
+        {'comment': '上传商品文件表'}
     )
 
-    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='upload id')
-    region: Mapped[str] = mapped_column(String(32), nullable=False, comment='region')
-    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='created by')
-    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='created time (UTC)')
-    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='updated by')
-    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='updated time (UTC)')
-    source_file: Mapped[Optional[str]] = mapped_column(String(255), comment='source file')
-    note: Mapped[Optional[str]] = mapped_column(Text, comment='notes')
-    total_rows: Mapped[Optional[int]] = mapped_column(Integer, comment='total rows in uploaded file')
-    dify_total: Mapped[Optional[int]] = mapped_column(Integer, comment='dify total rows to process')
-    dify_processed: Mapped[Optional[int]] = mapped_column(Integer, comment='dify processed row count')
-    dify_failed: Mapped[Optional[int]] = mapped_column(Integer, comment='dify failed row count')
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, comment='上传id')
+    region: Mapped[str] = mapped_column(String(32), nullable=False, comment='地区')
+    creator_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='创建人')
+    creation_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='创建时间（UTC 时间）')
+    last_modifier_id: Mapped[str] = mapped_column(CHAR(36), nullable=False, comment='更新人')
+    last_modification_time: Mapped[datetime.datetime] = mapped_column(DATETIME(fsp=3), nullable=False, comment='更新时间（UTC 时间）')
+    source_file: Mapped[Optional[str]] = mapped_column(String(255), comment='源文件')
+    note: Mapped[Optional[str]] = mapped_column(Text, comment='备注')
+    total_rows: Mapped[Optional[int]] = mapped_column(Integer, comment='上传文件的总行数')
+    dify_total: Mapped[Optional[int]] = mapped_column(Integer, comment='dify需处理总行数')
+    dify_processed: Mapped[Optional[int]] = mapped_column(Integer, comment='dify已经处理的行数')
+    dify_failed: Mapped[Optional[int]] = mapped_column(Integer, comment='dify处理失败的行数')
