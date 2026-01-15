@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, asc, desc
+from sqlalchemy import select, func, asc, desc, case, literal_column
 from uuid import uuid4
 import json
 
@@ -9,7 +9,6 @@ from common.core.exceptions import ResourceNotFoundError
 
 
 def _parse_datetime(dt_str: str) -> datetime:
-    """Parse datetime string with flexible format (handles non-zero-padded dates)"""
     if not dt_str:
         return None
     # Replace space with T for ISO format
@@ -66,29 +65,19 @@ class OutreachTaskService:
 
     @staticmethod
     def _calc_running_seconds(task: OutreachTasks) -> int:
-        if not task.real_start_at:
-            return 0
-
-        if task.real_end_at:
-            end_time = task.real_end_at
-            if end_time.tzinfo is None:
-                end_time = end_time.replace(tzinfo=timezone.utc)
-            start_time = task.real_start_at
-            if start_time.tzinfo is None:
-                start_time = start_time.replace(tzinfo=timezone.utc)
-            return int((end_time - start_time).total_seconds())
-
         if task.status == "running":
             start_time = task.real_start_at
+            if not start_time:
+                return 0
             if start_time.tzinfo is None:
                 start_time = start_time.replace(tzinfo=timezone.utc)
             return int((datetime.now(timezone.utc) - start_time).total_seconds())
 
+        if task.spend_time is not None:
+            return int(task.spend_time)
+
         return 0
 
-    # =========================
-    # 任务一：任务列表
-    # =========================
     @staticmethod
     async def get_task_list(
         session: AsyncSession,
@@ -149,6 +138,16 @@ class OutreachTaskService:
         total = await session.scalar(count_stmt)
 
         # list
+        running_seconds = func.timestampdiff(
+            literal_column("SECOND"),
+            OutreachTasks.real_start_at,
+            func.utc_timestamp(),
+        )
+        runtime_seconds = case(
+            (OutreachTasks.status == "running", func.coalesce(running_seconds, 0)),
+            else_=func.coalesce(OutreachTasks.spend_time, 0),
+        )
+
         sort_map = {
             "created_at": OutreachTasks.creation_time,
             "createdAt": OutreachTasks.creation_time,
@@ -162,6 +161,12 @@ class OutreachTaskService:
             "task_name": OutreachTasks.task_name,
             "taskName": OutreachTasks.task_name,
             "status": OutreachTasks.status,
+            "spend_time": runtime_seconds,
+            "spendTime": runtime_seconds,
+            "run_time": runtime_seconds,
+            "runTime": runtime_seconds,
+            "running_time": runtime_seconds,
+            "runningTime": runtime_seconds,
         }
         sort_column = sort_map.get(sort_by or "", OutreachTasks.creation_time)
         order = (sort_order or "desc").strip().lower()
@@ -199,9 +204,6 @@ class OutreachTaskService:
             ],
         }
 
-    # =========================
-    # 任务二：任务详情
-    # =========================
     @staticmethod
     async def get_task_detail(
         session: AsyncSession,
@@ -270,9 +272,6 @@ class OutreachTaskService:
             "createdAt": t.creation_time,
         }
 
-    # =========================
-    # 任务三：创建任务
-    # =========================
     @staticmethod
     async def create_task(
         session: AsyncSession,
@@ -347,9 +346,6 @@ class OutreachTaskService:
 
         return task
 
-    # =========================
-    # 任务四：更新任务
-    # =========================
     @staticmethod
     async def update_task(
         session: AsyncSession,
@@ -426,9 +422,6 @@ class OutreachTaskService:
 
         return task
 
-    # =========================
-    # 任务五：立即执行任务
-    # =========================
     @staticmethod
     async def run_task_now(
         session: AsyncSession,
@@ -487,9 +480,7 @@ class OutreachTaskService:
         await session.refresh(task)
         return task
 
-    # =========================
-    # 任务七：停止任务（批量）
-    # =========================
+
     @staticmethod
     async def stop_tasks(
         session: AsyncSession,

@@ -87,10 +87,6 @@ class SearchStrategy(BaseModel):
 
     @model_validator(mode="after")
     def _ensure_ranges(self) -> "SearchStrategy":
-        if self.gmv in (None, []) and self.min_GMV is None:
-            raise ValueError("gmvRange or min_GMV is required")
-        if self.sales in (None, []) and not self.min_sales:
-            raise ValueError("salesRange or min_sales is required")
         return self
 
 
