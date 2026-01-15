@@ -1,155 +1,149 @@
-# 项目介绍
+# Project Overview
 
-此项目为 INFound 项目的后端服务工程项目，以 Python 技术栈实现，运行环境为 Python 3.13
+This repository contains the backend services for the INFound project. It is built with Python 3.13.
 
-# 项目目录结构
+# Project Structure
 
 ```plaintext
 infound-backend-services/
-├── apps/
-│   ├── portal_inner_open_api/   # 内部服务专属 API，只对内部服务使用
-│   │   ├── api/                 # 服务专属路由
-│   │   │   ├── __init__.py
-│   │   │   ├── endpoints/       # 服务专属接口
-│   │   │   ├── router.py        # 服务专属路由
-│   │   ├── configs/             # 服务专属配置（YAML）
-│   │   │   ├── dev.yaml         # 服务开发环境专属配置（YAML，可覆盖全局配置）
-│   │   ├── models/              # 服务专属数据模型
-│   │   │   ├── __init__.py
-│   │   │   └── user_models.py
-│   │   └── services/            # 服务专属业务逻辑
-│   │      ├── __init__.py
-│   │      └── user_service.py
-│   │      └── startup.py        # 服务专属启动逻辑
-│   ├── portal_creator_open_api/ # 达人端专属 API 服务
-├── common/                      # 公共模块（共用基础服务/类库，独立维护）
-│   ├── __init__.py
-│   ├── core/                    # 共用核心组件
-│   │   ├── config.py            # 多环境配置（支持服务A/B独立配置）
-│   │   ├── exceptions.py        # 全局异常捕获（统一响应格式）
-│   │   ├── logger.py            # 日志配置（统一格式，支持独立日志文件）
-│   │   ├── dependencies.py      # 依赖注入（Redis/JWT 共用）
-│   │   └── response.py          # 统一 API 返回格式
-│   ├── models/                  # 共用数据模型（如 JWT 载荷、公共请求/响应模型）
-│   │   ├── __init__.py
-│   │   ├── common_request.py    # 共用请求模型（如分页、排序）
-│   │   └── common_response.py   # 共用响应模型
-│   ├── services/                # 共用业务服务（如 Redis 操作、第三方 API 调用）
-│   │   ├── __init__.py
-│   │   └── redis_service.py     # 共用 Redis 工具类
-│   └── utils/                   # 共用工具函数（如 JWT、加密、日期处理）
-│       ├── __init__.py
-│       └── jwt_utils.py
-├── configs/                     # 多环境配置（支持服务A/B独立配置）
-│   ├── base.yaml                # 全局基础配置（YAML 格式，所有服务共用，不变）
-├── pyproject.toml               # 统一依赖清单（公共+业务依赖）
-├── Dockerfile                   # 基础 Dockerfile（支持构建单个服务）
-├── main.py                      # 统一入口 main.py 动态调用专属钩子
+|-- apps/
+|   |-- portal_inner_open_api/   # Internal service-only API
+|   |   |-- api/                 # Service routes
+|   |   |   |-- __init__.py
+|   |   |   |-- endpoints/       # Service endpoints
+|   |   |   |-- router.py        # Service router
+|   |   |-- configs/             # Service configs (YAML)
+|   |   |   |-- dev.yaml         # Service dev config (YAML, can override global)
+|   |   |-- models/              # Service data models
+|   |   |   |-- __init__.py
+|   |   |   `-- user_models.py
+|   |   `-- services/            # Service business logic
+|   |       |-- __init__.py
+|   |       |-- user_service.py
+|   |       `-- startup.py       # Service startup hooks
+|   `-- portal_creator_open_api/ # Creator-side API service
+|-- common/                      # Shared modules (base services/libs, maintained separately)
+|   |-- __init__.py
+|   |-- core/                    # Shared core components
+|   |   |-- config.py            # Multi-env config (supports per-service overrides)
+|   |   |-- exceptions.py        # Global exception handling (standard response)
+|   |   |-- logger.py            # Logging config (standard format, per-service logs)
+|   |   |-- dependencies.py      # DI (Redis/JWT shared)
+|   |   `-- response.py          # Unified API response format
+|   |-- models/                  # Shared models (JWT payloads, common request/response)
+|   |   |-- __init__.py
+|   |   |-- common_request.py    # Common request models (pagination, sorting)
+|   |   `-- common_response.py   # Common response models
+|   |-- services/                # Shared services (Redis, third-party APIs)
+|   |   |-- __init__.py
+|   |   `-- redis_service.py     # Shared Redis helpers
+|   `-- utils/                   # Shared utilities (JWT, crypto, date helpers)
+|       |-- __init__.py
+|       `-- jwt_utils.py
+|-- configs/                     # Multi-env config (supports per-service overrides)
+|   `-- base.yaml                # Global base config (YAML, shared by all services)
+|-- pyproject.toml               # Unified dependencies (shared + app)
+|-- Dockerfile                   # Base Dockerfile (build a single service)
+`-- main.py                      # Unified entry, loads service hooks
 ```
 
-# 开发环境准备
+# Development Setup
 
-## 1. 安装 Python 3.13.*
+## 1. Install Python 3.13.*
 
-## 2. 安装 Poetry
+## 2. Install Poetry
 
-Poetry 官方推荐使用**安装脚本**，而非 pip，以避免依赖冲突。提供跨平台命令和配置。
+Poetry recommends the install script (instead of pip) to avoid dependency conflicts.
 
-### 🐧 **Linux / macOS 安装**
+### Linux / macOS
 
-#### **方式一：官方脚本（推荐）**
+#### Option 1: Official script (recommended)
 
 ```bash
-# 默认安装到 ~/.local/share/pypoetry
+# Default install path: ~/.local/share/pypoetry
 curl -sSL https://install.python-poetry.org | python3 -
 
-# 添加到 PATH（临时）
+# Add to PATH (temporary)
 export PATH="$HOME/.local/bin:$PATH"
 
-# 永久生效（推荐）
+# Add to PATH (permanent)
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-#### **方式二：指定安装目录**
+#### Option 2: Custom install directory
 
 ```bash
-# 1. 设置自定义目录
-export POETRY_HOME="/opt/poetry"  # 可改为你的路径
+# 1. Set custom directory
+export POETRY_HOME="/opt/poetry"  # Change to your path
 
-# 2. 执行安装（自动识别 POETRY_HOME）
+# 2. Install (respects POETRY_HOME)
 curl -sSL https://install.python-poetry.org | python3 -
 
-# 3. 添加到 PATH
+# 3. Add to PATH
 export PATH="$POETRY_HOME/bin:$PATH"
 
-# 4. 永久生效
+# 4. Make it persistent
 echo 'export POETRY_HOME="/opt/poetry"' >> ~/.bashrc
 echo 'export PATH="$POETRY_HOME/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
----
+### Windows
 
-### 🪟 **Windows 安装**
-
-#### **方式一：PowerShell 一键安装**
+#### Option 1: PowerShell one-liner
 
 ```powershell
-# 默认安装到 %APPDATA%\Python\Scripts
+# Default install path: %APPDATA%\Python\Scripts
 (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
 
-# 手动将以下路径添加到系统环境变量 PATH
+# Add the following path to PATH:
 # %APPDATA%\Python\Scripts
-# 例如: C:\Users\<你的用户名>\AppData\Roaming\Python\Scripts
+# Example: C:\Users\<your-user>\AppData\Roaming\Python\Scripts
 ```
 
-#### **方式二：指定目录安装**
+#### Option 2: Custom directory
 
 ```powershell
-# 1. 设置环境变量（右键"此电脑"→属性→高级系统设置→环境变量）
-#    变量名: POETRY_HOME
-#    变量值: D:\tools\poetry  （你的自定义路径）
+# 1. Set environment variable (System Properties -> Advanced -> Environment Variables)
+#    Name: POETRY_HOME
+#    Value: D:\tools\poetry  (your custom path)
 
-# 2. 执行安装
+# 2. Install
 (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
 
-# 3. 将 %POETRY_HOME%\bin 添加到系统 PATH
-#    例如: D:\tools\poetry\bin
+# 3. Add %POETRY_HOME%\bin to PATH
+#    Example: D:\tools\poetry\bin
 
-# 4. 重启终端验证
+# 4. Restart the terminal to verify
 ```
 
----
-
-### ✅ **验证安装**
+### Verify installation
 
 ```bash
 poetry --version
-# 输出: Poetry (version 1.8.x)
+# Output: Poetry (version 1.8.x)
 ```
 
----
+### Optional mirror configuration (Tsinghua)
 
-### 🚀 **国内加速配置（清华源）**
-
-#### **临时生效**
+#### Temporary
 
 ```bash
 export POETRY_PYPI_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"
 ```
 
-#### **永久配置（推荐）**
+#### Persistent (recommended)
 
 ```bash
-# 添加 Poetry 镜像源
+# Add Poetry mirror
 poetry source add --priority primary tuna https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 查看配置
+# Show config
 poetry config --list
 ```
 
-#### **配置 PIP 镜像（ Poetry 安装包时会用到）**
+#### Configure pip mirror (used by Poetry install)
 
 ```bash
 # Linux/macOS
@@ -159,97 +153,113 @@ pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
----
-
-### 🎨 **常用初始化配置**
+### Common local config
 
 ```bash
-# 在项目目录内创建 .venv（便于 IDE 识别）
+# Create .venv in project root (IDE friendly)
 poetry config virtualenvs.in-project true --local
 
-# 自动创建虚拟环境
+# Auto-create virtualenv
 poetry config virtualenvs.create true
 
-# 查看当前配置
+# Show current config
 poetry config --list
 ```
 
----
+### Troubleshooting
 
-### ⚠️ **常见问题**
+| Issue                          | Fix                                                         |
+|-------------------------------|--------------------------------------------------------------|
+| poetry: command not found     | PATH not set correctly. Add the install path to PATH.        |
+| Install script fails          | Check Python version (3.8+). Ensure network access.          |
+| Windows permission error      | Run PowerShell as admin or use pipx.                         |
+| CI/CD install is slow         | Use pip with a pinned version: pip install poetry==1.8.0     |
 
-| 问题                            | 解决方案                                       |
-|-------------------------------|--------------------------------------------|
-| **poetry: command not found** | 未正确配置 PATH，检查安装路径并添加到环境变量                  |
-| **安装脚本执行失败**                  | 检查 Python 版本（需 3.8+），确保网络通畅，或使用镜像          |
-| **Windows 权限错误**              | 以管理员身份运行 PowerShell，或改用 pipx 安装            |
-| **CI/CD 环境安装慢**               | 使用 pip 安装并指定版本：`pip install poetry==1.8.0` |
-
----
-
-### 📁 **安装后项目结构**
+### Project structure after install
 
 ```bash
-# 创建新项目
+# Create new project
 poetry new myproject
 cd myproject
 
-# 或初始化现有项目
-poetry init  # 交互式填写 pyproject.toml
+# Or initialize an existing project
+poetry init  # interactive pyproject.toml
 
-# 安装依赖
+# Install dependencies
 poetry add requests
 poetry add --group dev pytest
 
-# 进入虚拟环境
+# Enter virtualenv
 poetry shell
 
-# 运行命令
+# Run a command
 poetry run python main.py
 ```
 
-**推荐**：在 PyCharm 中打开项目，它会自动识别 Poetry 环境并提示配置解释器。
+Recommended: Open the project in PyCharm so it can detect the Poetry environment.
 
----
+## 3. Run poetry install at repo root
 
-## 3. 根目录执行 poetry install
-
-# 数据库表自动生成 ORM 模型文件
+# Generate ORM models from database tables
 
 ```bash
 sqlacodegen mysql+pymysql://<MYSQL_USER>:<MYSQL_PASSWORD>@<MYSQL_HOST>:<MYSQL_PORT>/<MYSQL_DB> --outfile common/models/infound.py
 ```
 
-## Sample 数据入库 API（Collector → Inner API）
+# Sample ingestion API (Collector -> Inner API)
 
-Playwright 爬虫现已不直接写入数据库，`portal_tiktok_sample_crawler` 会把标准化后的行数组提交到 inner API，由后者统一校验并入库 `samples`/`sample_contents`/`sample_crawl_logs`。关键模块包括：
+The Playwright crawler no longer writes to the database directly. The
+`portal_tiktok_sample_crawler` posts normalized row arrays to the inner API,
+which validates and writes to `samples` / `sample_contents` / `sample_crawl_logs`.
+Key modules:
 
-1. `apps/portal_inner_open_api/services/sample_ingestion_service.py`：封装 `SampleIngestionService`，实现 `_build_*payload`、`_build_content_summary_map`、`_logistics_summary_entries`、`_upsert_sample*` 等逻辑，直接操作 `common.models.infound`。
-2. `apps/portal_inner_open_api/models/sample.py`：定义 `sampleRow`、`sampleIngestionOptions`、`sampleIngestionRequest`、`sampleIngestionResult` 等 Pydantic 模型，约束 collector 的请求结构（请求/响应字段使用小驼峰）。
-3. `apps/portal_inner_open_api/apis/endpoints/sample.py`：暴露 `POST /samples/ingest` 接口，并在 `apis/router.py` 中挂载；handler 依赖 `SampleIngestionService` 并通过 `DatabaseManager.get_session()` 获取会话。
-4. `startup.py` 的 `startup_hook` 会调用 `DatabaseManager.initialize()`，确保 API 启动时即准备好 MySQL 连接池。
+1. `apps/portal_inner_open_api/services/sample_ingestion_service.py`: wraps
+   `SampleIngestionService`, implements `_build_*payload`,
+   `_build_content_summary_map`, `_logistics_summary_entries`, `_upsert_sample*`,
+   and writes directly to `common.models.infound`.
+2. `apps/portal_inner_open_api/models/sample.py`: defines Pydantic models
+   `sampleRow`, `sampleIngestionOptions`, `sampleIngestionRequest`,
+   `sampleIngestionResult`, etc. Request/response fields use lower camelCase.
+3. `apps/portal_inner_open_api/apis/endpoints/sample.py`: exposes
+   `POST /samples/ingest` and mounts it in `apis/router.py`. The handler depends
+   on `SampleIngestionService` and uses `DatabaseManager.get_session()`.
+4. `startup.py` runs `DatabaseManager.initialize()` in `startup_hook` to prepare
+   the MySQL pool on API startup.
 
-另外，inner API 会根据 `samples` 最新快照写入 `sample_chatbot_schedules`（状态变更触发 + 提醒类重复次数），并由 `ChatbotSchedulePublisher`（启动时后台任务）轮询到期 schedule、批量投递 RabbitMQ；消息内容由 inner API 生成/透传，数据采集侧的 `sample_chatbot` 仅负责消费 MQ 并发送（不管理模板/场景）。
+Additionally, the inner API writes schedules into `sample_chatbot_schedules`
+from the latest `samples` snapshot (status changes + reminder repeats). A
+`ChatbotSchedulePublisher` background task polls due schedules and publishes
+batches to RabbitMQ. The data collection side `sample_chatbot` only consumes MQ
+and sends messages (no template or scenario management).
 
-### Chatbot 消息投递 API（Inner API → MQ）
+### Chatbot message delivery API (Inner API -> MQ)
 
-- **Method & Path**：`POST /chatbot/messages`
-- **鉴权**：同 inner API 其他接口（`X-INFound-Inner-Service-Token`）
-- **Request Body**：JSON 数组，每项至少包含 `platformCreatorId` 与 `messages`（`[{type, content, meta?}, ...]`）
-- **Response**：`success_response({"count": <task_count>})`
+- Method and path: `POST /chatbot/messages`
+- Auth: same as other inner API endpoints (`X-INFound-Inner-Service-Token`)
+- Request body: JSON array, each item must include `platformCreatorId` and
+  `messages` (`[{type, content, meta?}, ...]`)
+- Response: `success_response({"count": <task_count>})`
 
-### API 约定
+### API contract
 
-- **Method & Path**：`POST /samples/ingest`
-- **鉴权**：沿用 `RequestFilterMiddleware`，collector 需要在请求头里包含 `X-INFound-Inner-Service-Token`，token 值来自 `apps/portal_inner_open_api/configs/base.yaml` 的 `AUTH.VALID_TOKENS`。
-- **Request Body**
-  - `source`: 字符串，标记数据来源（如 `portal_tiktok_sample_crawler`）
-  - `operatorId`: UUID，由 collector 通过 `SAMPLE_DEFAULT_OPERATOR_ID` 传入
-  - `options`: 对应 MQ 指令上下文（`campaignId`, `tabs`, `region`, `scanAllPages`, `expandViewContent`, `viewLogistics`, `exportExcel` 等），方便后续审计
-  - `rows`: Playwright 层整理后的行数组，每一项和当前 `_persist_results` 接收到的数据结构一致（字段包含 `region`, `productName`, `platformProductId`, `status`, `requestTimeRemaining`, `platformCreator*`, `postRate`, `isShowcase`, `contentSummary`/`logisticsSnapshot`，以及当 `type` 为 `video` 或 `live` 时的推广指标）
-- **Response**：统一返回 `success_response({"inserted": <rows>, "products": <unique_products>})`。若校验失败或数据库异常，返回标准化错误并写日志。
+- Method and path: `POST /samples/ingest`
+- Auth: `RequestFilterMiddleware`. Collector must send
+  `X-INFound-Inner-Service-Token`, token comes from
+  `apps/portal_inner_open_api/configs/base.yaml` -> `AUTH.VALID_TOKENS`.
+- Request body:
+  - `source`: string, data source (for example `portal_tiktok_sample_crawler`)
+  - `operatorId`: UUID from collector via `SAMPLE_DEFAULT_OPERATOR_ID`
+  - `options`: MQ context (`campaignId`, `tabs`, `region`, `scanAllPages`,
+    `expandViewContent`, `viewLogistics`, `exportExcel`, etc) for audit
+  - `rows`: normalized row array, same structure as `_persist_results`
+    (fields include `region`, `productName`, `platformProductId`, `status`,
+    `requestTimeRemaining`, `platformCreator*`, `postRate`, `isShowcase`,
+    `contentSummary` / `logisticsSnapshot`, plus promotion metrics when
+    `type` is `video` or `live`)
+- Response: `success_response({"inserted": <rows>, "products": <unique_products>})`.
+  Validation or DB errors return standardized errors and are logged.
 
-### 请求示例
+### Request example
 
 ```http
 POST /samples/ingest HTTP/1.1
@@ -305,30 +315,35 @@ Content-Type: application/json
 }
 ```
 
-> Inner API 收到数组后会按照 `platform_product_id` 聚合，分别 upsert `samples` 和 `sample_contents`，并写入 `sample_crawl_logs` / `sample_content_crawl_logs`，逻辑与原 collector 中的 `_persist_results` 保持一致。
+The inner API groups rows by `platform_product_id` and upserts `samples` and
+`sample_contents`, then writes `sample_crawl_logs` / `sample_content_crawl_logs`.
+The logic matches the collector's original `_persist_results`.
 
 ---
 
-## 建联任务（Creator Outreach）
+## Creator Outreach
 
-Inner API 提供建联任务、达人入库、消息下发三类接口，配合 data-collection 的建联爬虫使用。
+Inner API provides outreach tasks, creator ingestion, and message dispatch APIs
+for the data collection outreach crawler.
 
-### 1) 达人入库 API（Crawler → Inner API）
+### 1) Creator ingestion API (Crawler -> Inner API)
 
-- **Method & Path**：`POST /creators/ingest`
-- **鉴权**：`X-INFound-Inner-Service-Token`
-- **Request Body**：
-  - `source`: 数据来源（如 `portal_tiktok_creator_crawler`）
-  - `operatorId`: 账号/操作人 UUID（用于审计字段）
-  - `options`: 任务上下文（可包含 `taskId`/`searchStrategy`/`brandName` 等）
-  - `rows`: 达人数据数组（包含 `platformCreatorId`/`platformCreatorDisplayName`/`platformCreatorUsername`/`connect`/`reply`/`send`/`whatsapp`/`email` 等字段）
-- **写入表**：`creators`、`creator_crawl_logs`
+- Method and path: `POST /creators/ingest`
+- Auth: `X-INFound-Inner-Service-Token`
+- Request body:
+  - `source`: data source (for example `portal_tiktok_creator_crawler`)
+  - `operatorId`: account/operator UUID (for audit)
+  - `options`: task context (`taskId`, `searchStrategy`, `brandName`, etc)
+  - `rows`: creator data array (`platformCreatorId`,
+    `platformCreatorDisplayName`, `platformCreatorUsername`, `connect`, `reply`,
+    `send`, `whatsapp`, `email`, etc)
+- Tables: `creators`, `creator_crawl_logs`
 
-### 2) 建联任务同步 API（Crawler → Inner API）
+### 2) Outreach task sync API (Crawler -> Inner API)
 
-- **Method & Path**：`POST /outreach_tasks/ingest`
-- **鉴权**：`X-INFound-Inner-Service-Token`
-- **Request Body**（小驼峰；`task` 可扩展字段）：
+- Method and path: `POST /outreach_tasks/ingest`
+- Auth: `X-INFound-Inner-Service-Token`
+- Request body (lower camelCase; `task` can include extra fields):
   ```json
   {
     "source": "portal_tiktok_creator_crawler",
@@ -372,39 +387,41 @@ Inner API 提供建联任务、达人入库、消息下发三类接口，配合 
     }
   }
   ```
-- **写入表**：`outreach_tasks`
+- Tables: `outreach_tasks`
 
-### 3) 消息下发 API（Inner API → MQ）
+### 3) Message dispatch API (Inner API -> MQ)
 
-- **Method & Path**：`POST /chatbot/messages`
-- **鉴权**：`X-INFound-Inner-Service-Token`
-- **Request Body**：任务数组（每条至少含 `platformCreatorId` 与 `messages`）
-- **MQ**：Inner API 通过 `RabbitMQProducer` 推送到 `chatbot.topic`，routing key 为 `chatbot.sample.batch`，由 `sample_chatbot` 消费并发送。
+- Method and path: `POST /chatbot/messages`
+- Auth: `X-INFound-Inner-Service-Token`
+- Request body: task array (each item must include `platformCreatorId` and
+  `messages`)
+- MQ: inner API uses `RabbitMQProducer` to publish to `chatbot.topic` with routing
+  key `chatbot.sample.batch`. `sample_chatbot` consumes and sends.
 
-# 代码规范
+# Code Conventions
 
-## 1. 命名规范
+## 1. Naming
 
-| 类型        | 规范        | 示例                      |
-|-----------|-----------|-------------------------|
-| **模块/包**  | 小写 + 下划线  | `import my_module`      |
-| **类**     | 大驼峰命名法    | `class MyClass:`        |
-| **函数/变量** | 小写 + 下划线  | `def calculate_area()`  |
-| **常量**    | 全大写 + 下划线 | `MAX_CONNECTIONS = 100` |
-| **私有属性**  | 双下划线开头    | `__private_var`         |
-| **保护属性**  | 单下划线开头    | `_protected_var`        |
+| Type          | Convention            | Example                  |
+|---------------|-----------------------|--------------------------|
+| Module/Package| lowercase_with_underscores | `import my_module`   |
+| Class         | PascalCase            | `class MyClass:`         |
+| Function/Var  | lowercase_with_underscores | `def calculate_area()`|
+| Constant      | UPPERCASE_WITH_UNDERSCORES | `MAX_CONNECTIONS = 100` |
+| Private attr  | __leading_double_underscore | `__private_var`  |
+| Protected attr| _leading_single_underscore | `_protected_var`  |
 
-## 2. 导入规范
+## 2. Imports
 
-1. **位置**：文件顶部，在模块注释和文档字符串之后
-2. **顺序**：分三组，组间空1行
-    - 标准库
-    - 第三方库
-    - 本地模块
-3. **排序**：每组按字母顺序
+1. Location: top of file, after module comments/docstrings
+2. Order: three groups with a blank line between
+   - Standard library
+   - Third-party libraries
+   - Local modules
+3. Sort alphabetically within each group
 
 ```python
-# ✅ 正确
+# Correct
 import os
 import sys
 
@@ -417,43 +434,43 @@ from myproject.utils import helper
 
 ---
 
-## 3. 注释与文档字符串
+## 3. Comments and docstrings
 
-### 1. 块注释
+### 1. Block comments
 
-- `#` 后空1格，与代码同等级缩进
-- **说明"为什么"而非"做了什么"**
+- Use `#` plus a space, aligned with code indentation
+- Explain why, not what
 
 ```python
-# 计算圆面积（错误示例：重复代码逻辑）
-# 使用数学常数提高精度（正确示例：说明原因）
+# Wrong: repeats the code
+# Right: explain why for better precision
 area = pi * radius ** 2
 ```
 
-### 2. 文档字符串（Docstrings）
+### 2. Docstrings
 
-- **使用三引号** `"""..."""` 或 `'''...'''`
-- **位置**：模块、函数、类、方法的第一个语句
-- **内容**：功能、参数、返回值、异常说明
+- Use triple quotes `"""..."""` or `'''...'''`
+- First statement in module/function/class/method
+- Include purpose, args, return value, and exceptions
 
 ```python
 def calculate_area(radius):
-    """计算圆的面积。
-    
+    """Calculate area of a circle.
+
     Args:
-        radius: 圆的半径（浮点数）
-    
+        radius: Radius of the circle (float)
+
     Returns:
-        float: 圆的面积
+        float: Area of the circle
     """
     return 3.14159 * radius ** 2
 ```
 
 ---
 
-## 4. 其他核心建议
+## 4. Other guidelines
 
-1. ** 字符串引号 **：单引号 `'` 和双引号 `"` 均可，但需保持统一
-2. ** 布尔比较 **：直接用 `if x:` 而非 `if x == True:`
-3. ** 异常处理 **：捕获具体异常，而非裸 `except:`
-4. ** 编码声明 **：Python 3 默认 UTF-8，无需文件头声明
+1. String quotes: single or double is fine, but be consistent
+2. Boolean checks: use `if x:` instead of `if x == True:`
+3. Exceptions: catch specific exceptions, avoid bare `except:`
+4. Encoding: Python 3 defaults to UTF-8; no file header needed

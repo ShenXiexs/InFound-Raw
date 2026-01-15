@@ -1,152 +1,153 @@
-## INFound 数据采集服务
+## INFound Data Collection Services
 
-INFound 内部用于达人/商品信息丰富化的数据采集服务集合。仓库包含可复用的 RabbitMQ 消费与 Playwright 抓取基础设施（`common/`），以及两套样品爬虫实现：
+Internal data collection services for enriching creator and product data in INFound. The repo includes reusable RabbitMQ consumer and Playwright scraping infrastructure (`common/`), plus two sample crawler implementations:
 
-- `apps/portal_tiktok_sample_crawler`：API 版本（通过 Partner API 获取样品列表/内容）
-- `apps/portal_tiktok_sample_crawler_html`：网页抓取版本（Playwright，作为模板/兜底）
+- `apps/portal_tiktok_sample_crawler`: API-based version (Partner API for sample list/content)
+- `apps/portal_tiktok_sample_crawler_html`: HTML scraping version (Playwright, template/fallback)
 
-> **速览**
+> Quick overview
 >
-> 1. 配置由 `configs/base.yaml` 与 `apps/<service>/configs/*.yaml` 组合，`SERVICE_NAME` 环境变量决定加载哪个服务。
-> 2. `main.py` 根据命令行参数启动指定的消费者，并通过 `common.mq` 接到 RabbitMQ。
-> 3. 消费者从 RabbitMQ 读取 JSON 任务，将其交给服务层（示例中为 Playwright 爬虫）处理。
+> 1. Config is composed from `configs/base.yaml` and `apps/<service>/configs/*.yaml`. The `SERVICE_NAME` env var decides which service is loaded.
+> 2. `main.py` starts the specified consumer from CLI args and connects to RabbitMQ via `common.mq`.
+> 3. Consumers read JSON tasks from RabbitMQ and pass them to the service layer (Playwright crawler in the example).
 
 ---
 
-### 技术栈
+### Tech Stack
 
-- Python 3.13，依赖使用 Poetry 管理
-- 异步组件：`asyncio`、`aio-pika`（RabbitMQ）、`Playwright`
-- 数据访问：SQLAlchemy 2 + AsyncMy（未来可复用 `common.models`）
-- 可观测性：`structlog`，并发安全的日志滚动
+- Python 3.13 with Poetry
+- Async stack: `asyncio`, `aio-pika` (RabbitMQ), `Playwright`
+- Data access: SQLAlchemy 2 + AsyncMy (future reuse of `common.models`)
+- Observability: `structlog`, concurrent-safe log rotation
 
 ---
 
-## 仓库结构
+## Repository Structure
 
 ```
 infound-data-collection/
-├── apps/
-│   ├── portal_tiktok_sample_crawler/         # API 版本
-│       ├── crawler_consumer.py               # RabbitMQ 消费端入口
-│       └── configs/{base,dev}.yaml           # 服务内配置
-│   ├── portal_tiktok_sample_crawler_html/    # Playwright 网页抓取版本
-│       ├── crawler_consumer.py               # RabbitMQ 消费端入口
-│       ├── services/crawler_runner_service.py# Playwright 执行逻辑
-│       └── configs/{base,dev}.yaml           # 服务内配置
-│   └── sample_chatbot/                       # Chatbot 消费者（仅转发消息）
-│       ├── crawler_consumer.py               # 消费端入口（dispatcher only）
-│       ├── services/                         # 轮询/派发逻辑骨架
-│       └── configs/{base,dev}.yaml           # 服务内配置
-├── common/
-│   ├── core/                                 # 配置 / 日志 / 数据库通用模块
-│   ├── mq/                                   # RabbitMQ 连接 & 消费基类
-│   └── models/all.py                         # SQLAlchemy 模型集合
-├── configs/base.yaml                         # 全局默认配置
-├── main.py                                   # CLI 启动入口
-├── rabbitmq_connect_test.py                  # RabbitMQ 连通性测试脚本
-├── pyproject.toml / poetry.lock
-└── readme.md
+|-- apps/
+|   |-- portal_tiktok_sample_crawler/           # API-based version
+|   |   |-- crawler_consumer.py                 # RabbitMQ consumer entry
+|   |   `-- configs/{base,dev}.yaml             # Service configs
+|   |-- portal_tiktok_sample_crawler_html/      # Playwright HTML version
+|   |   |-- crawler_consumer.py                 # RabbitMQ consumer entry
+|   |   |-- services/crawler_runner_service.py  # Playwright runner logic
+|   |   `-- configs/{base,dev}.yaml             # Service configs
+|   `-- sample_chatbot/                         # Chatbot consumer (forwarder only)
+|       |-- crawler_consumer.py                 # Consumer entry (dispatcher only)
+|       |-- services/                           # Poll/dispatch logic skeleton
+|       `-- configs/{base,dev}.yaml             # Service configs
+|-- common/
+|   |-- core/                                   # Config / logging / DB utilities
+|   |-- mq/                                     # RabbitMQ connection and consumer base
+|   `-- models/all.py                           # SQLAlchemy model collection
+|-- configs/base.yaml                           # Global defaults
+|-- main.py                                     # CLI entry
+|-- rabbitmq_connect_test.py                    # RabbitMQ connectivity test
+|-- pyproject.toml / poetry.lock
+`-- readme.md
 ```
 
 ---
 
-## 配置模型
+## Configuration Model
 
-1. **环境变量**
-   - `SERVICE_NAME`（必填）：决定加载 `apps/<SERVICE_NAME>/configs` 下的配置。
-   - `ENV`（默认 `dev`）：决定使用 `apps/<SERVICE_NAME>/configs/<ENV>.yaml`。
-   - 支持使用嵌套写法覆盖任意键，例如 `export RABBITMQ__PASSWORD=xxx`、`LOG_LEVEL=DEBUG`。
-2. **配置文件**
-   - `configs/base.yaml`：所有服务共享的默认值（系统名称、RabbitMQ 凭证、日志目录等）。
-   - `apps/<service>/configs/base.yaml`：服务专属配置（交换机、队列、鉴权 token 等）。
-   - `apps/<service>/configs/<env>.yaml`：按环境覆盖（示例给出 `dev.yaml`）。
-3. **加载顺序**
-   - `common.core.config.Settings` 会扁平化 YAML，并以 **全局 → 服务 base → 服务 env → 环境变量** 的顺序合并。
-   - 如果未设置 `SERVICE_NAME`，`settings` 在导入时会直接抛出 `ValueError`。
+1. Environment variables
+   - `SERVICE_NAME` (required): chooses `apps/<SERVICE_NAME>/configs`.
+   - `ENV` (default `dev`): uses `apps/<SERVICE_NAME>/configs/<ENV>.yaml`.
+   - Nested override is supported, for example `export RABBITMQ__PASSWORD=xxx`, `LOG_LEVEL=DEBUG`.
+2. Config files
+   - `configs/base.yaml`: shared defaults (system name, RabbitMQ creds, log dir, etc).
+   - `apps/<service>/configs/base.yaml`: service-specific config (exchange, queue, auth token, etc).
+   - `apps/<service>/configs/<env>.yaml`: environment overrides (example: `dev.yaml`).
+3. Merge order
+   - `common.core.config.Settings` flattens YAML and merges in order:
+     global -> service base -> service env -> environment variables.
+   - If `SERVICE_NAME` is not set, `settings` raises `ValueError` at import time.
 
 ---
 
-## 本地运行指南
+## Local Run Guide
 
-### 1. 前置依赖
+### 1. Prerequisites
 
 - Python 3.13
 - Poetry
-- 已可访问的 RabbitMQ（脚本会连接实际服务器）
-- Playwright 浏览器依赖（首次需执行 `playwright install`，Linux 可能还要安装系统依赖）
+- RabbitMQ access (scripts connect to a real server)
+- Playwright browser deps (first run requires `playwright install`, Linux may need system deps)
 
-### 2. 安装依赖
+### 2. Install dependencies
 
 ```bash
 cd /Users/samxie/Research/Infound_Influencer/InFound_Back/infound-data-collection
-poetry env use python3.13          # 指定解释器
-poetry lock                        # 使 lock 文件与 pyproject 对齐
-poetry install --no-root           # 仅安装依赖，避免包布局报错
-poetry run playwright install      # 下载浏览器
-# 可选：进入虚拟环境交互
+poetry env use python3.13          # Set interpreter
+poetry lock                        # Sync lock with pyproject
+poetry install --no-root           # Install deps without packaging
+poetry run playwright install      # Download browsers
+# Optional: enter virtualenv
 # poetry shell
 ```
 
-### 3. 设置环境变量
+### 3. Set environment variables
 
 ```bash
 export SERVICE_NAME=portal_tiktok_sample_crawler_html
-export ENV=dev        # 若有 stg/pro 配置也可切换
-export PLAYWRIGHT_HEADLESS=false     # 本地调试想看到页面可改为 false
+export ENV=dev        # Switch to stg/pro if present
+export PLAYWRIGHT_HEADLESS=false     # Set false to see the browser locally
 ```
 
-### 4. 启动消费者
+### 4. Start the consumer
 
 ```bash
 poetry run python main.py --consumer portal_tiktok_sample_crawler_html --env "$ENV"
 ```
 
-可选参数：
+Optional flags:
 
-- `--env`: 临时覆盖 `ENV`，如 `--env stg`
-- `--all`: 预留用于同时启动 `settings.CONSUMERS` 中的全部消费者（目前只有一个）
+- `--env`: override `ENV` temporarily (for example `--env stg`)
+- `--all`: reserved for starting all consumers in `settings.CONSUMERS` (currently one)
 
-使用 `Ctrl+C` 退出，`main.py` 会捕获 SIGINT/SIGTERM，调用 `consumer.stop()` 关闭 RabbitMQ 连接。
+Use `Ctrl+C` to exit. `main.py` traps SIGINT/SIGTERM and calls `consumer.stop()`.
 
-### 5. 后台运行（nohup 示例）
+### 5. Run in background (nohup example)
 
 ```bash
 mkdir -p logs
 nohup poetry run python main.py --consumer portal_tiktok_sample_crawler_html --env "$ENV" \
   > logs/portal_tiktok_sample_crawler_html.out 2>&1 &
-tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
+tail -f logs/portal_tiktok_sample_crawler_html.out   # Follow output
 ```
 
-如需停止，查找 PID 后 `kill <pid>`。
+To stop, find the PID and run `kill <pid>`.
 
 ---
 
-## RabbitMQ 集成
+## RabbitMQ Integration
 
 - `common.mq.connection.RabbitMQConnection`
-  - 声明 **direct** 交换机 + 专用死信交换机（`<exchange>.dlx`）与死信队列（`<queue>.dead`）。
-  - 可配置的 QoS、重连间隔、最大重试次数。
-  - 通过结构化日志输出连接/关闭状态。
+  - Declares a direct exchange plus a dedicated DLX (`<exchange>.dlx`) and DLQ (`<queue>.dead`).
+  - Configurable QoS, reconnect interval, and max retries.
+  - Structured logs for connect/close state.
 - `common.mq.consumer_base.ConsumerBase`
-  - 提供统一的消费循环与自动重连。
-  - 解析 JSON 消息体并写入上下文日志，封装错误策略：
-    - `ValueError`：`reject(requeue=False)`（格式错误，不重试）
-    - `MessageProcessingError`：`reject(requeue=True)`（业务可重试）
-    - 其他异常：`reject(requeue=False)`（防止死循环）
-  - 使用 `async with message.process()` 确保手动 ACK/NACK。
+  - Unified consume loop with auto reconnect.
+  - Parses JSON body and attaches context logs, with error handling:
+    - `ValueError`: `reject(requeue=False)` (bad format, no retry)
+    - `MessageProcessingError`: `reject(requeue=True)` (business retry)
+    - Other errors: `reject(requeue=False)` (avoid endless loops)
+  - Uses `async with message.process()` for manual ACK/NACK.
 
-示例消费者 `apps/portal_tiktok_sample_crawler_html/crawler_consumer.py` 继承该基类，从配置构造 RabbitMQ 连接，并将任务交给 `CrawlerRunnerService`。
+Example consumer `apps/portal_tiktok_sample_crawler_html/crawler_consumer.py` extends the base, builds RabbitMQ connection from config, and delegates to `CrawlerRunnerService`.
 
 ---
 
-## Collector → Inner API 写库链路
+## Collector -> Inner API Ingestion Pipeline
 
-`portal_tiktok_sample_crawler_html` 现在不再直接写库，而是通过 `SampleIngestionClient` 将每批归一化结果 POST 到 backend inner API (`POST /samples/ingest`)，由 `SampleIngestionService` 负责聚合 content summary、去重 content 并落库。整体约定如下：
+`portal_tiktok_sample_crawler_html` no longer writes to DB directly. It posts each batch of normalized rows to the backend inner API (`POST /samples/ingest`) via `SampleIngestionClient`. The inner API aggregates content summary, de-duplicates content, and writes to the DB. Details:
 
-1. `apps/portal_tiktok_sample_crawler_html/services/sample_ingestion_client.py` 封装了基于 `httpx.AsyncClient` 的调用、鉴权和错误处理；当启用 `RABBITMQ.AT_MOST_ONCE=true` 时，任务不会重试，失败会记录日志并（尽力）投递到死信队列。
-2. `CrawlerRunnerService._persist_results` 会把 `CrawlOptions`（`dataclasses.asdict`）和标准化 `rows` 打包，并附带 `source`（默认取 `settings.CONSUMER`）与当前 `operatorId`。
-3. `apps/portal_tiktok_sample_crawler_html/configs/base.yaml` 中新增 `INNER_API` 配置，可通过环境变量覆盖：
+1. `apps/portal_tiktok_sample_crawler_html/services/sample_ingestion_client.py` wraps `httpx.AsyncClient` calls, auth, and error handling. When `RABBITMQ.AT_MOST_ONCE=true`, tasks do not retry; failures are logged and best-effort pushed to DLQ.
+2. `CrawlerRunnerService._persist_results` bundles `CrawlOptions` (`dataclasses.asdict`) and normalized `rows`, and includes `source` (default `settings.CONSUMER`) and `operatorId`.
+3. `apps/portal_tiktok_sample_crawler_html/configs/base.yaml` adds `INNER_API` config, overridable by env vars:
    ```yaml
    INNER_API:
      BASE_URL: "<INNER_API_BASE_URL>"
@@ -156,16 +157,16 @@ tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
      REQUIRED_HEADER: "X-INFound-Inner-Service-Token"
      VALID_TOKENS: ["<INNER_API_TOKEN>"]
    ```
-   将来上线环境只需设置 `INNER_API__BASE_URL` 和 `INNER_API_AUTH__TOKEN` 即可。
-4. Collector 仍可按需导出 Excel/CSV；即便数据库临时不可达，只要 inner API 可访问即可完成任务，进一步降低了 Playwright 进程的权限需求。
+   In production, set `INNER_API__BASE_URL` and `INNER_API_AUTH__TOKEN` only.
+4. The collector can still export Excel/CSV. As long as inner API is reachable, the task can complete even if DB is not directly accessible, reducing Playwright permissions.
 
-### 请求/响应协定
+### Request/response contract
 
-- **URL**：`${INNER_API.BASE_URL}${INNER_API.SAMPLE_PATH}`
-- **Headers**：
+- URL: `${INNER_API.BASE_URL}${INNER_API.SAMPLE_PATH}`
+- Headers:
   - `Content-Type: application/json`
   - `${INNER_API_AUTH.REQUIRED_HEADER}: <token>`
-- **Body**：
+- Body:
   ```json
   {
     "source": "portal_tiktok_sample_crawler_html",
@@ -179,65 +180,65 @@ tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
       "viewLogistics": true,
       "exportExcel": false
     },
-    "rows": [{ "...": "Playwright 整理后的字段" }]
+    "rows": [{ "...": "Playwright normalized fields" }]
   }
   ```
-- **成功响应**：`{"code": 200, "msg": "success", "data": {"inserted": 40, "products": 9}}`
-- **失败响应**：inner API 会返回 `code!=200` 或 HTTP 4xx/5xx，客户端会写日志并抛出 `MessageProcessingError`。
+- Success response: `{"code": 200, "msg": "success", "data": {"inserted": 40, "products": 9}}`
+- Error response: inner API returns non-200 code or HTTP 4xx/5xx; client logs and raises `MessageProcessingError`.
 
 ---
 
-## Sample 系列专题
+## Sample Series Notes
 
-目前队列里只支持「Sample」系列的爬虫任务，因此每条消息都需要显式声明 `function: "sample"`（命令行脚本已默认带上）。后续增加新的功能链路时，可以在 `function` 上做分流，互不影响。
+Currently the queue supports only the "Sample" series. Each message must include `function: "sample"` (CLI defaults include it). If new functions are added, `function` can be used for routing.
 
-### Tab 对应关系
+### Tab mapping
 
-| MQ `tab` 值 | 页面标题             | URL 参数                |
-| ------------- | -------------------- | ----------------------- |
-| `review`    | To review            | `tab=to_review`       |
-| `ready`     | Ready to ship        | `tab=ready_to_ship`   |
-| `shipped`   | Shipped              | `tab=shipped`         |
-| `pending`   | Content pending      | `tab=content_pending` |
-| `completed` | Completed            | `tab=completed`       |
-| `canceled`  | Canceled             | `tab=cancel`          |
-| `all`       | 顺序遍历上述六个标签 | *依次跳转*            |
+| MQ `tab` value | Page title        | URL parameter           |
+|---------------|-------------------|-------------------------|
+| `review`      | To review         | `tab=to_review`         |
+| `ready`       | Ready to ship     | `tab=ready_to_ship`     |
+| `shipped`     | Shipped           | `tab=shipped`           |
+| `pending`     | Content pending   | `tab=content_pending`   |
+| `completed`   | Completed         | `tab=completed`         |
+| `canceled`    | Canceled          | `tab=cancel`            |
+| `all`         | Iterate all tabs  | *switch in order*       |
 
-> `tab=all` 在页面上依次切换到 To review → Ready to ship → Shipped → Content pending → Completed → Canceled，方便一次性导出/写库全部状态。
+`tab=all` switches in order: To review -> Ready to ship -> Shipped -> Content pending -> Completed -> Canceled.
 
 ---
 
-## Playwright 爬虫服务
+## Playwright Crawler Service
 
-`apps/portal_tiktok_sample_crawler_html/services/crawler_runner_service.py` 现在完整复刻了历史 `sample_all.py` + `sample_process.py` 的功能，核心特性如下：
+`apps/portal_tiktok_sample_crawler_html/services/crawler_runner_service.py` fully mirrors the legacy `sample_all.py` + `sample_process.py` behavior. Key features:
 
-- **账号/区域管理**：支持通过配置文件或 MQ 消息选择账号、禁用账号、切换区域，内置 Gmail 验证码登录流程。
-- **自动监控与抓取**：登录后常驻主页，监听 RabbitMQ 消息并按 tab（All/To review/Ready...）轮询，每条消息仅处理一个活动 ID。
-- **精准筛选**：收到 `campaignId` 时自动在搜索框输入 Campaign ID，再分页抓取；`scanAllPages=true` 时会遍历整个 tab。
-- **多 Action 处理**：除基础行解析外，实现了 View content 抽屉解析（视频/直播 Tab、多重重试）、View logistics 快照（基础信息+时间线+原始文本）以及 Approve 按钮可用性记录。
-- **数据标准化与持久化**：按 `sample_process.py` 的标准对字段进行格式化、聚合 content_summary（含去重及 logistics 插桩），并实时更新 `samples`、`sample_crawl_logs`、`sample_contents`、`sample_content_crawl_logs`。
-- **可选导出**：当 `exportExcel=true` 时会将规范化后的所有行同步导出为 `data/manage_sample/samples_<region>_<campaign>_<tabs>_<ts>.{xlsx,csv}`，方便人工校验与回溯。
+- Account and region management: select accounts via config or MQ messages, disable accounts, switch regions, includes Gmail OTP login flow.
+- Auto monitoring and scraping: stay on home page after login, listen to RabbitMQ messages and poll by tab (All/To review/Ready...). Each message handles one campaign ID.
+- Precise filtering: with `campaignId`, fill search box and crawl pages; `scanAllPages=true` iterates all pages in the tab.
+- Action parsing: parses View content drawer (video/live, retries), View logistics snapshot (basic info + timeline + raw text), and Approve button state.
+- Normalization and persistence: formats fields per `sample_process.py` rules, aggregates content_summary (dedupe + logistics insert), and updates `samples`, `sample_crawl_logs`, `sample_contents`, `sample_content_crawl_logs`.
+- Optional export: when `exportExcel=true`, exports normalized rows to `data/manage_sample/samples_<region>_<campaign>_<tabs>_<ts>.{xlsx,csv}` for review.
 
-### MQ 消息字段（推荐小驼峰）
+### MQ message fields (lower camelCase recommended)
 
-| 字段                    | 类型                | 说明                                                                            |
-| ----------------------- | ------------------- | ------------------------------------------------------------------------------- |
-| `function`            | `str`             | 任务类型标识，当前仅支持 `sample`（并据此选择 Sample 系列逻辑）               |
-| `campaignId`          | `str`             | 可选，指定 Campaign ID，默认遍历全部                                            |
-| `accountName`         | `str`             | 可选，覆盖配置文件中的账号                                                      |
-| `region`              | `str`             | 可选，默认 `settings.SAMPLE_DEFAULT_REGION`                                   |
-| `tab` / `tabs`      | `str / list[str]` | 需要扫描的 tab（`all`/`review`/`ready`/...），支持传入数组                |
-| `expandViewContent`   | `bool`            | 是否展开 View content 抽屉并解析视频/直播数据                                   |
-| `viewLogistics`       | `bool`            | 是否点击 View logistics 并保存物流快照                                          |
-| `scanAllPages`        | `bool`            | `true` 时分页遍历整个 tab；若缺省且提供 `campaignId`，默认只抓取首个匹配行 |
-| `maxPages`            | `int`             | 最大翻页数，防止无限循环                                                        |
-| `exportExcel`         | `bool`            | 是否在写库前额外导出 Excel/CSV                                                  |
+| Field                 | Type           | Description                                                  |
+|-----------------------|----------------|--------------------------------------------------------------|
+| `function`            | `str`          | Task type, currently only `sample`                           |
+| `campaignId`          | `str`          | Optional, campaign ID                                        |
+| `accountName`         | `str`          | Optional, override account                                   |
+| `region`              | `str`          | Optional, default `settings.SAMPLE_DEFAULT_REGION`           |
+| `tab` / `tabs`        | `str / list`   | Tabs to scan (`all`/`review`/`ready`/...)                    |
+| `expandViewContent`   | `bool`         | Expand View content drawer and parse video/live              |
+| `viewLogistics`       | `bool`         | Click View logistics and save snapshot                       |
+| `scanAllPages`        | `bool`         | If true, paginate all pages; with `campaignId` default is first match only
+| `maxPages`            | `int`          | Max pages to prevent infinite loops                          |
+| `exportExcel`         | `bool`         | Export Excel/CSV before DB write                             |
 
-所有字段均支持在 `configs/*.yaml` 中设置默认值。
+All fields can be set with defaults in `configs/*.yaml`.
 
-### MQ 消息示例
+### MQ message examples
 
-- **最常用（单 Campaign + Completed 标签）**：
+- Most common (single campaign, Completed tab):
 
 ```json
 {
@@ -252,7 +253,7 @@ tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
 }
 ```
 
-- **按多个 Campaign ID 顺序抓取（逐个搜索、每次等待加载 5~8 秒，抓完清空再下一个）**：
+- Multiple campaign IDs in order (search, wait 5 to 8 seconds per ID):
 
 ```json
 {
@@ -266,9 +267,9 @@ tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
 }
 ```
 
-> 行为：每个 campaign 会重新点击目标 tab → 填入搜索框 → 回车/点放大镜并等待约 5 秒 → 抓取 → 清空搜索框再处理下一个。
+Behavior: for each campaign, switch to tab, type search, press enter or click search, wait about 5 seconds, crawl, clear search, move to next ID.
 
-- **全量遍历当前 tab（不指定活动）**：
+- Full traversal for current tabs (no campaign filter):
 
 ```json
 {
@@ -281,9 +282,9 @@ tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
 }
 ```
 
-> 说明：`tab=all` 会顺序遍历 To review / Ready to ship / Shipped / Content pending / Completed / Canceled 六个标签。只有提供 `campaignId` 时才会执行搜索过滤，否则按各标签的完整列表抓取。
+`tab=all` iterates To review / Ready to ship / Shipped / Content pending / Completed / Canceled. If `campaignId` is provided, search filtering is applied; otherwise it crawls full lists.
 
-- **指定活动 ID，抓取搜索结果的所有分页**：
+- Specific campaign ID with full pagination:
 
 ```json
 {
@@ -297,51 +298,51 @@ tail -f logs/portal_tiktok_sample_crawler_html.out   # 实时查看输出
 }
 ```
 
-将 JSON 发送到交换机 `crawler.direct`（按 tab 拆分投递；由 `portal_tiktok_sample_crawler` 单进程同时消费）：
+Send JSON to exchange `crawler.direct` (split by tab routing). The single process `portal_tiktok_sample_crawler` consumes:
 
-- Completed 队列：routing key `crawler.tiktok.sample.completed.key` → 队列 `crawler.tiktok.sample.completed.queue`
-- Other 队列：routing key `crawler.tiktok.sample.other.key` → 队列 `crawler.tiktok.sample.other.queue`
+- Completed queue: routing key `crawler.tiktok.sample.completed.key` -> queue `crawler.tiktok.sample.completed.queue`
+- Other queue: routing key `crawler.tiktok.sample.other.key` -> queue `crawler.tiktok.sample.other.queue`
 
-### 抓取与落库流程
+### Crawl and persistence flow
 
-1. **登录 & 主页监控**：启动 Playwright、完成 Gmail 验证码登录，并记录 tab 数量基线。
-2. **任务执行**：对每个 tab -> 清空或输入 Campaign ID -> 分页调用 `_crawl_current_page`。每行除了基础字段，还会记录按钮状态、Creator 详情。
-3. **Action 扩展**：
-   - `View content`: 逐个 Tab（Video/Live）提取推广指标，内置重试/抽屉关闭。
-   - `View logistics`: 抽取描述信息、表格、时间线与原始文本，存入 `content_summary`（`type="logistics"`）并在导出文件中以 JSON 形式保留。
-4. **标准化**：数字/百分比/时间字段全部转换为整数或 Decimal，`content_summary` 依据 `platform_product_id` 去重聚合，保证所有 promotion/logistics 条目唯一。
-5. **写库 & 导出**：将标准化结果分别 upsert 到 4 张样品相关表，并根据选项导出 Excel/CSV。
+1. Login and home monitoring: start Playwright, complete Gmail OTP login, record tab count baseline.
+2. Task execution: for each tab -> clear or input campaign ID -> paginate and call `_crawl_current_page`. Each row records base fields plus button states and creator details.
+3. Action expansion:
+   - View content: parse video/live metrics with retries and drawer close handling.
+   - View logistics: parse description list, table, timeline, raw text; stored in `content_summary` (`type="logistics"`) and exported as JSON.
+4. Normalization: numbers, percentages, and time fields are converted to int or Decimal; `content_summary` is deduped by `platform_product_id` and ensures unique promotion/logistics entries.
+5. DB write and export: upsert into four sample tables and export Excel/CSV as configured.
 
-Playwright 相关依赖需通过 `poetry run playwright install` 安装，推荐在消费者启动阶段完成一次 `initialize()` 以复用浏览器实例。
+Playwright dependencies must be installed with `poetry run playwright install`. It is recommended to call `initialize()` once at consumer startup to reuse the browser instance.
 
-### 功能清单（已对齐旧版 sample_all.py / sample_process.py）
+### Feature list (aligned with legacy `sample_all.py` / `sample_process.py`)
 
-- **账号策略**：支持配置文件的多账号、禁用位、区域优先匹配；MQ 可指定 `accountName`/`region`，未命中时回退默认账号。
-- **登录与验证码**：Gmail App 密码拉取验证码；失败自动重试 3 次。
-- **首页监控**：登录后记录 tab 计数，任务前比对增量（新消息提醒）。
-- **消息协议**：支持 tab 数组、区域/账号/是否展开 View content、是否抓物流、是否全量翻页、最大页数、是否导出 Excel/CSV。
-- **搜索与分页**：若 `campaignId` 且未开启全量，先填入搜索框并仅抓取匹配行；全量则清空搜索并逐页抓取，分页按钮含重试。
-- **行解析**：商品/活动 ID、SKU、库存、可用样品、状态、剩余时间、post_rate、is_showcase、creator 信息等全部保留。
-- **Action 解析**：识别 View content / View logistics / Approve，记录按钮是否禁用；可按开关执行物流抽屉抓取。
-- **View content 抽屉**：多次重试、按 Video/Live tab 提取推广指标，支持特殊布局与兜底空值。
-- **View logistics 抽屉**：解析描述列表、表格、时间线事件与原始文本，并写入 content_summary 的 `type="logistics"` 条目。
-- **字段规范化**：沿用 `sample_process.py` 的转换规则，含缩写数字（k/m）、百分比、时间残留、布尔统一等，避免科学计数。
-- **content_summary 去重**：同一商品按 JSON 去重 promotion/logistics 条目，无数据时写入空条目保证 JSON 列有效。
-- **写库**：实时 upsert `samples`、`sample_crawl_logs`、`sample_contents`、`sample_content_crawl_logs`。时间字段用 UTC，操作人取 `settings.SAMPLE_DEFAULT_OPERATOR_ID`。
-- **导出**：若 `exportExcel=true`，将标准化后的所有行导出到 `data/manage_sample/samples_<region>_<campaign>_<tabs>_<ts>.xlsx/csv`，并对列表/JSON 字段序列化方便审阅。
+- Account strategy: multi-account config, disabled slots, region match priority; MQ can specify `accountName`/`region`, fallback to default.
+- Login and OTP: Gmail App Password based OTP retrieval; retries up to 3 times.
+- Home monitoring: record tab counts and compare deltas before tasks.
+- Message protocol: supports tab arrays, region/account overrides, content drawer toggle, logistics toggle, full pagination, max pages, export flags.
+- Search and pagination: with `campaignId` and no full scan, only crawl matched rows; full scan clears search and paginates with retries.
+- Row parsing: product/campaign ID, SKU, inventory, available samples, status, remaining time, post_rate, is_showcase, creator info.
+- Action parsing: detect View content / View logistics / Approve, record disabled state; optional logistics drawer parsing.
+- View content drawer: retries, parse metrics by Video/Live tab, handle special layouts and empty fallback.
+- View logistics drawer: parse description list, tables, timeline, raw text; store as `type="logistics"` in content_summary.
+- Field normalization: same rules as `sample_process.py` including compact numbers (k/m), percentages, time remaining, boolean normalization; avoid scientific notation.
+- content_summary dedupe: per product JSON de-dup for promotion/logistics entries; if empty, write an empty summary to keep JSON valid.
+- DB write: upsert `samples`, `sample_crawl_logs`, `sample_contents`, `sample_content_crawl_logs`. Timestamps are UTC; operator uses `settings.SAMPLE_DEFAULT_OPERATOR_ID`.
+- Export: if `exportExcel=true`, export normalized rows to `data/manage_sample/samples_<region>_<campaign>_<tabs>_<ts>.xlsx/csv`, JSON-encode list/JSON fields for review.
 
-## 样品 Chatbot（MX 区域）
+## Sample Chatbot (MX region)
 
-- 启动方式：设置 `SERVICE_NAME=sample_chatbot`、`ENV=<env>` 后执行 `poetry run python main.py --consumer sample_chatbot`。
-- 职责拆分：
-  - Inner API：入库后写入 `sample_chatbot_schedules`（状态变更/提醒规则），并由后台任务批量投递 MQ。
-  - `sample_chatbot`：只消费 MQ 并通过 Playwright 发送聊天消息（不再轮询 DB 生产任务）。
-- RabbitMQ（topic）约定：
-  - Exchange：`chatbot.topic`
-  - Queue：`chatbot.sample.queue.topic`（DLQ：`chatbot.sample.queue.topic.dead`，DLX：`chatbot.topic.dlx`）
-  - 发布 routing key：`chatbot.sample.batch`（队列绑定：`chatbot.sample.*`）
-- 消息格式（小驼峰；`messages` 必填，可直接发送数组或使用 `tasks` 包装）：
-  - 任务数组（推荐）：
+- Startup: set `SERVICE_NAME=sample_chatbot`, `ENV=<env>`, then run `poetry run python main.py --consumer sample_chatbot`.
+- Responsibilities:
+  - Inner API: writes `sample_chatbot_schedules` after ingestion (status change and reminder rules), and publishes batches to MQ via a background task.
+  - `sample_chatbot`: only consumes MQ and sends chat messages via Playwright (no DB polling, no template management).
+- RabbitMQ (topic) conventions:
+  - Exchange: `chatbot.topic`
+  - Queue: `chatbot.sample.queue.topic` (DLQ: `chatbot.sample.queue.topic.dead`, DLX: `chatbot.topic.dlx`)
+  - Publish routing key: `chatbot.sample.batch` (queue binding: `chatbot.sample.*`)
+- Message format (lower camelCase; `messages` required, can send array or wrap with `tasks`):
+  - Task array (recommended):
     ```json
     [
       {
@@ -354,7 +355,7 @@ Playwright 相关依赖需通过 `poetry run playwright install` 安装，推荐
       }
     ]
     ```
-  - 批量包装（兼容）：
+  - Batch wrapper (compatible):
     ```json
     {
       "taskId": "BATCH-UUID",
@@ -370,25 +371,25 @@ Playwright 相关依赖需通过 `poetry run playwright install` 安装，推荐
       ]
     }
     ```
-  - 可选字段：`accountName`（指定发送账号）、`from`/`operatorId`（发送者 ID）、`sampleId`、`platformProductId`、`platformProductName`、`platformCampaignName`、`platformCreatorUsername`、`creatorWhatsapp`。
-- 消息生成：Inner API/运营中台负责生成并下发消息内容；`sample_chatbot` 只按 `messages` 转发，不管理模板/场景。
-- 失败与重发：
-  - 单条 task 发送失败会投递到 DLQ `chatbot.sample.queue.topic.dead`（不会吞掉整批）。
-  - 可用 `poetry run python tools/requeue_chatbot_dlq.py --consumer sample_chatbot --env <env>` 将 DLQ 消息重新投递回主 exchange。
+  - Optional fields: `accountName`, `from`/`operatorId`, `sampleId`, `platformProductId`, `platformProductName`, `platformCampaignName`, `platformCreatorUsername`, `creatorWhatsapp`.
+- Message generation: Inner API or ops tooling generates content and sends; `sample_chatbot` only forwards `messages`.
+- Failures and replay:
+  - Failed task is moved to DLQ `chatbot.sample.queue.topic.dead` (does not drop the whole batch).
+  - Use `poetry run python tools/requeue_chatbot_dlq.py --consumer sample_chatbot --env <env>` to republish DLQ messages.
 
-## 建联任务（Creator Outreach）
+## Creator Outreach
 
-### 运行链路（爬虫 → Inner API → MQ/发送）
+### Run pipeline (crawler -> Inner API -> MQ/send)
 
-1. `portal_tiktok_creator_crawler` 通过 Playwright 登录、筛选、滚动加载达人列表并抓取详情/联系方式。
-2. 每个达人抓取结果会发送到 Inner API `/creators/ingest` 进行入库（`creators` + `creator_crawl_logs`）。
-3. 任务进度/状态同步到 Inner API `/outreach_tasks/ingest`（建联任务表）。
-4. 若满足发送条件，则向 Inner API `/chatbot/messages` 发送消息任务；Inner API 再转发到 RabbitMQ，由 `sample_chatbot` 消费并通过 Playwright 发送。
+1. `portal_tiktok_creator_crawler` logs in via Playwright, filters, scrolls, and scrapes creator details and contacts.
+2. Each creator row is posted to Inner API `/creators/ingest` (tables `creators` + `creator_crawl_logs`).
+3. Task progress and status are synced to Inner API `/outreach_tasks/ingest`.
+4. If send conditions are met, it sends message tasks to Inner API `/chatbot/messages`, which forwards to RabbitMQ for `sample_chatbot` to deliver.
 
-### Inner API 调用
+### Inner API calls
 
-- **创建/更新建联任务**：`POST /outreach_tasks/ingest`
-  - Body（小驼峰；`task` 可扩展字段）：
+- Create or update outreach task: `POST /outreach_tasks/ingest`
+  - Body (lower camelCase; `task` can include extra fields):
     ```json
     {
       "source": "portal_tiktok_creator_crawler",
@@ -432,79 +433,80 @@ Playwright 相关依赖需通过 `poetry run playwright install` 安装，推荐
       }
     }
     ```
-  - `operatorId`：账号/操作人 UUID（用于审计字段）。
+  - `operatorId`: account/operator UUID used for audit fields.
 
-- **达人数据入库**：`POST /creators/ingest`
-  - Body：`source`/`operatorId`/`options`/`rows`；`rows` 里包含 `creator_id`、`creator_name`、`categories`、`followers`、`gmv`、`contact`、`connect/reply/send` 等完整字段。
+- Creator ingestion: `POST /creators/ingest`
+  - Body: `source` / `operatorId` / `options` / `rows`; `rows` includes
+    `creator_id`, `creator_name`, `categories`, `followers`, `gmv`, `contact`,
+    `connect/reply/send` etc.
 
-- **发送消息任务**：`POST /chatbot/messages`
-  - 与样品 Chatbot 的 payload 格式一致，Inner API 会转发到 RabbitMQ。
+- Message tasks: `POST /chatbot/messages`
+  - Payload matches the sample chatbot format; inner API forwards to RabbitMQ.
 
-### RabbitMQ 约定
+### RabbitMQ conventions
 
-- 交换机/队列与 `sample_chatbot` 共用：
-  - Exchange：`chatbot.topic`
-  - Queue：`chatbot.sample.queue.topic`（DLQ：`chatbot.sample.queue.topic.dead`，DLX：`chatbot.topic.dlx`）
-  - Routing key：`chatbot.sample.batch`（队列绑定：`chatbot.sample.*`）
+- Exchange and queue shared with `sample_chatbot`:
+  - Exchange: `chatbot.topic`
+  - Queue: `chatbot.sample.queue.topic` (DLQ: `chatbot.sample.queue.topic.dead`, DLX: `chatbot.topic.dlx`)
+  - Routing key: `chatbot.sample.batch` (queue binding: `chatbot.sample.*`)
 
-### 字段规范化与入库映射（与 sample_process.py 对齐）
+### Field normalization and persistence mapping (aligned with `sample_process.py`)
 
-- **ID/标识**：`platform_product_id` 必填；`platform_campaign_id` 归一化（去前后空格、纯数字去前导 0）；空值行直接丢弃。
-- **数值**：`available_sample_count`、`stock`、`promotion_view/like/comment/order` → 整数；`post_rate`、`promotion_order_total_amount` → Decimal。
-- **时间/字符串**：`request_time_remaining` 归一化为 “X days/hours”；`extracted_time` 统一 UTC 文本。
-- **布尔**：`is_showcase`、`is_uncooperative`、`is_unapprovable` 填充 0/False。
-- **creator 信息**：`platform_creator_display_name`/`platform_creator_username`/`platform_creator_id`/`creator_url` 全部落库；用户名自动去 @。
-- **content_summary**：按 `platform_product_id` 聚合，包含 Video/Live promotion 指标及物流事件，避免重复记录；空则写入一条空 summary。
-- **日志表**：`SampleCrawlLogs` 按天记录全量字段；`SampleContentCrawlLogs` 保存每条内容（Video/Live）明细。
-- **导出列顺序**：保持旧版 Excel 字段顺序，附带 `actions`、`action_details`、`logistics_snapshot` 的 JSON。
+- IDs: `platform_product_id` required; `platform_campaign_id` normalized (trim, remove leading zeros for numeric). Empty rows are dropped.
+- Numbers: `available_sample_count`, `stock`, `promotion_view/like/comment/order` -> int; `post_rate`, `promotion_order_total_amount` -> Decimal.
+- Time/strings: `request_time_remaining` normalized to "X days/hours"; `extracted_time` stored as UTC string.
+- Booleans: `is_showcase`, `is_uncooperative`, `is_unapprovable` default to 0/False.
+- Creator info: `platform_creator_display_name`, `platform_creator_username`, `platform_creator_id`, `creator_url` are persisted; username strips leading @.
+- content_summary: aggregate by `platform_product_id`, include Video/Live promotions and logistics events, and avoid duplicates; if empty, write one empty summary.
+- Log tables: `SampleCrawlLogs` stores full rows by day; `SampleContentCrawlLogs` stores per content item (Video/Live).
+- Export column order: keep legacy Excel column order and include JSON for `actions`, `action_details`, `logistics_snapshot`.
 
-### 实际操作提示
+### Operational tips
 
-1. **准备配置**：在 `apps/portal_tiktok_sample_crawler_html/configs/*.yaml` 配置账号、区域、默认 tab 与开关（`SAMPLE_EXPAND_VIEW_CONTENT`、`SAMPLE_VIEW_LOGISTICS_ENABLED`、`SAMPLE_ENABLE_EXCEL_EXPORT`）。
-2. **运行**：设置 `SERVICE_NAME=portal_tiktok_sample_crawler_html`，启动消费者；向队列投递消息时，可附 `{"campaignId": "...", "viewLogistics": true, "exportExcel": true}` 验证。
-3. **验证**：关注日志中的 tab 计数 diff、登录成功提示；检查导出目录 `data/manage_sample/` 与数据库 `samples`/`sample_contents` 是否有对应记录。
-4. **故障排查**：如果登录/抽屉偶发超时，重试已内置；若页面结构再变化，可更新 `SAMPLE_SEARCH_INPUT_SELECTOR` 或 selector 片段后重跑。
+1. Config prep: update `apps/portal_tiktok_sample_crawler_html/configs/*.yaml` for account, region, default tab, and switches (`SAMPLE_EXPAND_VIEW_CONTENT`, `SAMPLE_VIEW_LOGISTICS_ENABLED`, `SAMPLE_ENABLE_EXCEL_EXPORT`).
+2. Run: set `SERVICE_NAME=portal_tiktok_sample_crawler_html`, start consumer; publish MQ message with `{"campaignId": "...", "viewLogistics": true, "exportExcel": true}` to validate.
+3. Verify: watch logs for tab count diff and login success; check `data/manage_sample/` exports and DB tables `samples` / `sample_contents`.
+4. Troubleshoot: login/drawer timeout retries are built in; if UI changes, update `SAMPLE_SEARCH_INPUT_SELECTOR` or selector snippets and re-run.
 
-### 样品爬虫账号配置
+### Sample crawler account config
 
-- 账号配置文件：`configs/accounts.json`（由 `SAMPLE_ACCOUNT_CONFIG_PATH` 指定，已创建）。MQ 消息可用 `accountName`、`region` 强制选择账号，否则按「区域匹配 → 启用优先」顺序自动挑选。禁用账号 `enabled=false` 时不会被使用。
-- 当前内置账号：
-  > 所有账号邮箱/密码都已替换为占位符，讲演/演示版本不会暴露真实凭据。
-  - `MX1`（region MX）：`mx1@example.com` / Gmail App 密码 `<GMAIL_APP_PASSWORD>`
-  - `MX2`（region MX）：`mx2@example.com` / Gmail App 密码 `<GMAIL_APP_PASSWORD>`
-  - `MX3`（region MX）：`mx3@example.com` / Gmail App 密码 `<GMAIL_APP_PASSWORD>`
-  - `MX4`（region MX，已禁用，需要 luna 启动程式码）：`mx4@example.com`（禁用账号，密码留空）
-  - `FR1`（region FR）：`fr1@example.com` / Gmail App 密码 `<GMAIL_APP_PASSWORD>`
-- 单账号兜底：如果未找到 `accounts.json`，会回退到 `apps/portal_tiktok_sample_crawler_html/configs/base.yaml` 中的 `SAMPLE_LOGIN_EMAIL/SAMPLE_GMAIL_USERNAME/...`。
-- 建议：如需调整优先级，直接在 `accounts.json` 重排顺序或设置 `enabled=false`；跨区域任务请在消息里显式传 `region` 以选到对应账号。
+- Account config file: `configs/accounts.json` (set by `SAMPLE_ACCOUNT_CONFIG_PATH`, already created). MQ messages can use `accountName` and `region` to force selection; otherwise selection is by region match -> enabled-first. Disabled accounts (`enabled=false`) are skipped.
+- Current built-in accounts:
+  - `MX1` (region MX): `mx1@example.com` / Gmail App Password `<GMAIL_APP_PASSWORD>`
+  - `MX2` (region MX): `mx2@example.com` / Gmail App Password `<GMAIL_APP_PASSWORD>`
+  - `MX3` (region MX): `mx3@example.com` / Gmail App Password `<GMAIL_APP_PASSWORD>`
+  - `MX4` (region MX, disabled, needs launcher code): `mx4@example.com` (disabled, password empty)
+  - `FR1` (region FR): `fr1@example.com` / Gmail App Password `<GMAIL_APP_PASSWORD>`
+- Single-account fallback: if `accounts.json` is missing, fallback to `SAMPLE_LOGIN_EMAIL` / `SAMPLE_GMAIL_USERNAME` / ... in `apps/portal_tiktok_sample_crawler_html/configs/base.yaml`.
+- Suggestion: reorder `accounts.json` to change priority, or set `enabled=false`; pass `region` in MQ messages for cross-region tasks.
 
 ---
 
-## 数据访问工具
+## Data Access Tools
 
 - `common.core.database`
-  - 基于 `settings.SQLALCHEMY_DATABASE_URL` 创建异步 SQLAlchemy 引擎。
-  - 暴露 `get_db()` 上下文管理器，方便在服务/DAO 中注入会话。
+  - Creates async SQLAlchemy engine from `settings.SQLALCHEMY_DATABASE_URL`.
+  - Exposes `get_db()` context manager for session injection.
 - `common.models/all.py`
-  - 使用 `sqlacodegen` 生成的 INFound 业务表模型，覆盖活动、达人、样品等数据结构。
-  - 未来可按需导入（如 `from common.models.all import Creators`）实现持久化逻辑。
+  - `sqlacodegen` generated INFound models for campaigns, creators, samples, etc.
+  - Can be imported as needed (for example `from common.models.all import Creators`).
 
-目前示例消费者尚未落库，但这些模块已就绪。
+Some example consumers do not write to DB yet, but the modules are ready.
 
 ---
 
-## 日志与可观测性
+## Logs and Observability
 
 - `common.core.logger`
-  - 基于 `structlog`，同时输出控制台（本地时间、易读）与文件（JSON，支持并发安全滚动）。
-  - 日志文件位于 `logs/<APP_NAME>.log`，可通过 `LOG_DIR`、`LOG_FILE_MAX_SIZE`、`LOG_FILE_BACKUP_COUNT` 等配置调整。
-  - 自动合并上下文（消费者名称、请求 ID 等），便于排查问题。
+  - Based on `structlog`, outputs console logs (local time, readable) and file logs (JSON, concurrent-safe rotation).
+  - Log files live under `logs/<APP_NAME>.log`; adjust via `LOG_DIR`, `LOG_FILE_MAX_SIZE`, `LOG_FILE_BACKUP_COUNT`.
+  - Automatically merges context fields (consumer name, request ID, etc).
 - `common.core.exceptions`
-  - 统一定义 `RabbitMQConnectionError`、`MessageProcessingError`、`PlaywrightError` 等异常，方便在业务中区分处理策略。
+  - Central exceptions like `RabbitMQConnectionError`, `MessageProcessingError`, `PlaywrightError` for consistent handling.
 
 ---
 
-## 工具与排障
+## Tools and Troubleshooting
 
 - `rabbitmq_connect_test.py`
 
@@ -512,41 +514,41 @@ Playwright 相关依赖需通过 `poetry run playwright install` 安装，推荐
   poetry run python rabbitmq_connect_test.py
   ```
 
-  独立使用 `aio-pika.connect_robust` 验证连通性，可快速定位防火墙/凭证问题。若需使用不同凭证，可修改 `configs/base.yaml` 或通过环境变量覆盖。
+  Uses `aio-pika.connect_robust` to verify connectivity, helpful for firewall or credential issues. Update `configs/base.yaml` or use env vars for alternate creds.
 
 ---
 
-## 新增消费者的步骤
+## Steps to Add a New Consumer
 
-1. 创建目录结构：
+1. Create the directory structure:
    ```
    apps/<new_consumer>/
-     ├── crawler_consumer.py
-     ├── services/...
-     └── configs/{base,dev,stg,pro}.yaml
+     |-- crawler_consumer.py
+     |-- services/...
+     `-- configs/{base,dev,stg,pro}.yaml
    ```
-2. 在 `configs/base.yaml` 的 `CONSUMERS` 中加入新服务名称。
-3. 运行前设置 `SERVICE_NAME=<new_consumer>`。
-4. 在 `process_message_body` 中校验消息、调用业务逻辑，并在可重试的场景抛出 `MessageProcessingError`。
+2. Add the service name to `CONSUMERS` in `configs/base.yaml`.
+3. Set `SERVICE_NAME=<new_consumer>` before running.
+4. Validate the message in `process_message_body`, call business logic, and raise `MessageProcessingError` for retryable cases.
 
-通过该结构可以最大程度复用 RabbitMQ、日志与配置逻辑，只需专注于具体业务。
-
----
-
-## 开发工作流
-
-- 代码格式化：`poetry run black .`
-- Lint：`poetry run flake8`
-- 新增依赖：`poetry add <package>`；锁文件：`poetry lock --no-update`
-- 测试：当前尚未内置测试目录，可根据需要新增 `tests/`
-
-提交代码时请保持配置与环境解耦，并在 README 中补充新消费者说明。业务代码优先使用 `common.core.exceptions` 中的异常类型，保持处理一致性。
+This structure maximizes reuse of RabbitMQ, logging, and configuration logic while keeping business logic focused.
 
 ---
 
-## 常见问题（FAQ）
+## Development Workflow
 
-- **为什么导入 `common.core.config` 会立即报错？**因为配置在模块导入时立即实例化，所有模块共享一个 `settings`。未设置 `SERVICE_NAME` 会导致应用在启动前就抛出异常。
-- **如何为不同环境配置 RabbitMQ？**在 `apps/<service>/configs/` 中新增 `stg.yaml`、`pro.yaml` 等文件，覆写 `RABBITMQ: {HOST: "...", ROUTING_KEY: "...", ...}`。仍可使用环境变量覆盖敏感字段。
-- **生产环境日志写在哪里？**
-  默认写入仓库内的 `logs/` 目录，可挂载或改写 `LOG_DIR`。容器化部署时建议将日志目录映射到宿主机或日志系统。
+- Format: `poetry run black .`
+- Lint: `poetry run flake8`
+- Add dependencies: `poetry add <package>`; lock file: `poetry lock --no-update`
+- Tests: no built-in test folder yet, add `tests/` if needed
+
+Keep config decoupled from environment, and update README when adding new consumers. Prefer exceptions from `common.core.exceptions` for consistent handling.
+
+---
+
+## FAQ
+
+- Why does importing `common.core.config` fail immediately? Because config is instantiated at import time and shared across modules. Missing `SERVICE_NAME` throws before startup.
+- How do I configure RabbitMQ per environment? Add `stg.yaml`/`pro.yaml` under `apps/<service>/configs/` and override `RABBITMQ: {HOST: "...", ROUTING_KEY: "...", ...}`. Env vars can still override sensitive fields.
+- Where are production logs written?
+  Default is `logs/` under the repo. In containers, mount the directory or route logs to your log system.
