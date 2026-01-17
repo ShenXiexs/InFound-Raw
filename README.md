@@ -19,13 +19,15 @@ This workspace pairs FastAPI backend services with Playwright- and RabbitMQ-powe
 
 - `common/mq` contains a resilient `RabbitMQConnection` and `ConsumerBase` that every consumer inherits; they auto-handle reconnection, error classification (`MessageProcessingError`, `ValueError`), and JSON parsing with contextual logs.
 - `apps/portal_tiktok_sample_crawler_html` rebuilds the legacy `sample_all.py`/`sample_process.py` workflow with `CrawlerRunnerService`, Playwright browser pools, Gmail code handlers, account/region selection, tab navigation, view-content/logistics extraction, and data normalization/export routines that still align with `samples`, `sample_contents`, and `sample_chatbot_schedules` through `SampleIngestionClient`.
+- `apps/portal_tiktok_campaign_crawler` logs into TikTok Shop Partner Center, crawls campaign/product tables, optionally exports Excel snapshots, and posts normalized payloads to `/campaigns/ingest` and `/products/ingest` via `CampaignIngestionClient`.
 - `apps/portal_tiktok_creator_crawler` gathers creator metadata, contact info, and outreach-relevant stats, then posts them to the inner API endpoints for creator ingestion, outreach task syncing, and chatbot scheduling.
 - `apps/sample_chatbot`, `apps/outreach_chatbot`, and `apps/unified_chatbot` consume the `chatbot.topic` exchange, respect DLQs, and use Playwright instances to send sample and outreach messages, while providing manual overrides for accounts/regions and retry limits.
-- RabbitMQ tasks are routed through `crawler.direct`, `chatbot.topic`, and their DLQs; each consumer can also be run with `AT_MOST_ONCE` semantics or batched delivery and can export normalized rows to `data/manage_sample/` when `exportExcel` is enabled.
+- RabbitMQ tasks are routed through `crawler.direct`, `chatbot.topic`, and their DLQs; each consumer can also be run with `AT_MOST_ONCE` semantics or batched delivery and can export normalized rows to `data/manage_sample/` or `data/manage_campaign/` when `exportExcel` is enabled.
 
-## Committee showcase: sample crawler, creator crawler, and chatbots
+## Committee showcase: sample crawler, campaign crawler, creator crawler, and chatbots
 
 - **Sample crawler story**: the Playwright-backed `portal_tiktok_sample_crawler_html` service drives `[region, tab, campaign]` exploration, extracts content/logistics/promotions, enforces the same normalization rules as `sample_process.py`, exports verification files, then hands every batch to `/samples/ingest` via `SampleIngestionClient`. This chain demonstrates the playbook for how TikTok sample requests become structured data.
+- **Campaign crawler story**: `portal_tiktok_campaign_crawler` logs into Partner Center, scans campaigns or specific IDs, opens campaign detail tables, exports optional spreadsheets, and ships campaign/product rows to `/campaigns/ingest` and `/products/ingest` for catalog seeding and monitoring.
 - **Creator crawler story**: `portal_tiktok_creator_crawler` logs into the partner creator portal, scrolls results, captures creator stats/contact info, and calls `/creators/ingest`/`/outreach_tasks/ingest` to sync records with the backend. It showcases how outreach datasets and creator contact pipelines are seeded before any chatbot outreach is scheduled.
 - **Chatbot story**: `sample_chatbot`, `outreach_chatbot`, and `unified_chatbot` consume `chatbot.topic`, honor DLQs, and use Playwright to send the prepared sequences from the inner API. The scheduler + RabbitMQ flow demonstrates how the platform closes the loop, moving from discovery (sample & creator crawlers) to automated engagement without human-in-the-loop tweaks once the MQ payloads arrive.
 
@@ -63,7 +65,7 @@ export ENV=dev
 poetry run python main.py --consumer portal_tiktok_sample_crawler_html --env "$ENV"
 ```
 
-- Swap `SERVICE_NAME`/`--consumer` to run `portal_tiktok_creator_crawler`, `sample_chatbot`, `outreach_chatbot`, or `unified_chatbot`.
+- Swap `SERVICE_NAME`/`--consumer` to run `portal_tiktok_campaign_crawler`, `portal_tiktok_creator_crawler`, `sample_chatbot`, `outreach_chatbot`, or `unified_chatbot`.
 - Playwright credentials, Gmail app passwords, and RabbitMQ/inner API hosts are loaded through environment variables or local YAML overrides (see `common/core/config.py` for aliasing rules).
 - Replace every `<...>` placeholder in the YAML configs with real values before deploying (RabbitMQ hosts, MySQL credentials, inner API tokens, etc.).
 
@@ -77,6 +79,16 @@ export SERVICE_NAME=portal_tiktok_sample_crawler_html
 export ENV=dev
 export PLAYWRIGHT_HEADLESS=false
 poetry run python main.py --consumer portal_tiktok_sample_crawler_html --env "$ENV"
+```
+
+### Campaign crawler
+
+```bash
+cd infound-data-collection
+export SERVICE_NAME=portal_tiktok_campaign_crawler
+export ENV=dev
+export PLAYWRIGHT_HEADLESS=false
+poetry run python main.py --consumer portal_tiktok_campaign_crawler --env "$ENV"
 ```
 
 ### Creator crawler
