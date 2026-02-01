@@ -7,20 +7,20 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# --- 1. 单例状态管理和自定义异常 ---
+# --- 1. Singleton state and custom exception ---
 
 class InitializationError(Exception):
     """Raised when trying to access settings before they are initialized."""
     pass
 
 
-# 全局配置实例，默认为 None
+# Global settings instance, defaults to None
 _SETTINGS_INSTANCE: Optional['Settings'] = None
-# 标记配置是否已成功初始化
+# Flag to indicate settings are initialized
 _SETTINGS_INITIALIZED: bool = False
 
 
-# --- 2. 辅助函数（保持不变） ---
+# --- 2. Helper functions ---
 
 def flatten_nested_config(config: Dict[str, Any], parent_key: str = "", separator: str = "__") -> Dict[str, Any]:
     """Flattens nested YAML configuration (e.g., CORS: {ALLOW_ORIGINS: [...]})"""
@@ -37,13 +37,13 @@ def flatten_nested_config(config: Dict[str, Any], parent_key: str = "", separato
 def load_yaml_config(file_path: Path) -> Dict[str, Any]:
     """Loads YAML configuration, handling nested structure."""
     if not file_path.exists():
-        return {}  # 配置文件不存在时返回空字典，而不是抛出 FileNotFoundError
+        return {}  # Return empty dict when config file is missing instead of raising
     with open(file_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     return flatten_nested_config(config)
 
 
-# --- 3. 配置模型定义（Settings） ---
+# --- 3. Settings model definitions ---
 
 class Settings(BaseSettings):
     """
@@ -153,7 +153,7 @@ class Settings(BaseSettings):
         return v
 
 
-# --- 4. 初始化和获取单例函数 ---
+# --- 4. Initialize and retrieve singleton ---
 
 def initialize_settings() -> 'Settings':
     """
@@ -166,21 +166,21 @@ def initialize_settings() -> 'Settings':
     if _SETTINGS_INITIALIZED:
         return _SETTINGS_INSTANCE
 
-    # 1. 确定 ENV 和 SERVICE_NAME 的最终值（CLI > Env Var > Default）
-    # 在您的 main.py 中，consumer_arg 就是服务名 (SERVICE_NAME)
+    # 1. Resolve final ENV and SERVICE_NAME (priority: CLI/env > default)
+    # In main.py, consumer_arg maps to SERVICE_NAME.
     final_env = os.getenv("ENV") or os.getenv("env") or "dev"
     final_service_name = os.getenv("SERVICE_NAME") or os.getenv("service_name")
 
     if not final_service_name:
         raise ValueError("Service name must be specified via --consumer argument or SERVICE_NAME environment variable.")
 
-    # 2. 定义配置文件路径
+    # 2. Define config file paths
     base_yaml_path = Path("configs/base.yaml")
     service_config_dir = Path(f"apps/{final_service_name}/configs")
     service_base_yaml_path = service_config_dir / f"base.yaml"
     service_yaml_path = service_config_dir / f"{final_env}.yaml"
 
-    # 3. 加载并合并配置：基础 → 服务基础 → 服务环境（后面覆盖前面）
+    # 3. Load and merge configs: base -> service base -> service env (later overrides earlier)
     base_config = load_yaml_config(base_yaml_path)
     service_base_config = load_yaml_config(service_base_yaml_path)
     service_config = load_yaml_config(service_yaml_path)
@@ -188,16 +188,13 @@ def initialize_settings() -> 'Settings':
     merged_config = {**base_config, **service_base_config, **service_config, 'SERVICE_NAME': final_service_name,
                      'ENV': final_env}
 
-    # 4. 动态添加 SERVICE_NAME 和 ENV 到配置中
-    # Pydantic Settings 需要这些值，即使它们不来自 YAML 或 ENV。
-
-    # 5. 实例化 Settings，Pydantic 会自动处理环境变量覆盖
+    # 4. Instantiate Settings; Pydantic will apply env overrides automatically
     try:
         instance = Settings(**merged_config)
     except Exception as e:
         raise InitializationError(f"Failed to validate and instantiate settings: {e}") from e
 
-    # 6. 存储实例并标记初始化完成
+    # 5. Store instance and mark initialized
     _SETTINGS_INSTANCE = instance
     _SETTINGS_INITIALIZED = True
 

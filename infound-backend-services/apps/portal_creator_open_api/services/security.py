@@ -12,8 +12,8 @@ from common.core.redis_client import RedisClientManager
 settings = get_settings()
 logger = get_logger()
 
-SECRET_KEY = "94dfc07baaef3854516a0f0f0d0d22f5bb887b1b28380fcb6734d055f353d43b"
-ALGORITHM = "HS256"
+SECRET_KEY = ""
+ALGORITHM = ""
 ACCESS_TOKEN_EXPIRE_DAYS = 14
 MAX_TOKEN_PER_USER = 5
 
@@ -27,53 +27,52 @@ def create_access_token(data: dict) -> str:
 
 
 def decode_access_token(token: str) -> Optional[dict]:
-    """解码 JWT 令牌"""
+    """Decode a JWT token."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         return payload
     except jwt.exceptions.DecodeError as e:
-        logger.warning(f"JWT 解码失败: {str(e)}")
+        logger.warning(f"JWT decode failed: {str(e)}")
         return None
 
 
 def save_token_to_redis(user: CurrentUserInfo, token: str) -> None:
     """
-    将 Token 保存到 Redis
-    规则：每个用户最多 5 个 Token，超出则删除最早的
+    Persist the token to Redis.
+    Rule: each user can keep at most 5 tokens; drop the oldest when exceeding the limit.
     """
-    # Redis Key：user_tokens:{username}（存储该用户的所有 Token 及创建时间）
+    # Redis key: user_tokens:{username} (stores all tokens and their creation time)
     redis_key = get_redis_key_for_user(user.platform_creator_username)
     token_jti = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])["jti"]
 
-    # 1. 检查用户已有的 Token 数量
+    # 1) Check existing token count
     redis_client = RedisClientManager.get_client()
     token_count = redis_client.hlen(redis_key)
 
-    # 2. 如果达到上限，删除最早的 Token
+    # 2) If the cap is reached, remove the oldest token
     if token_count >= MAX_TOKEN_PER_USER:
-        # 获取所有 Token 的创建时间，按时间排序，删除最早的
         tokens = redis_client.hgetall(redis_key)
         sorted_tokens = sorted(tokens.items(), key=lambda x: int(x[0]))
         oldest_token_jti, _ = sorted_tokens[0]
         redis_client.hdel(redis_key, oldest_token_jti)
 
-    logger.info(f"用户 {user.platform_creator_username} 添加 Token: {redis_key}")
+    logger.info(f"User {user.platform_creator_username} added token: {redis_key}")
 
-    # 3. 保存新 Token（JTI 作为字段名，创建时间作为值）
+    # 3) Save new token (JTI as field, creation time as value)
     redis_client.hset(redis_key, token_jti, user.model_dump_json())
-    # 4. 设置 Redis 过期时间（与 Token 有效期一致）
+    # 4) Set Redis expiration to match token lifetime
     redis_client.expire(redis_key, ACCESS_TOKEN_EXPIRE_DAYS * 86400)
 
 
 def is_token_valid_in_redis(username: str, token_jti: str) -> bool:
-    """检查 Token 是否存在于 Redis（有效）"""
+    """Check whether the token exists in Redis (i.e., still valid)."""
     redis_client = RedisClientManager.get_client()
     redis_key = get_redis_key_for_user(username)
     return redis_client.hexists(redis_key, token_jti)
 
 
 def get_current_user_info(username: str, token_jti: str) -> Optional[CurrentUserInfo]:
-    """获取用户信息"""
+    """Fetch user info from Redis."""
     redis_client = RedisClientManager.get_client()
     redis_key = get_redis_key_for_user(username)
     user_data = redis_client.hget(redis_key, token_jti)

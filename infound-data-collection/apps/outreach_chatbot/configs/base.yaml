@@ -7,7 +7,7 @@ OUTREACH_CHATBOT_WORKER_COUNT: 3
 # Reuse account config used by crawler/chatbot
 SAMPLE_ACCOUNT_CONFIG_PATH: "configs/accounts.json"
 
-# 运行时可覆盖
+# Runtime override allowed
 PLAYWRIGHT_HEADLESS: true
 
 INNER_API_AUTH:

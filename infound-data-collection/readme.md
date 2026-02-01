@@ -4,6 +4,8 @@ Internal data collection services for enriching creator and product data in INFo
 
 - `apps/portal_tiktok_sample_crawler`: API-based version (Partner API for sample list/content)
 - `apps/portal_tiktok_sample_crawler_html`: HTML scraping version (Playwright, template/fallback)
+- `apps/portal_tiktok_shop_creator_crawler`: Seller-portal creator connection crawler that can also publish shop-outreach chatbot tasks.
+- `apps/portal_tiktok_shop_chatbot`: Seller-portal IM sender that consumes `chatbot.shop_outreach.*` messages.
 
 > Quick overview
 >
@@ -38,6 +40,12 @@ infound-data-collection/
 |       |-- crawler_consumer.py                 # Consumer entry (dispatcher only)
 |       |-- services/                           # Poll/dispatch logic skeleton
 |       `-- configs/{base,dev}.yaml             # Service configs
+|   |-- portal_tiktok_shop_creator_crawler/     # Seller portal creator connection crawler
+|   |   |-- crawler_consumer.py                 # MQ consumer
+|   |   `-- services/shop_outreach_crawler_service.py # Playwright flow + ingestion + chatbot publish
+|   `-- portal_tiktok_shop_chatbot/             # Seller portal chatbot (topic consumer)
+|       |-- crawler_consumer.py                 # MQ consumer
+|       `-- services/shop_chatbot_dispatcher_service.py
 |-- common/
 |   |-- core/                                   # Config / logging / DB utilities
 |   |-- mq/                                     # RabbitMQ connection and consumer base
@@ -97,6 +105,27 @@ export ENV=dev        # Switch to stg/pro if present
 export PLAYWRIGHT_HEADLESS=false     # Set false to see the browser locally
 ```
 
+Seller portal variants:
+
+```bash
+# Seller-side creator crawler (produces creator ingest + shop-outreach chatbot messages)
+export SERVICE_NAME=portal_tiktok_shop_creator_crawler
+export ENV=dev
+export PLAYWRIGHT_HEADLESS=false
+# Optional overrides:
+# export SHOP_OUTREACH_ACCOUNT_NAME=MX1            # picks account from configs/accounts.json
+# export SHOP_OUTREACH_DEFAULT_REGION=MX
+# export SHOP_OUTREACH_CHATBOT_PUBLISH_ENABLED=true
+
+# Seller-side chatbot (consumes chatbot.shop_outreach.*)
+export SERVICE_NAME=portal_tiktok_shop_chatbot
+export ENV=dev
+export PLAYWRIGHT_HEADLESS=false
+# Optional overrides:
+# export SHOP_CHATBOT_ACCOUNT_NAME=MX1             # picks account from configs/accounts.json
+# export SHOP_CHATBOT_LOGIN_EMAIL=...             # fallback if account_name not set
+```
+
 ### 4. Start the consumer
 
 ```bash
@@ -109,6 +138,16 @@ Optional flags:
 - `--all`: reserved for starting all consumers in `settings.CONSUMERS` (currently one)
 
 Use `Ctrl+C` to exit. `main.py` traps SIGINT/SIGTERM and calls `consumer.stop()`.
+
+Other services quick commands:
+
+```bash
+# Seller portal creator crawler
+poetry run python main.py --consumer portal_tiktok_shop_creator_crawler --env "$ENV"
+
+# Seller portal chatbot
+poetry run python main.py --consumer portal_tiktok_shop_chatbot --env "$ENV"
+```
 
 ### 5. Run in background (nohup example)
 

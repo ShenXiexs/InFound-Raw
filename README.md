@@ -5,7 +5,7 @@ This workspace pairs FastAPI backend services with Playwright- and RabbitMQ-powe
 ## Architecture snapshot
 
 - `infound-backend-services` houses the internal ingestion API, creator portals, request filters, scheduler, and MQ producers that run inside FastAPI processes.
-- `infound-data-collection` implements RabbitMQ consumers, Playwright crawlers, and chatbot dispatchers that normalize TikTok partner data and hand it to the backend.
+- `infound-data-collection` implements RabbitMQ consumers, Playwright crawlers, and chatbot dispatchers (now covering partner, creator, **and seller/shop** portals) that normalize TikTok data and hand it to the backend.
 - Shared helpers in `common/` modules centralize multi-environment config, structured logging, SQLAlchemy/Redis sessions, RabbitMQ connections, and model definitions so business logic can stay focused.
 
 ## Backend services
@@ -21,7 +21,9 @@ This workspace pairs FastAPI backend services with Playwright- and RabbitMQ-powe
 - `apps/portal_tiktok_sample_crawler_html` rebuilds the legacy `sample_all.py`/`sample_process.py` workflow with `CrawlerRunnerService`, Playwright browser pools, Gmail code handlers, account/region selection, tab navigation, view-content/logistics extraction, and data normalization/export routines that still align with `samples`, `sample_contents`, and `sample_chatbot_schedules` through `SampleIngestionClient`.
 - `apps/portal_tiktok_campaign_crawler` logs into TikTok Shop Partner Center, crawls campaign/product tables, optionally exports Excel snapshots, and posts normalized payloads to `/campaigns/ingest` and `/products/ingest` via `CampaignIngestionClient`.
 - `apps/portal_tiktok_creator_crawler` gathers creator metadata, contact info, and outreach-relevant stats, then posts them to the inner API endpoints for creator ingestion, outreach task syncing, and chatbot scheduling.
+- `apps/portal_tiktok_shop_creator_crawler` targets the **seller/shop portal** to pull creator-connection lists, persist them through `/creators/ingest`, and (optionally) publish shop-outreach chatbot tasks to `chatbot.topic`.
 - `apps/sample_chatbot`, `apps/outreach_chatbot`, and `apps/unified_chatbot` consume the `chatbot.topic` exchange, respect DLQs, and use Playwright instances to send sample and outreach messages, while providing manual overrides for accounts/regions and retry limits.
+- `apps/portal_tiktok_shop_chatbot` consumes shop-outreach messages (topic-based) and drives seller-portal IM to creators with the same Playwright/Gmail fallback stack as other chatbots.
 - RabbitMQ tasks are routed through `crawler.direct`, `chatbot.topic`, and their DLQs; each consumer can also be run with `AT_MOST_ONCE` semantics or batched delivery and can export normalized rows to `data/manage_sample/` or `data/manage_campaign/` when `exportExcel` is enabled.
 
 ## Committee showcase: sample crawler, campaign crawler, creator crawler, and chatbots
@@ -29,6 +31,7 @@ This workspace pairs FastAPI backend services with Playwright- and RabbitMQ-powe
 - **Sample crawler story**: the Playwright-backed `portal_tiktok_sample_crawler_html` service drives `[region, tab, campaign]` exploration, extracts content/logistics/promotions, enforces the same normalization rules as `sample_process.py`, exports verification files, then hands every batch to `/samples/ingest` via `SampleIngestionClient`. This chain demonstrates the playbook for how TikTok sample requests become structured data.
 - **Campaign crawler story**: `portal_tiktok_campaign_crawler` logs into Partner Center, scans campaigns or specific IDs, opens campaign detail tables, exports optional spreadsheets, and ships campaign/product rows to `/campaigns/ingest` and `/products/ingest` for catalog seeding and monitoring.
 - **Creator crawler story**: `portal_tiktok_creator_crawler` logs into the partner creator portal, scrolls results, captures creator stats/contact info, and calls `/creators/ingest`/`/outreach_tasks/ingest` to sync records with the backend. It showcases how outreach datasets and creator contact pipelines are seeded before any chatbot outreach is scheduled.
+- **Seller/shop outreach story**: `portal_tiktok_shop_creator_crawler` logs into the seller portal creator-connection page, applies keyword/brand filters, sends normalized creator rows to `/creators/ingest`, and emits `chatbot.shop_outreach.*` MQ messages so the shop chatbot can DM those creators without human intervention.
 - **Chatbot story**: `sample_chatbot`, `outreach_chatbot`, and `unified_chatbot` consume `chatbot.topic`, honor DLQs, and use Playwright to send the prepared sequences from the inner API. The scheduler + RabbitMQ flow demonstrates how the platform closes the loop, moving from discovery (sample & creator crawlers) to automated engagement without human-in-the-loop tweaks once the MQ payloads arrive.
 
 ## Data pipeline overview
@@ -101,6 +104,19 @@ export PLAYWRIGHT_HEADLESS=false
 poetry run python main.py --consumer portal_tiktok_creator_crawler --env "$ENV"
 ```
 
+### Seller portal creator crawler (shop side)
+
+```bash
+cd infound-data-collection
+export SERVICE_NAME=portal_tiktok_shop_creator_crawler
+export ENV=dev
+export PLAYWRIGHT_HEADLESS=false          # set true for headless
+# Optional overrides:
+# export SHOP_OUTREACH_DEFAULT_REGION=MX
+# export SHOP_OUTREACH_ACCOUNT_NAME=MX1   # match configs/accounts.json
+poetry run python main.py --consumer portal_tiktok_shop_creator_crawler --env "$ENV"
+```
+
 ### Sample chatbot
 
 ```bash
@@ -126,6 +142,17 @@ cd infound-data-collection
 export SERVICE_NAME=unified_chatbot
 export ENV=dev
 poetry run python main.py --consumer unified_chatbot --env "$ENV"
+```
+
+### Shop chatbot (seller IM to creators)
+
+```bash
+cd infound-data-collection
+export SERVICE_NAME=portal_tiktok_shop_chatbot
+export ENV=dev
+export PLAYWRIGHT_HEADLESS=false          # false to watch browser
+# Optional: export SHOP_CHATBOT_ACCOUNT_NAME=MX1  # pick account from configs/accounts.json
+poetry run python main.py --consumer portal_tiktok_shop_chatbot --env "$ENV"
 ```
 
 ## Security & sanitization

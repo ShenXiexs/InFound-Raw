@@ -11,23 +11,23 @@ logger = get_logger()
 
 
 def startup_hook(app: FastAPI):
-    """service-a 专属启动逻辑：加载限流中间件、扩展跨域规则"""
-    logger.info("执行服务【portal_creator_open_api】专属启动逻辑...")
+    """Service-specific startup: init middleware prerequisites and dependencies."""
+    logger.info("Running portal_creator_open_api startup hooks...")
     RedisClientManager.initialize()
     DatabaseManager.initialize()
 
 
 def shutdown_hook(app: FastAPI):
-    """service-a 专属关闭逻辑：释放资源"""
-    logger.info("执行服务【portal_creator_open_api】专属关闭逻辑...")
+    """Service-specific shutdown: release resources."""
+    logger.info("Running portal_creator_open_api shutdown hooks...")
 
 
 def register_middlewares(app: FastAPI):
     """
-    专门用来注册服务专属中间件：
-    - 该函数在 create_app() 中调用，此时 app 还未启动（uvicorn.run() 之前）
-    - 仅做中间件注册，不做资源初始化
+    Register service-specific middlewares.
+    - Called inside create_app() before the app starts (before uvicorn.run()).
+    - Only registers middleware; does not initialize resources.
     """
-    logger.info("注册【portal_creator_open_api】专属中间件")
-    # 注册 Token 拦截中间件
+    logger.info("Registering portal_creator_open_api middlewares")
+    # Token interception middleware
     app.add_middleware(AuthFilterMiddleware)
