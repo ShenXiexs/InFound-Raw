@@ -17,9 +17,9 @@ from apps.portal_inner_open_api.services.chatbot_message_builder import (
     chatbot_message_builder,
 )
 from apps.portal_inner_open_api.services.chatbot_schedule_repository import (
-    _is_ad_code_empty,
     _is_empty_content_summary,
     _normalize_status,
+    chatbot_schedule_repository,
 )
 
 
@@ -27,14 +27,11 @@ logger = get_logger()
 
 
 @dataclass(frozen=True)
-class ScheduleRow:
-    id: str
+class SampleScheduleRow:
     sample_id: str
     scenario: str
     region: Optional[str]
-    interval_days: Optional[int]
-    max_runs: int
-    run_count: int
+    no_content_run_count: int
 
 
 def _utcnow() -> datetime:
@@ -43,18 +40,14 @@ def _utcnow() -> datetime:
 
 class ChatbotSchedulePublisher:
     """
-    Polls `sample_chatbot_schedules` and publishes due tasks to RabbitMQ.
+    轮询 Samples 表中的 chatbot 调度字段，发布到 RabbitMQ。
 
-    This runs inside inner API process (background task) so that `sample_chatbot`
-    can stay as a sender-only MQ consumer.
+    这在 inner API 进程内以后台任务运行。
     """
-
-    TABLE_NAME = "sample_chatbot_schedules"
 
     SCENARIO_SHIPPED = "shipped"
     SCENARIO_CONTENT_PENDING = "content_pending"
     SCENARIO_NO_CONTENT_POSTED = "no_content_posted"
-    SCENARIO_MISSING_AD_CODE = "missing_ad_code"
 
     STATUS_SHIPPED = "shipped"
     STATUS_CONTENT_PENDING = "content pending"
@@ -70,6 +63,12 @@ class ChatbotSchedulePublisher:
         self.supported_region = str(
             getattr(self.settings, "CHATBOT_SCHEDULE_SUPPORTED_REGION", "MX") or "MX"
         ).upper()
+        self.no_content_interval_days = int(
+            getattr(chatbot_schedule_repository, "NO_CONTENT_INTERVAL_DAYS", 5) or 5
+        )
+        self.no_content_max_runs = int(
+            getattr(chatbot_schedule_repository, "REPEAT_TIMES", 3) or 3
+        ) + 1
         self._stop_event = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
 
@@ -122,7 +121,7 @@ class ChatbotSchedulePublisher:
             task = None
             row = None
             async with DatabaseManager.get_session() as session:
-                due = await self._fetch_due_schedules(session, lock_rows=True, limit=1)
+                due = await self._fetch_due_samples(session, lock_rows=True, limit=1)
                 if not due:
                     return processed
 
@@ -134,14 +133,14 @@ class ChatbotSchedulePublisher:
                 except Exception:
                     self.logger.error(
                         "Failed to build schedule task",
-                        schedule_id=row.id,
                         sample_id=row.sample_id,
                         scenario=row.scenario,
                         exc_info=True,
                     )
                     continue
                 if not task:
-                    await self._deactivate(session, row.id)
+                    if row.scenario == self.SCENARIO_NO_CONTENT_POSTED:
+                        await self._deactivate_no_content(session, row.sample_id)
                     continue
                 await self._mark_executed(session, row)
 
@@ -151,16 +150,15 @@ class ChatbotSchedulePublisher:
             except Exception:
                 self.logger.error(
                     "Failed to publish schedule task after update",
-                    schedule_id=getattr(row, "id", None),
                     sample_id=getattr(row, "sample_id", None),
                     scenario=getattr(row, "scenario", None),
                     exc_info=True,
                 )
         return processed
 
-    async def _fetch_due_schedules(
+    async def _fetch_due_samples(
         self, session: AsyncSession, *, lock_rows: bool = False, limit: Optional[int] = None
-    ) -> List[ScheduleRow]:
+    ) -> List[SampleScheduleRow]:
         now = _utcnow()
         limit_value = int(limit or self.batch_size)
         suffix = " FOR UPDATE SKIP LOCKED" if lock_rows else ""
@@ -168,42 +166,79 @@ class ChatbotSchedulePublisher:
             result = await session.execute(
                 text(
                     f"""
-                    SELECT id, sample_id, scenario, region, interval_days, max_runs, run_count
-                    FROM `{self.TABLE_NAME}`
-                    WHERE active = 1
-                      AND next_run_time <= :now
-                      AND run_count < max_runs
-                    ORDER BY next_run_time ASC
+                    SELECT id, region,
+                      CASE
+                        WHEN LOWER(TRIM(status)) = :status_shipped
+                             AND chatbot_shipped_sent_at IS NULL
+                          THEN :scenario_shipped
+                        WHEN LOWER(TRIM(status)) = :status_content_pending
+                             AND chatbot_content_pending_sent_at IS NULL
+                          THEN :scenario_content_pending
+                        WHEN LOWER(TRIM(status)) = :status_completed
+                             AND no_content_active = 1
+                             AND no_content_next_run_at IS NOT NULL
+                             AND no_content_next_run_at <= :now
+                             AND COALESCE(no_content_run_count, 0) < :max_runs
+                          THEN :scenario_no_content
+                        ELSE NULL
+                      END AS scenario,
+                      COALESCE(no_content_run_count, 0) AS no_content_run_count
+                    FROM `samples`
+                    WHERE
+                      (LOWER(TRIM(status)) = :status_shipped AND chatbot_shipped_sent_at IS NULL)
+                      OR (LOWER(TRIM(status)) = :status_content_pending AND chatbot_content_pending_sent_at IS NULL)
+                      OR (
+                        LOWER(TRIM(status)) = :status_completed
+                        AND no_content_active = 1
+                        AND no_content_next_run_at IS NOT NULL
+                        AND no_content_next_run_at <= :now
+                        AND COALESCE(no_content_run_count, 0) < :max_runs
+                      )
+                    ORDER BY
+                      CASE
+                        WHEN LOWER(TRIM(status)) = :status_completed AND no_content_active = 1
+                          THEN no_content_next_run_at
+                        ELSE :now
+                      END ASC
                     LIMIT :limit{suffix};
                     """
                 ),
-                {"now": now, "limit": limit_value},
+                {
+                    "status_shipped": self.STATUS_SHIPPED,
+                    "status_content_pending": self.STATUS_CONTENT_PENDING,
+                    "status_completed": self.STATUS_COMPLETED,
+                    "scenario_shipped": self.SCENARIO_SHIPPED,
+                    "scenario_content_pending": self.SCENARIO_CONTENT_PENDING,
+                    "scenario_no_content": self.SCENARIO_NO_CONTENT_POSTED,
+                    "now": now,
+                    "max_runs": self.no_content_max_runs,
+                    "limit": limit_value,
+                },
             )
         except Exception:
-            self.logger.warning(
-                "Failed to query chatbot schedules (table missing or DB error)",
-                table=self.TABLE_NAME,
+            self.logger.error(
+                "Failed to query chatbot schedules from samples",
                 exc_info=True,
             )
             return []
 
-        rows: List[ScheduleRow] = []
+        rows: List[SampleScheduleRow] = []
         for item in result.mappings().all():
+            scenario = item.get("scenario")
+            if not scenario:
+                continue
             rows.append(
-                ScheduleRow(
-                    id=str(item["id"]),
-                    sample_id=str(item["sample_id"]),
-                    scenario=str(item["scenario"]),
+                SampleScheduleRow(
+                    sample_id=str(item["id"]),
+                    scenario=str(scenario),
                     region=item.get("region"),
-                    interval_days=item.get("interval_days"),
-                    max_runs=int(item.get("max_runs") or 1),
-                    run_count=int(item.get("run_count") or 0),
+                    no_content_run_count=int(item.get("no_content_run_count") or 0),
                 )
             )
         return rows
 
     async def _build_task_for_schedule(
-        self, session: AsyncSession, row: ScheduleRow
+        self, session: AsyncSession, row: SampleScheduleRow
     ) -> Optional[dict]:
         sample = await self._load_sample(session, row.sample_id)
         if not sample:
@@ -264,52 +299,74 @@ class ChatbotSchedulePublisher:
             return status == self.STATUS_COMPLETED and _is_empty_content_summary(
                 getattr(sample, "content_summary", None)
             )
-        if scenario == self.SCENARIO_MISSING_AD_CODE:
-            return _is_ad_code_empty(getattr(sample, "ad_code", None))
         return False
 
-    async def _mark_executed(self, session: AsyncSession, row: ScheduleRow) -> None:
+    async def _mark_executed(self, session: AsyncSession, row: SampleScheduleRow) -> None:
         now = _utcnow()
-        new_count = row.run_count + 1
+        if row.scenario == self.SCENARIO_SHIPPED:
+            await session.execute(
+                text(
+                    """
+                    UPDATE `samples`
+                    SET chatbot_shipped_sent_at = :now
+                    WHERE id = :sample_id AND chatbot_shipped_sent_at IS NULL;
+                    """
+                ),
+                {"sample_id": row.sample_id, "now": now},
+            )
+            return
+        if row.scenario == self.SCENARIO_CONTENT_PENDING:
+            await session.execute(
+                text(
+                    """
+                    UPDATE `samples`
+                    SET chatbot_content_pending_sent_at = :now
+                    WHERE id = :sample_id AND chatbot_content_pending_sent_at IS NULL;
+                    """
+                ),
+                {"sample_id": row.sample_id, "now": now},
+            )
+            return
+        if row.scenario != self.SCENARIO_NO_CONTENT_POSTED:
+            return
+
+        new_count = row.no_content_run_count + 1
         active = 1
-        next_time = now
-        if new_count >= row.max_runs:
+        next_time = None
+        if new_count >= self.no_content_max_runs:
             active = 0
         else:
-            if row.interval_days:
-                next_time = now + timedelta(days=int(row.interval_days))
+            next_time = now + timedelta(days=self.no_content_interval_days)
+
         await session.execute(
             text(
-                f"""
-                UPDATE `{self.TABLE_NAME}`
-                SET run_count = :new_count,
-                    last_run_time = :now,
-                    next_run_time = :next_time,
-                    active = :active,
-                    updated_at = :now
-                WHERE id = :id;
+                """
+                UPDATE `samples`
+                SET no_content_run_count = :new_count,
+                    no_content_next_run_at = :next_time,
+                    no_content_active = :active
+                WHERE id = :sample_id;
                 """
             ),
             {
-                "id": row.id,
+                "sample_id": row.sample_id,
                 "new_count": new_count,
-                "now": now,
                 "next_time": next_time,
                 "active": active,
             },
         )
 
-    async def _deactivate(self, session: AsyncSession, schedule_id: str) -> None:
-        now = _utcnow()
+    async def _deactivate_no_content(self, session: AsyncSession, sample_id: str) -> None:
         await session.execute(
             text(
-                f"""
-                UPDATE `{self.TABLE_NAME}`
-                SET active = 0, updated_at = :now
-                WHERE id = :id;
+                """
+                UPDATE `samples`
+                SET no_content_active = 0,
+                    no_content_next_run_at = NULL
+                WHERE id = :sample_id;
                 """
             ),
-            {"id": schedule_id, "now": now},
+            {"sample_id": sample_id},
         )
 
 

@@ -9,7 +9,6 @@ from common.models.infound import Samples, SampleCrawlLogs
 from apps.portal_inner_open_api.services.chatbot_schedule_repository import (
     _normalize_status,
     _is_empty_content_summary,
-    _is_ad_code_empty,
 )
 
 logger = get_logger()
@@ -17,12 +16,12 @@ logger = get_logger()
 
 class ChatbotStatusDetector:
     """
-    Detect status changes keyed by username:sample_id.
+    基于 username:sample_id 的状态变更检测服务。
     """
 
     @staticmethod
     def _make_key(username: Optional[str], sample_id: Optional[str]) -> Optional[str]:
-        """Build unique key: username:sample_id."""
+        """生成唯一键：username:sample_id"""
         if not username or not sample_id:
             return None
         return f"{username}:{sample_id}"
@@ -31,7 +30,7 @@ class ChatbotStatusDetector:
         self, session: AsyncSession
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Fetch current sample states from Samples, grouped by username:sample_id.
+        查询当前所有样品状态（从 Samples 表），按 username:sample_id 分组。
 
         Returns:
             {
@@ -74,7 +73,7 @@ class ChatbotStatusDetector:
             if not sample_id or not username:
                 continue
 
-            # Build unique key: username:sample_id
+            # 生成唯一键：username:sample_id
             key = self._make_key(username, sample_id)
             if not key:
                 continue
@@ -90,15 +89,15 @@ class ChatbotStatusDetector:
                 "ad_code": row.ad_code,
             }
 
-        logger.info("Fetched current sample states", total_count=len(current_map))
+        logger.info("查询当前样品状态完成", total_count=len(current_map))
         return current_map
 
     async def get_last_crawl_status_by_key(
         self, session: AsyncSession
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Fetch last crawl states from SampleCrawlLogs, joined by username:sample_id.
-        Uses Samples to find the latest crawl record per username:sample_id.
+        查询上次爬取时的状态（从 SampleCrawlLogs 表），按 username:sample_id 关联。
+        通过 Samples 表关联 SampleCrawlLogs，找到每个 username:sample_id 对应的最新 SampleCrawlLogs 记录（时间最近的）。
 
         Returns:
             {
@@ -109,7 +108,7 @@ class ChatbotStatusDetector:
                 }
             }
         """
-        # Query Samples to get sample_id and platform_creator_username
+        # 先查询 Samples 表，获取所有 sample_id 及其对应的 platform_creator_username
         samples_stmt = select(
             Samples.id,
             Samples.platform_creator_username,
@@ -122,11 +121,11 @@ class ChatbotStatusDetector:
         samples_rows = samples_result.all()
         
         if not samples_rows:
-            logger.info("No valid sample records found")
+            logger.info("没有找到有效的样品记录")
             return {}
-
-        # Map sample_id -> (platform_product_id, platform_creator_username)
-        # SampleCrawlLogs does not store sample_id, only platform_product_id
+        
+        # 构建 sample_id 到 (platform_product_id, platform_creator_username) 的映射
+        # 用于后续关联 SampleCrawlLogs（因为 SampleCrawlLogs 没有 sample_id，只有 platform_product_id）
         sample_to_product_username = {}
         for row in samples_rows:
             sample_id = row.id
@@ -137,11 +136,11 @@ class ChatbotStatusDetector:
                 sample_to_product_username[sample_id] = (product_id, username)
         
         if not sample_to_product_username:
-            logger.info("No valid sample records found (missing platform_product_id)")
+            logger.info("没有找到有效的样品记录（缺少 platform_product_id）")
             return {}
-
-        # Window function: latest crawl record per (platform_product_id, platform_creator_username)
-        # Sort by most recent (crawl_date DESC, creation_time DESC)
+        
+        # 使用窗口函数找出每个 (platform_product_id, platform_creator_username) 组合的最新爬取记录
+        # 按时间最近的排序（crawl_date DESC, creation_time DESC）
         subquery = (
             select(
                 SampleCrawlLogs.platform_product_id,
@@ -171,7 +170,7 @@ class ChatbotStatusDetector:
             .subquery()
         )
 
-        # Keep only latest record (rn=1)
+        # 只取每个组合的最新记录（rn=1）
         stmt = select(
             subquery.c.platform_product_id,
             subquery.c.platform_creator_username,
@@ -183,7 +182,7 @@ class ChatbotStatusDetector:
         result = await session.execute(stmt)
         rows = result.all()
 
-        # Build mapping for (platform_product_id, platform_creator_username)
+        # 构建 (platform_product_id, platform_creator_username) 到状态的映射
         product_username_to_status = {}
         for row in rows:
             key = (row.platform_product_id, row.platform_creator_username)
@@ -193,7 +192,7 @@ class ChatbotStatusDetector:
                 "ad_code": row.ad_code,
             }
 
-        # Map back to username:sample_id keys
+        # 通过 sample_id 映射到状态，构建 username:sample_id 为 key 的字典
         last_map = {}
         for sample_id, (product_id, username) in sample_to_product_username.items():
             key = (product_id, username)
@@ -202,7 +201,7 @@ class ChatbotStatusDetector:
                 if username_sample_key:
                     last_map[username_sample_key] = product_username_to_status[key]
 
-        logger.info("Fetched last crawl states", total_count=len(last_map))
+        logger.info("查询上次爬取状态完成", total_count=len(last_map))
         return last_map
 
     def detect_status_changes(
@@ -211,16 +210,16 @@ class ChatbotStatusDetector:
         last_map: Dict[str, Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """
-        Compare snapshots and return samples with state changes.
+        对比两次快照，找出状态变化的样品。
 
         Args:
-            current_map: current state map keyed by username:sample_id
-            last_map: previous state map keyed by username:sample_id
+            current_map: 当前状态，key 为 username:sample_id
+            last_map: 上次状态，key 为 username:sample_id
 
         Returns:
             [{
                 "sample_id": "...",
-                "scenario": "shipped|content_pending|no_content_posted|missing_ad_code",
+                "scenario": "shipped|content_pending|no_content_posted",
                 "region": "...",
                 "platform_product_id": "...",
                 "platform_creator_username": "...",
@@ -234,14 +233,14 @@ class ChatbotStatusDetector:
         for key, current_info in current_map.items():
             last_info = last_map.get(key)
 
-            # Skip new samples not present in previous snapshot
+            # 如果上次快照里没有（新样品），跳过
             if last_info is None:
                 continue
 
             prev_status = _normalize_status(last_info.get("status"))
             curr_status = _normalize_status(current_info.get("status"))
 
-            # Detect status changes (one-time events)
+            # 检测状态变更（一次性事件）
             if prev_status and curr_status and prev_status != curr_status:
                 if curr_status == "shipped":
                     changes.append(
@@ -278,7 +277,7 @@ class ChatbotStatusDetector:
                         }
                     )
 
-            # Detect content summary changes (recurring reminders)
+            # 检测内容摘要变化（重复提醒）
             if curr_status == "completed":
                 prev_has_content = not _is_empty_content_summary(
                     last_info.get("content_summary")
@@ -287,7 +286,7 @@ class ChatbotStatusDetector:
                     current_info.get("content_summary")
                 )
 
-                # From content -> no content, or first time no content
+                # 从有内容变为无内容，或首次检测到无内容
                 if (prev_has_content and not curr_has_content) or (
                     last_info.get("content_summary") is None
                     and not curr_has_content
@@ -309,33 +308,10 @@ class ChatbotStatusDetector:
                         }
                     )
 
-            # Detect AD code changes (recurring reminders)
-            prev_has_ad_code = not _is_ad_code_empty(last_info.get("ad_code"))
-            curr_has_ad_code = not _is_ad_code_empty(current_info.get("ad_code"))
-
-            # From AD code -> no AD code, or first time no AD code
-            if (prev_has_ad_code and not curr_has_ad_code) or (
-                last_info.get("ad_code") is None and not curr_has_ad_code
-            ):
-                changes.append(
-                    {
-                        "sample_id": current_info["sample_id"],
-                        "scenario": "missing_ad_code",
-                        "region": current_info.get("region"),
-                        "platform_product_id": current_info["platform_product_id"],
-                        "platform_creator_username": current_info[
-                            "platform_creator_username"
-                        ],
-                        "platform_creator_id": current_info.get("platform_creator_id"),
-                        "previous_status": last_info.get("status"),
-                        "current_status": current_info.get("status"),
-                    }
-                )
-
-        logger.info("Status change detection completed", changed_count=len(changes))
+        logger.info("状态变更检测完成", changed_count=len(changes))
         return changes
 
 
-# Singleton instance
+# 单例实例
 chatbot_status_detector = ChatbotStatusDetector()
 

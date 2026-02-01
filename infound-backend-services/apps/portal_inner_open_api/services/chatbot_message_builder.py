@@ -20,7 +20,6 @@ class ChatbotMessageBuilder:
     SCENARIO_SHIPPED = "shipped"
     SCENARIO_CONTENT_PENDING = "content_pending"
     SCENARIO_NO_CONTENT_POSTED = "no_content_posted"
-    SCENARIO_MISSING_AD_CODE = "missing_ad_code"
 
     def __init__(self) -> None:
         settings = get_settings()
@@ -48,8 +47,6 @@ class ChatbotMessageBuilder:
             return await self._content_pending(session, sample)
         if normalized == self.SCENARIO_NO_CONTENT_POSTED:
             return await self._no_content_posted(session, sample)
-        if normalized == self.SCENARIO_MISSING_AD_CODE:
-            return await self._missing_ad_code(session, sample)
         return []
 
     async def _product_block(self, session: AsyncSession, sample: Any) -> str:
@@ -121,27 +118,9 @@ class ChatbotMessageBuilder:
             "Notamos que el contenido del producto aún no ha sido publicado y ya pasó la fecha acordada. ¿Podrías por favor confirmarme cuándo podrás subir el video?\n\n"
             f"{block}\n\n"
             "Tu publicación es muy importante para futuras colaboraciones y para poder seguir enviándote más productos. 🙏\n\n"
-            "¡Gracias por tu apoyo!\n\n"
-            "Copia el enlace y ábrelo en el navegador de tu móvil para ver los detalles.👇"
+            "¡Gracias por tu apoyo!"
         )
-        messages = [{"type": "text", "content": first}]
-        link = self._link(sample)
-        if link:
-            messages.append({"type": "link", "content": link})
-        return messages
-
-    async def _missing_ad_code(self, session: AsyncSession, sample: Any) -> List[dict]:
-        block = await self._product_block(session, sample)
-        first = (
-            "Hola, 😍 nos encantaría darle aún más visibilidad con una promoción en TikTok. ¿Podrías compartirnos tu código AD para que podamos lanzar la campaña? 🙏\n\n"
-            f"{block}\n\n"
-            "Copia el enlace y ábrelo en el navegador de tu móvil para ver los detalles.👇"
-        )
-        messages = [{"type": "text", "content": first}]
-        link = self._link(sample)
-        if link:
-            messages.append({"type": "link", "content": link})
-        return messages
+        return [{"type": "text", "content": first}]
 
 
 chatbot_message_builder = ChatbotMessageBuilder()

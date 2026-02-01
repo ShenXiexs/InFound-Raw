@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from common.core.response import success_response, APIResponse
 
-router = APIRouter(tags=["Home"])
+router = APIRouter(tags=["首页"])
 
 
 @router.get(

@@ -86,10 +86,10 @@ class SampleIngestionRequest(BaseModel):
         populate_by_name=True,
     )
 
-    source: str = Field(..., description="Source identifier, e.g., portal_tiktok_sample_crawler")
+    source: str = Field(..., description="数据来源标识，例如 portal_tiktok_sample_crawler")
     operator_id: Optional[str] = Field(
         default=None,
-        description="Operator/account ID; uses server default if not provided",
+        description="操作人/账号 ID，若未提供则使用服务端默认值",
     )
     options: Optional[SampleIngestionOptions] = None
     rows: List[SampleRow] = Field(..., min_length=1)
@@ -103,5 +103,5 @@ class SampleIngestionResult(BaseModel):
         populate_by_name=True,
     )
 
-    inserted: int = Field(..., description="Total submitted rows (including content rows)")
-    products: int = Field(..., description="Unique product count in this submission")
+    inserted: int = Field(..., description="本次提交的总行数（含内容行）")
+    products: int = Field(..., description="涉及的唯一商品数量")
