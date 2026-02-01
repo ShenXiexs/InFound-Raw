@@ -1,24 +1,24 @@
-# 全局基础配置（所有服务共用）
+# Global base config (shared by all services)
 APP_NAME: "infound-data-collection"
 
-# MySQL 基础配置
+# MySQL defaults
 MYSQL_CHARSET: "utf8mb4"
 MYSQL_PORT: 3306
 MYSQL_USER: "root"
 MYSQL_HOST: "localhost"
 
-# Redis 基础配置
+# Redis defaults
 REDIS_DB: 0
 REDIS_URL: "redis://localhost:6379/0"
 
-# 日志基础配置
+# Logging defaults
 LOG_LEVEL: "INFO"
 LOG_FILE_MAX_SIZE: 10  # MB
-LOG_FILE_BACKUP_COUNT: 30  # 保留30天
+LOG_FILE_BACKUP_COUNT: 30  # keep 30 days
 LOG_DIR: "logs"
 
 
-# 通用 RabbitMQ 配置（可被消费端专属配置覆盖）
+# Common RabbitMQ config (can be overridden per consumer)
 RABBITMQ:
   HOST: "<RABBITMQ_HOST>"
   PORT: 8803
