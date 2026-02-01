@@ -118,6 +118,9 @@ class SampleIngestionService:
             )
             session.add(SampleContentCrawlLogs(**content_log_payload))
 
+        # Ensure newly inserted samples exist before updating schedule fields.
+        await session.flush()
+
         # Trigger chatbot schedules based on latest sample snapshot(s).
         for previous, current in sample_snapshots:
             try:

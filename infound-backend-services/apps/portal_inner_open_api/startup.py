@@ -12,40 +12,40 @@ logger = get_logger()
 
 
 async def startup_hook(app: FastAPI):
-    """Service-specific startup logic."""
-    logger.info("Running portal_inner_open_api startup hook; initializing DB pool...")
+    """service-a 专属启动逻辑：加载限流中间件、扩展跨域规则"""
+    logger.info("执行服务【portal_inner_open_api】专属启动逻辑，初始化数据库连接池...")
     DatabaseManager.initialize()
-
-    # Initialize RabbitMQ producer
+    
+    # 初始化 RabbitMQ 生产者
     try:
         await RabbitMQProducer.initialize()
     except Exception as e:
         logger.warning(
-            "RabbitMQ initialization failed (chatbot dispatch may be unavailable)",
+            "RabbitMQ 初始化失败（聊天机器人消息功能可能不可用）",
             error=str(e)
         )
 
-    # Start chatbot schedule publisher (repeat reminders / scheduled sends)
+    # 启动 chatbot schedule publisher（用于重复提醒/定时发送）
     if getattr(getattr(chatbot_schedule_publisher, "settings", None), "CHATBOT_SCHEDULE_PUBLISHER_ENABLED", True):
         try:
             await chatbot_schedule_publisher.start()
         except Exception as e:
             logger.warning(
-                "Chatbot schedule publisher failed to start (reminders may be unavailable)",
+                "Chatbot schedule publisher 启动失败（重复提醒可能不可用）",
                 error=str(e),
             )
 
 
 async def shutdown_hook(app: FastAPI):
-    """Service-specific shutdown logic."""
-    logger.info("Running portal_inner_open_api shutdown hook...")
+    """service-a 专属关闭逻辑：释放资源"""
+    logger.info("执行服务【portal_inner_open_api】专属关闭逻辑...")
 
     try:
         await chatbot_schedule_publisher.stop()
     except Exception:
         pass
     
-    # Close RabbitMQ connection
+    # 关闭 RabbitMQ 连接
     try:
         await RabbitMQProducer.close()
     except Exception:
@@ -54,11 +54,10 @@ async def shutdown_hook(app: FastAPI):
 
 def register_middlewares(app: FastAPI):
     """
-    Register service-specific middleware.
-
-    - Called in create_app() before the app starts.
-    - Only registers middleware; does not initialize resources.
+    专门用来注册服务专属中间件：
+    - 该函数在 create_app() 中调用，此时 app 还未启动（uvicorn.run() 之前）
+    - 仅做中间件注册，不做资源初始化
     """
-    logger.info("Registering portal_inner_open_api middleware")
-    # Register token filter middleware
+    logger.info("注册【portal_inner_open_api】专属中间件")
+    # 注册 Token 拦截中间件
     app.add_middleware(RequestFilterMiddleware)

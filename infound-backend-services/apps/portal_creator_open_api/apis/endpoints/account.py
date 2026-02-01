@@ -14,7 +14,7 @@ from common.core.logger import get_logger
 from common.core.response import APIResponse, success_response
 from common.models.infound import Samples, Creators
 
-router = APIRouter(tags=["Account"])
+router = APIRouter(tags=["账号"])
 logger = get_logger()
 
 
@@ -27,7 +27,7 @@ async def login_for_access_token(
         request: LoginRequest,
         db: Annotated[AsyncSession, Depends(get_db_session)]
 ) -> APIResponse[dict]:
-    """Issue a JWT access token (login)."""
+    """获取 JWT 令牌（登录）"""
     try:
         sample: Samples = (await db.execute(
             select(Samples)
@@ -45,7 +45,7 @@ async def login_for_access_token(
                 detail="Invalid username or password"
             )
 
-        # Create access token
+        # 创建访问令牌
         jti = str(int(time.time()))
         access_token = create_access_token(
             {
@@ -73,7 +73,7 @@ async def login_for_access_token(
                 )
                 save_token_to_redis(current_user_info, access_token)
             else:
-                # TODO: If the creator record is missing, this login is inconsistent. Handle later.
+                # TODO: 理论上如果 creator 表不存在数据，那这个登录是有问题的，现在先这样处理，后面流程跑顺了，再看看怎么解决。
                 current_user_info = CurrentUserInfo(
                     jti=jti,
                     if_id='',
@@ -91,17 +91,17 @@ async def login_for_access_token(
             "token": access_token,
         })
 
-    # Re-raise HTTPException directly (avoid wrapping as 500).
+    # 捕获 HTTPException 直接往上抛，不要被下面的 Exception 拦截成 500
     except HTTPException as http_ex:
         raise http_ex
 
-    # Catch-all for unexpected exceptions
+    # 捕获所有其他未知异常
     except Exception as e:
-        # Log the error
+        # 记录错误日志
         logger.error(f"Login failed unexpectedly: {e}")
         raise HTTPException(
             status_code=401,
-            detail="Invalid username or password"  # do not expose internal errors
+            detail="Invalid username or password"  # 给前端统一的错误提示，不暴露内部异常
         )
 
 
@@ -111,7 +111,7 @@ async def login_for_access_token(
     response_model_by_alias=True,
 )
 async def get_current_user(request: Request) -> APIResponse[CurrentUserInfo]:
-    """Get current user info."""
+    """获取当前用户信息"""
     if not hasattr(request.state, "current_user_info"):
         raise HTTPException(status_code=401, detail="Unverified")
 

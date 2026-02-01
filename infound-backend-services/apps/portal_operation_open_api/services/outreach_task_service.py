@@ -78,6 +78,9 @@ class OutreachTaskService:
 
         return 0
 
+    # =========================
+    # 任务一：任务列表
+    # =========================
     @staticmethod
     async def get_task_list(
         session: AsyncSession,
@@ -204,6 +207,9 @@ class OutreachTaskService:
             ],
         }
 
+    # =========================
+    # 任务二：任务详情
+    # =========================
     @staticmethod
     async def get_task_detail(
         session: AsyncSession,
@@ -272,6 +278,9 @@ class OutreachTaskService:
             "createdAt": t.creation_time,
         }
 
+    # =========================
+    # 任务三：创建任务
+    # =========================
     @staticmethod
     async def create_task(
         session: AsyncSession,
@@ -346,6 +355,9 @@ class OutreachTaskService:
 
         return task
 
+    # =========================
+    # 任务四：更新任务
+    # =========================
     @staticmethod
     async def update_task(
         session: AsyncSession,
@@ -422,6 +434,9 @@ class OutreachTaskService:
 
         return task
 
+    # =========================
+    # 任务五：立即执行任务
+    # =========================
     @staticmethod
     async def run_task_now(
         session: AsyncSession,
@@ -480,7 +495,9 @@ class OutreachTaskService:
         await session.refresh(task)
         return task
 
-
+    # =========================
+    # 任务七：停止任务（批量）
+    # =========================
     @staticmethod
     async def stop_tasks(
         session: AsyncSession,

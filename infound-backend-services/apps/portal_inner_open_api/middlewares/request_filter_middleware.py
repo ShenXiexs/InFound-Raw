@@ -12,42 +12,42 @@ logger = get_logger()
 
 class RequestFilterMiddleware(BaseHTTPMiddleware):
     # --------------------------
-    # 2. Exempt endpoints
+    # 2. 豁免接口配置
     # --------------------------
     exempt_paths = [
         "/",
-        "/health",  # health check
+        "/health",  # 健康检查接口
     ]
 
     async def dispatch(self, request, call_next):
-        # Allow exempt paths
-        logger.info(f"Request path: {request.url.path}")
+        # 豁免接口直接放行
+        logger.info(f"请求路径：{request.url.path}")
 
         if any(request.url.path.startswith(path) for path in self.exempt_paths):
             response = await call_next(request)
             return response
 
-        # 1. Read token from header
+        # 1. 从 Header 中获取 Token
         required_header = settings.AUTH__REQUIRED_HEADER
         token = request.headers.get(required_header)
 
-        # 2. Validate token
+        # 2. 校验 Token
         if not token:
-            logger.warning(f"Missing header: {required_header}")
+            logger.warning(f"缺少 Header：{required_header}")
             return JSONResponse(
                 status_code=401,
-                content={"detail": f\"Unauthorized: missing header '{required_header}'\"}
+                content={"detail": f"Unauthorized: 缺少 Header '{required_header}'"}
             )
 
         valid_tokens: List[str] = settings.AUTH__VALID_TOKENS
         if token not in valid_tokens:
-            logger.warning(f"Invalid token: {token}")
+            logger.warning(f"非法 Token：{token}")
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Unauthorized: invalid token"}
+                content={"detail": "Unauthorized: 无效的 Token"}
             )
 
-        # 3. Token valid, continue
-        logger.info(f"Token validated: {token}")
+        # 3. Token 合法，继续执行请求
+        logger.info(f"Token 校验通过：{token}")
         response = await call_next(request)
         return response

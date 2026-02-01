@@ -1,12 +1,9 @@
-# Service token config (used for request filtering)
+# service-a 专属 Token 配置（用于请求拦截校验）
 AUTH:
-  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"  # custom header name
-  VALID_TOKENS: [ "<INNER_API_TOKEN>" ]  # allowed token list
+  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"  # 自定义 Header 名（区分其他服务）
+  VALID_TOKENS: [ "844a22c4c6d47231bb4fc89c3e8a64ca5b09ec5de8f6d4bf65dacd7d" ]  # 合法 Token 列表
 
-# Chatbot message content config
-CHATBOT_SAMPLE_LINK_TEMPLATE: "https://creator.example.com/samples/{sampleId}"
-
-# Chatbot schedule publisher (inner API polls sample_chatbot_schedules and publishes to MQ)
+# Chatbot schedule publisher（由 inner API 轮询 samples 表的 chatbot 字段并投递 MQ）
 CHATBOT_SCHEDULE_PUBLISHER_ENABLED: true
 CHATBOT_SCHEDULE_POLL_INTERVAL_SECONDS: 15
 CHATBOT_SCHEDULE_BATCH_SIZE: 20

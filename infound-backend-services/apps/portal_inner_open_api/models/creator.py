@@ -58,6 +58,7 @@ class CreatorRow(BaseModel):
     sales_revenue_per_buyer: Optional[Any] = None
     gmv_per_sales_channel: Optional[str] = None
     gmv_by_product_category: Optional[str] = None
+    est_post_rate: Optional[Any] = None
     avg_commission_rate: Optional[Any] = None
     collab_products: Optional[Any] = None
     partnered_brands: Optional[Any] = None
