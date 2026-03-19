@@ -58,6 +58,22 @@ CATEGORY_ID_TO_NAME = {value: key for key, value in CATEGORY_NAME_TO_ID.items()}
 CATEGORY_NAME_TO_ID_LOWER = {key.lower(): value for key, value in CATEGORY_NAME_TO_ID.items()}
 
 
+async def _close_with_timeout(resource: Any, name: str, timeout: float = 3.0) -> None:
+    if not resource:
+        return
+    close_fn = getattr(resource, "aclose", None) or getattr(resource, "close", None) or getattr(
+        resource, "stop", None
+    )
+    if not close_fn:
+        return
+    try:
+        await asyncio.wait_for(close_fn(), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning("Close timed out", resource=name)
+    except Exception:
+        logger.warning("Close failed", resource=name, exc_info=True)
+
+
 @dataclass
 class AccountProfile:
     name: str
@@ -806,22 +822,14 @@ class CreatorCrawlerService:
         return True
 
     async def close(self) -> None:
-        if self.ingestion_client:
-            await self.ingestion_client.aclose()
-        if self.outreach_task_client:
-            await self.outreach_task_client.aclose()
-        if self.outreach_chatbot_client:
-            await self.outreach_chatbot_client.aclose()
-        if self.outreach_control_client:
-            await self.outreach_control_client.aclose()
-        if self._page:
-            await self._page.close()
-        if self._context:
-            await self._context.close()
-        if self._browser:
-            await self._browser.close()
-        if self._playwright:
-            await self._playwright.stop()
+        await _close_with_timeout(self.ingestion_client, "ingestion_client")
+        await _close_with_timeout(self.outreach_task_client, "outreach_task_client")
+        await _close_with_timeout(self.outreach_chatbot_client, "outreach_chatbot_client")
+        await _close_with_timeout(self.outreach_control_client, "outreach_control_client")
+        await _close_with_timeout(self._page, "page")
+        await _close_with_timeout(self._context, "context")
+        await _close_with_timeout(self._browser, "browser")
+        await _close_with_timeout(self._playwright, "playwright")
         self._playwright = None
         self._browser = None
         self._context = None

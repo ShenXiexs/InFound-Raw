@@ -99,7 +99,7 @@ def _sanitize_decimal(value: Optional[str]) -> Optional[Decimal]:
         return Decimal(text)
     except (ValueError, InvalidOperation):
         try:
-            # Handle truncated/annotated currency strings like "$157.93 ..." or "p... 1351.57"
+            # 兼容金额/截断展示，例如 "$157.93 ..." / "p... 1351.57"
             match = re.search(r"[-+]?\d*\.?\d+", text)
             if match:
                 return Decimal(match.group())
@@ -158,9 +158,9 @@ def _format_order_expired_time(value: Any) -> str:
         return "--"
     if raw < 0:
         raw = 0
-    # TikTok sometimes returns this in seconds and sometimes in milliseconds; adapt conservatively:
-    # - treat values below 10_000_000 (~115 days in seconds) as seconds
-    # - otherwise treat as milliseconds
+    # TikTok 接口里该字段有时以秒返回，有时以毫秒返回；这里做一个保守的自适应：
+    # - 小于 10_000_000（~115 天的秒数）时按“秒”处理（常见为几天内的秒数）
+    # - 否则按“毫秒”处理
     seconds = raw // 1000 if raw >= 10_000_000 else raw
     days = seconds // (3600 * 24)
     if days >= 1:
@@ -170,15 +170,15 @@ def _format_order_expired_time(value: Any) -> str:
 
 
 def _clean_promotion_earn_text(value: Optional[str]) -> str:
-    """Handle UI truncation (e.g., p.../p…) and strip extra whitespace."""
+    """兼容 UI 截断（例如 p... / p…）以及多余空白。"""
     if value is None:
         return ""
     text = str(value).strip()
     if not text:
         return ""
-    # Older pages may prepend a truncated prefix like `p... 1351.57`
+    # 旧版页面会出现类似 `p... 1351.57` 的截断前缀
     text = re.sub(r"(?i)\bp(\.\.\.|…)\s*", "", text).strip()
-    # Also remove occurrences in the middle of the string
+    # 有些情况下会出现在中间，尽量清掉
     text = text.replace("p...", "").replace("p…", "").strip()
     return text
 
@@ -220,13 +220,13 @@ class CrawlerRunnerService:
         self._initialize_lock = asyncio.Lock()
         self._view_content_counter = 0
         self._task_deadline: Optional[float] = None
-        # Table pagination current page index (used to recover after hangs/refreshes)
+        # 样品列表分页（table pagination）当前页号：用于卡死/刷新后的恢复。
         self._table_page_index = 1
-        # Reuse the prewarmed main page when SAMPLE_REUSE_MAIN_PAGE=True to avoid extra windows
+        # 如需避免任务时新开窗口，可通过配置 SAMPLE_REUSE_MAIN_PAGE=True 复用预热主页面
         self.reuse_main_page_for_tasks = bool(
             getattr(settings, "SAMPLE_REUSE_MAIN_PAGE", True)
         )
-        # Task-level stop flag to allow callers to abort
+        # 任务级停止标记，可由上层请求终止当前任务
         self.stop_event = asyncio.Event()
         self.service_name = getattr(settings, "CONSUMER", "portal_tiktok_sample_crawler") or "portal_tiktok_sample_crawler"
         inner_api_token = (

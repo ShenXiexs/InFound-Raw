@@ -27,7 +27,7 @@ class LoginManager:
     ) -> None:
         self.login_url = login_url
         self.search_input_selector = search_input_selector
-        # Force automated login unless manual mode is explicitly enabled.
+        # 强制自动登录路径；若确需手动模式应显式传 True
         self.manual_login_default = bool(manual_login_default)
         self.manual_email_code_input = bool(manual_email_code_input)
         self.manual_email_code_input_timeout_seconds = int(manual_email_code_input_timeout_seconds or 180)
@@ -36,27 +36,27 @@ class LoginManager:
         """Prompt user to enter the email verification code (fallback when IMAP is unavailable)."""
         if not self.manual_email_code_input:
             return None
-        prompt = "Enter the TikTok email code (6 letters/digits). Press Enter to skip: "
+        prompt = "请输入 TikTok 邮箱验证码（6位字母/数字），直接回车表示放弃本次： "
         try:
             raw = await asyncio.wait_for(
                 asyncio.to_thread(input, prompt),
                 timeout=float(self.manual_email_code_input_timeout_seconds),
             )
         except asyncio.TimeoutError:
-            logger.warning("Manual code entry timed out; skipping this login attempt")
+            logger.warning("手动输入验证码超时，放弃本次登录尝试")
             return None
         except EOFError:
-            logger.warning("Manual input unavailable (non-interactive); skipping this login attempt")
+            logger.warning("无法读取手动输入（非交互环境），放弃本次登录尝试")
             return None
         except Exception as exc:
-            logger.warning("Manual code entry failed: %s", exc)
+            logger.warning("手动输入验证码失败: %s", exc)
             return None
 
         code = str(raw or "").strip().upper()
         if not code:
             return None
         if not re.fullmatch(r"[A-Z0-9]{6}", code):
-            logger.warning("Invalid code format (expect 6 letters/digits); retrying automatically")
+            logger.warning("验证码格式不正确（期望 6 位字母/数字），将继续自动重试")
             return None
         return code
 
@@ -89,7 +89,7 @@ class LoginManager:
                 return True
             except Exception:
                 continue
-        # Fallback: if already on partner domain and not on login path, treat as logged in.
+        # 兜底：域名已是 partner 且 URL 不包含 login 时，也视为登录成功
         path = (urlparse(page.url or "").path or "").lower()
         if "login" not in path:
             return True
@@ -119,7 +119,7 @@ class LoginManager:
         """Perform login using email code flow."""
         await page.goto(self.login_url, wait_until="load")
         if await self.is_logged_in(page):
-            logger.info("Login check passed: already logged in (dashboard marker detected)")
+            logger.info("登录检测通过：已在登录状态（重定向后直接命中 dashboard 标识）")
             return
 
         if self.manual_login_default:
@@ -142,7 +142,7 @@ class LoginManager:
                     except Exception:
                         continue
                 else:
-                    raise PlaywrightError("Login-with-code button not found")
+                    raise PlaywrightError("找不到“通过验证码登录”按钮")
 
                 email_input_selectors = ["#email input", 'input[name="email"]', 'input[type="email"]']
                 for selector in email_input_selectors:
@@ -164,12 +164,12 @@ class LoginManager:
                         send_btn = candidate
                         break
                 if not send_btn:
-                    raise PlaywrightError("Send code button not found")
+                    raise PlaywrightError("找不到发送验证码按钮")
                 await send_btn.wait_for(state="visible", timeout=10_000)
                 await send_btn.click()
                 await page.wait_for_timeout(1000)
 
-                # IMAP fetch can be blocked; allow manual input for local debugging.
+                # IMAP 拉取验证码可能受网络限制影响；开启手动输入时优先提示用户（本地调试更快）。
                 if self.manual_email_code_input:
                     verification_code = await self._prompt_verification_code()
                     if not verification_code:
@@ -186,25 +186,25 @@ class LoginManager:
 
                 await page.fill("#emailCode_input", verification_code)
                 await page.locator('button[starling-key="account_login_btn_loginform_login_text"]').click()
-                # Wait after submit to allow SSO redirect to settle.
+                # 登录提交后留足 8s，让 SSO 重定向稳定再检查标识
                 await page.wait_for_timeout(8000)
-                # If redirected to partner domain and not on login path, treat as success.
+                # 如果已经跳到 partner 域且非 login 路径，直接视为成功
                 host = (urlparse(page.url or "").hostname or "").lower()
                 path = (urlparse(page.url or "").path or "").lower()
                 if (
                         ("partner.tiktokshop.com" in host or "partner.eu.tiktokshop.com" in host or "partner" in host)
                         and "login" not in path
                 ):
-                    logger.info("Login succeeded; redirected to partner domain")
+                    logger.info("登录成功，已重定向到 partner 域")
                     return
 
-                for _ in range(20):  # up to ~40s
+                for _ in range(20):  # 最长 ~40s
                     try:
                         await page.wait_for_load_state("networkidle", timeout=5_000)
                     except Exception:
                         pass
                     if await self.is_logged_in(page):
-                        logger.info("Login succeeded; login markers detected")
+                        logger.info("登录成功，检测到登录标识")
                         return
                     await asyncio.sleep(2)
                 raise PlaywrightError("Login submitted but no logged-in markers detected")
@@ -217,4 +217,4 @@ class LoginManager:
                         pass
                 await asyncio.sleep(3)
                 await page.goto(self.login_url, wait_until="load")
-        raise PlaywrightError("Login failed")
+        raise PlaywrightError("登录失败")

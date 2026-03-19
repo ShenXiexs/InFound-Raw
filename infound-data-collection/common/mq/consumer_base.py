@@ -14,7 +14,7 @@ logger = get_logger()
 
 
 def _parse_message_body(body_bytes: bytes) -> Dict[str, Any]:
-    """Parse message body (JSON)."""
+    """解析消息体（支持 JSON 格式）"""
     try:
         return json.loads(body_bytes.decode('utf-8'))
     except Exception as e:
@@ -22,7 +22,7 @@ def _parse_message_body(body_bytes: bytes) -> Dict[str, Any]:
 
 
 class ConsumerBase(ABC):
-    """Base consumer class; all consumers inherit this."""
+    """消费端基类，所有消费端继承此类"""
 
     def __init__(self, rabbitmq_connection: RabbitMQConnection):
         self.rabbitmq_conn = rabbitmq_connection
@@ -32,14 +32,14 @@ class ConsumerBase(ABC):
     @abstractmethod
     async def process_message_body(self, message_id: str, body: Dict[str, Any]) -> None:
         """
-        Abstract handler for message body (implemented by subclasses).
-        :param message_id: message ID
-        :param body: parsed message body
+        抽象方法：处理消息体（子类必须实现）
+        :param message_id: 消息ID
+        :param body: 解析后的消息体
         """
         pass
 
     async def process_message(self, message: AbstractIncomingMessage) -> None:
-        """Unified message handler (parse, log, error handling)."""
+        """统一消息处理入口（包含解析、日志、错误处理）"""
         message_id = message.message_id
         self.logger.info("Received message", message_id=message_id, routing_key=message.routing_key)
 
@@ -116,15 +116,15 @@ class ConsumerBase(ABC):
             self.logger.warning("Failed to publish to dead-letter exchange", exc_info=True)
 
     async def start(self) -> None:
-        """Start consumer."""
+        """启动消费端"""
         self.logger.info("Starting consumer", queue=self.rabbitmq_conn.queue_name)
 
         while True:
             try:
-                # Ensure RabbitMQ connection
+                # 确保 RabbitMQ 连接
                 await self.rabbitmq_conn.connect()
 
-                # Log binding/backlog for debugging
+                # 记录当前绑定信息与队列堆积情况，方便排查“未收到消息”
                 backlog = None
                 try:
                     result = getattr(self.rabbitmq_conn.queue, "declaration_result", None)
@@ -139,20 +139,20 @@ class ConsumerBase(ABC):
                     backlog=backlog,
                 )
 
-                # Start consuming
+                # 开始消费
                 await self.rabbitmq_conn.queue.consume(
                     self.process_message,
                     no_ack=bool(getattr(self.rabbitmq_conn, "at_most_once", False))
                 )
 
                 self.logger.info("Consumer started successfully", queue=self.rabbitmq_conn.queue_name)
-                # Keep consuming
+                # 保持消费循环
                 while True:
                     await asyncio.sleep(1)
 
             except Exception as e:
                 self.logger.error("Consumer error, restarting...", error=str(e), exc_info=True)
-                # Clean up to avoid noisy robust channel callbacks.
+                # 连接/通道断开时，先显式清理，避免 robust 恢复任务反复抛出 callback 异常
                 try:
                     await self.rabbitmq_conn.close()
                 except Exception:
@@ -160,7 +160,7 @@ class ConsumerBase(ABC):
                 await asyncio.sleep(self.rabbitmq_conn.reconnect_delay)
 
     async def stop(self) -> None:
-        """Stop consumer (cleanup)."""
+        """停止消费端（清理资源）"""
         self.logger.info("Stopping consumer")
         await self.rabbitmq_conn.close()
         self.logger.info("Consumer stopped successfully")

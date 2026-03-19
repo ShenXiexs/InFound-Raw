@@ -51,6 +51,17 @@ class CrawlerConsumer(ConsumerBase):
     async def stop(self) -> None:
         for task in list(self._active_tasks):
             task.cancel()
+        if self._active_tasks:
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*self._active_tasks, return_exceptions=True),
+                    timeout=10,
+                )
+            except asyncio.TimeoutError:
+                self.logger.warning(
+                    "Timed out waiting for active tasks; forcing shutdown",
+                    active=len(self._active_tasks),
+                )
         await super().stop()
 
     async def process_message_body(self, message_id: str, body: Dict[str, Any]) -> None:

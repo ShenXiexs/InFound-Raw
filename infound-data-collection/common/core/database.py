@@ -12,47 +12,47 @@ from common.core.logger import get_logger
 settings = get_settings()
 logger = get_logger()
 
-# Base model (async-friendly)
+# 基础模型类（集成异步特性）
 Base = declarative_base(cls=AsyncAttrs)
 
-# Async engine (singleton)
+# 异步引擎（单例）
 engine: Optional[AsyncEngine] = None
 
-# Async session factory (tuned defaults)
+# 异步会话工厂（优化配置）
 AsyncSessionLocal = sessionmaker(
     class_=AsyncSession,
     autoflush=False,
     autocommit=False,
     expire_on_commit=False,
-    bind=None,  # bind lazily
+    bind=None,  # 延迟绑定引擎
 )
 
 
 def init_database() -> None:
-    """Initialize the MySQL async connection pool."""
+    """初始化 MySQL 连接池（支持动态配置）"""
     global engine
     try:
-        # Create async engine with tuned pool settings
+        # 创建异步引擎（优化连接池配置）
         engine = create_async_engine(
             settings.SQLALCHEMY_DATABASE_URL,
-            pool_size=10,  # base pool size
-            max_overflow=20,  # extra connections
-            pool_recycle=3600,  # recycle hourly (avoid MySQL 8h timeout)
-            pool_pre_ping=True,  # validate before use
-            echo=settings.DEBUG,  # log SQL in dev
-            echo_pool=settings.DEBUG,  # log pool events in dev
+            pool_size=10,  # 核心连接数
+            max_overflow=20,  # 最大溢出连接数
+            pool_recycle=3600,  # 1小时回收连接（避免 MySQL 8小时超时）
+            pool_pre_ping=True,  # 连接前校验（避免无效连接）
+            echo=settings.DEBUG,  # 开发环境打印 SQL
+            echo_pool=settings.DEBUG,  # 开发环境打印连接池日志
         )
-        # Bind engine to session factory
+        # 绑定引擎到会话工厂
         AsyncSessionLocal.configure(bind=engine)
-        logger.info("MySQL async pool initialized", extra={"db_url": settings.SQLALCHEMY_DATABASE_URL})
+        logger.info("MySQL 异步连接池初始化成功", extra={"db_url": settings.SQLALCHEMY_DATABASE_URL})
     except Exception as e:
-        logger.error("MySQL pool initialization failed", exc_info=True, extra={"error": str(e)})
+        logger.error("MySQL 连接池初始化失败", exc_info=True, extra={"error": str(e)})
         raise
 
 
 @asynccontextmanager
 async def get_db() -> AsyncSession:
-    """Dependency helper for a managed async DB session."""
+    """依赖注入：获取 MySQL 异步会话（上下文管理器优化）"""
     global engine
     if not engine:
         init_database()
@@ -63,7 +63,7 @@ async def get_db() -> AsyncSession:
             await session.commit()
         except Exception as e:
             await session.rollback()
-            logger.error("Database session error", exc_info=True, extra={"error": str(e)})
+            logger.error("数据库会话异常", exc_info=True, extra={"error": str(e)})
             raise
         finally:
             await session.close()
