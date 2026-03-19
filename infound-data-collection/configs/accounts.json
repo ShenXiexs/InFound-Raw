@@ -2,58 +2,58 @@
   "accounts": [
     {
       "name": "MX1",
-      "login_email": "mx1@example.com",
-      "login_password": "<ACCOUNT_PASSWORD>",
-      "gmail_username": "mx1@example.com",
-      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "login_email": "tiktokshopinfoundtest@gmail.com",
+      "login_password": "fyvbyn-hyctu0-Rafqyp",
+      "gmail_username": "tiktokshopinfoundtest@gmail.com",
+      "gmail_app_password": "cfhlfedjqhfbbbhb",
       "region": "MX",
-      "creator_id": "00000000-0000-0000-0000-000000000001",
+      "creator_id": "59A7FE40-D372-11F0-B446-2AA7A70856D4",
       "enabled": true,
-      "notes": "MX region account"
+      "notes": "MX区域账号"
     },
     {
       "name": "MX2",
-      "login_email": "mx2@example.com",
-      "login_password": "<ACCOUNT_PASSWORD>",
-      "gmail_username": "mx2@example.com",
-      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "login_email": "naileditz88@gmail.com",
+      "login_password": "123456@Infound",
+      "gmail_username": "naileditz88@gmail.com",
+      "gmail_app_password": "ceezvbpmacwxwdck",
       "region": "MX",
-      "creator_id": "00000000-0000-0000-0000-000000000002",
+      "creator_id": "59A7FF1C-D372-11F0-B446-2AA7A70856D4",
       "enabled": true,
-      "notes": "MX region account"
+      "notes": "MX区域账号"
     },
     {
       "name": "MX3",
-      "login_email": "mx3@example.com",
-      "login_password": "<ACCOUNT_PASSWORD>",
-      "gmail_username": "mx3@example.com",
-      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "login_email": "naileditz888@gmail.com",
+      "login_password": "123456@Infound",
+      "gmail_username": "naileditz888@gmail.com",
+      "gmail_app_password": "oirkmvrnhfcyoqkq",
       "region": "MX",
-      "creator_id": "00000000-0000-0000-0000-000000000003",
+      "creator_id": "59A7FF62-D372-11F0-B446-2AA7A70856D4",
       "enabled": true,
-      "notes": "MX region account"
+      "notes": "MX区域账号"
     },
     {
       "name": "EU1",
-      "login_email": "eu1@example.com",
-      "login_password": "<ACCOUNT_PASSWORD>",
-      "gmail_username": "eu1@example.com",
-      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "login_email": "luna.lu.shein@gmail.com",
+      "login_password": "k2AM&Ab6HB?&Kug",
+      "gmail_username": "luna.lu.shein@gmail.com",
+      "gmail_app_password": "kbpcahxfvearpknj",
       "region": "MX",
-      "creator_id": "00000000-0000-0000-0000-000000000004",
+      "creator_id": "59A7FF8A-D372-11F0-B446-2AA7A70856D4",
       "enabled": false,
-      "notes": "MX region account"
+      "notes": "MX区域账号"
     },
     {
       "name": "FR1",
-      "login_email": "fr1@example.com",
-      "login_password": "<ACCOUNT_PASSWORD>",
-      "gmail_username": "fr1@example.com",
-      "gmail_app_password": "<GMAIL_APP_PASSWORD>",
+      "login_email": "tiktokinfoundfrance@gmail.com",
+      "login_password": "dyvvac-coqnYp-sespo0",
+      "gmail_username": "tiktokinfoundfrance@gmail.com",
+      "gmail_app_password": "gnseoovwafbstjbt",
       "region": "FR",
-      "creator_id": "00000000-0000-0000-0000-000000000005",
+      "creator_id": "7AADBEFE-D372-11F0-8A40-2AA7A70856D4",
       "enabled": true,
-      "notes": "FR region account"
+      "notes": "FR区域账号"
     }
   ]
 }

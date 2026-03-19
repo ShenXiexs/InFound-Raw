@@ -1,37 +1,40 @@
-# Global base config (shared by all services)
+# 全局基础配置（所有服务共用）
 APP_NAME: "infound-data-collection"
 
-# MySQL defaults
+# MySQL 基础配置
 MYSQL_CHARSET: "utf8mb4"
 MYSQL_PORT: 3306
 MYSQL_USER: "root"
 MYSQL_HOST: "localhost"
 
-# Redis defaults
+# Redis 基础配置
 REDIS_DB: 0
 REDIS_URL: "redis://localhost:6379/0"
 
-# Logging defaults
+# 日志基础配置
 LOG_LEVEL: "INFO"
 LOG_FILE_MAX_SIZE: 10  # MB
-LOG_FILE_BACKUP_COUNT: 30  # keep 30 days
+LOG_FILE_BACKUP_COUNT: 30  # 保留30天
 LOG_DIR: "logs"
 
 
-# Common RabbitMQ config (can be overridden per consumer)
+# 通用 RabbitMQ 配置（可被消费端专属配置覆盖）
 RABBITMQ:
-  HOST: "<RABBITMQ_HOST>"
+  HOST: "47.238.5.253"
   PORT: 8803
-  USERNAME: "<RABBITMQ_USER>"
-  PASSWORD: "<RABBITMQ_PASSWORD>"
-  VHOST: "<RABBITMQ_VHOST>"
+  USERNAME: "infound.pro"
+  PASSWORD: "Fwur5r1R#%I9+2a"
+  VHOST: "/infound.pro"
   PREFETCH_COUNT: 1
   RECONNECT_DELAY: 5
   MAX_RECONNECT_ATTEMPTS: 1
+  EXCHANGE_NAME: "crawler.direct"
 
 CONSUMERS:
   - "portal_tiktok_sample_crawler"
   - "portal_tiktok_creator_crawler"
+  - "portal_tiktok_campaign_crawler"
+  - "portal_tiktok_shop_collection"
   - "portal_tiktok_sample_crawler_html"
   - "sample_chatbot"
   - "outreach_chatbot"

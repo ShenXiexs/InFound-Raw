@@ -1,7 +1,7 @@
 [project]
 name = "infound-data-collection"
 version = "1.0.0"
-description = "INFound data collection services"
+description = "INFound 数据采集器集合"
 authors = [
     {name = "INFound"}
 ]

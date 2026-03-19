@@ -61,7 +61,7 @@ class SampleIngestionClient:
         try:
             response = await client.post(self.url, content=body.encode("utf-8"), headers=headers)
         except httpx.HTTPError as exc:
-            logger.error("Failed to call inner API", exc_info=True)
+            logger.error("调用 inner API 失败", exc_info=True)
             raise MessageProcessingError(f"Failed to call inner API: {exc}") from exc
 
         if response.status_code >= 500:
@@ -82,7 +82,7 @@ class SampleIngestionClient:
             raise MessageProcessingError(f"Inner API error: {result.get('msg')}")
 
         logger.info(
-            "Sample data submitted to inner API",
+            "样品数据已提交至 inner API",
             url=self.url,
             rows=len(rows),
             products=result.get("data", {}).get("products"),

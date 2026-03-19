@@ -1,28 +1,28 @@
 class ConsumerBaseException(Exception):
-    """Base exception."""
+    """基础异常"""
     pass
 
 
 class RabbitMQConnectionError(ConsumerBaseException):
-    """RabbitMQ connection error."""
+    """RabbitMQ 连接异常"""
     pass
 
 
 class MessageProcessingError(ConsumerBaseException):
-    """Message processing error."""
+    """消息处理异常"""
     pass
 
 
 class NonRetryableMessageError(ConsumerBaseException):
-    """Non-retryable message error."""
+    """不可重试的消息异常"""
     pass
 
 
 class ApiClientError(ConsumerBaseException):
-    """API client error."""
+    """API 客户端异常"""
     pass
 
 
 class PlaywrightError(ConsumerBaseException):
-    """Playwright operation error."""
+    """Playwright 操作异常"""
     pass

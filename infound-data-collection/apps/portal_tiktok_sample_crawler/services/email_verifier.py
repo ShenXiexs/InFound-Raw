@@ -1,4 +1,4 @@
-"""Gmail verification code helper (HTML/text parsing, retries, connection reuse)."""
+"""Gmail 验证码获取（更鲁棒的实现，支持 HTML/纯文本、多次重试、保持连接）。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class GmailVerificationCode:
-    """Fetch TikTok login verification codes."""
+    """获取 TikTok 登录验证码."""
 
     def __init__(self, username: str, app_password: str):
         self.gmail_username = username
@@ -25,37 +25,37 @@ class GmailVerificationCode:
         self._last_activity = 0.0
         self._connection_lifetime = 3600  # seconds
 
-    # ---------------------- Connection management ---------------------- #
+    # ---------------------- 连接管理 ---------------------- #
     def connect_gmail(self, timeout: int = 10, max_retries: int = 5) -> Optional[imaplib.IMAP4_SSL]:
         servers = [("imap.gmail.com", 993)]
         for server_host, server_port in servers:
             for retry in range(max_retries):
                 try:
-                    logger.info("Connecting to %s:%s (attempt %s/%s)", server_host, server_port, retry + 1, max_retries)
+                    logger.info("尝试连接 %s:%s (尝试 %s/%s)", server_host, server_port, retry + 1, max_retries)
                     original_timeout = socket.getdefaulttimeout()
                     socket.setdefaulttimeout(timeout)
                     mail = imaplib.IMAP4_SSL(server_host, server_port)
                     mail.login(self.gmail_username, self.gmail_app_password)
                     socket.setdefaulttimeout(original_timeout)
-                    logger.info("Connected to Gmail: %s via %s", self.gmail_username, server_host)
+                    logger.info("成功连接 Gmail: %s via %s", self.gmail_username, server_host)
                     return mail
                 except (socket.timeout, socket.error) as exc:
-                    logger.warning("Network error (%s): %s", server_host, exc)
+                    logger.warning("网络错误 (%s): %s", server_host, exc)
                     if retry < max_retries - 1:
                         time.sleep((retry + 1) * 2)
                 except imaplib.IMAP4.error as exc:
                     msg = str(exc)
                     if "AUTHENTICATIONFAILED" in msg or "Too many login failures" in msg:
-                        logger.error("Authentication failed or too many login attempts: %s", msg)
+                        logger.error("认证失败或登录次数过多: %s", msg)
                         return None
-                    logger.warning("IMAP error (%s): %s", server_host, msg)
+                    logger.warning("IMAP错误 (%s): %s", server_host, msg)
                     if retry < max_retries - 1:
                         time.sleep(2)
                 except Exception as exc:
-                    logger.error("Unknown error (%s): %s", server_host, exc)
+                    logger.error("未知错误 (%s): %s", server_host, exc)
                     if retry < max_retries - 1:
                         time.sleep(2)
-        logger.error("All connection attempts failed")
+        logger.error("所有连接尝试均失败")
         return None
 
     def safe_logout(self, mail: Optional[imaplib.IMAP4_SSL]) -> None:
@@ -63,7 +63,7 @@ class GmailVerificationCode:
             try:
                 mail.noop()
                 mail.logout()
-                logger.info("Gmail connection closed safely")
+                logger.info("Gmail连接已安全断开")
             except Exception:
                 try:
                     mail.sock.close()
@@ -89,10 +89,10 @@ class GmailVerificationCode:
         self._last_activity = now
         return self._mail_connection
 
-    # ---------------------- Email parsing ---------------------- #
+    # ---------------------- 邮件解析 ---------------------- #
     @staticmethod
     def decode_email_subject(msg: email.message.Message) -> str:
-        subject = "No subject"
+        subject = "无主题"
         if msg["Subject"]:
             try:
                 parts = decode_header(msg["Subject"])
@@ -148,7 +148,7 @@ class GmailVerificationCode:
             if matches:
                 code = matches[-1].strip().upper()
                 if len(code) == 6 and code.isalnum():
-                    logger.info("Verification code matched pattern: %s", code)
+                    logger.info("使用模式找到验证码: %s", code)
                     return code
 
         all_codes = re.findall(r"\b([A-Z0-9]{6})\b", cleaned)
@@ -160,12 +160,12 @@ class GmailVerificationCode:
             }
             valid = [code.upper() for code in all_codes if code.upper() not in stopwords]
             if valid:
-                logger.info("Verification code found by search: %s", valid[-1])
+                logger.info("通过搜索找到验证码: %s", valid[-1])
                 return valid[-1]
-        logger.warning("Failed to extract verification code")
+        logger.warning("未能提取到验证码")
         return None
 
-    # ---------------------- Main flow ---------------------- #
+    # ---------------------- 主流程 ---------------------- #
     def get_latest_verification_code_from_email(self, mail: imaplib.IMAP4_SSL) -> Optional[str]:
         try:
             mail.noop()
@@ -174,16 +174,16 @@ class GmailVerificationCode:
             if status != "OK":
                 status, messages = mail.search(None, "ALL")
             if status != "OK":
-                logger.error("Email search failed")
+                logger.error("搜索邮件失败")
                 return None
             email_ids = messages[0].split()
             if not email_ids or email_ids == [b""]:
-                logger.warning("Inbox empty or no matching email found")
+                logger.warning("收件箱为空或未找到相关邮件")
                 return None
             latest_id = email_ids[-1]
             status, msg_data = mail.fetch(latest_id, "(RFC822)")
             if status != "OK":
-                logger.error("Failed to fetch email")
+                logger.error("获取邮件失败")
                 return None
             msg = email.message_from_bytes(msg_data[0][1])
             subject = self.decode_email_subject(msg)
@@ -191,7 +191,7 @@ class GmailVerificationCode:
             code = self.extract_verification_code(content) or self.extract_verification_code(subject)
             return code
         except Exception as exc:
-            logger.error("Error while fetching email: %s", exc, exc_info=True)
+            logger.error("获取邮件时出错: %s", exc, exc_info=True)
             return None
 
     def get_verification_code(
@@ -200,14 +200,14 @@ class GmailVerificationCode:
             check_interval: int = 10,
             connection_timeout: int = 80,
     ) -> Optional[str]:
-        logger.info("Fetching Gmail verification code...")
+        logger.info("开始获取Gmail验证码...")
         attempt = 0
         previous_code: Optional[str] = None
         consecutive_failures = 0
 
         while attempt < max_attempts:
             attempt += 1
-            logger.info("Check attempt %s/%s...", attempt, max_attempts)
+            logger.info("第 %s/%s 次检查验证码...", attempt, max_attempts)
             mail = self.get_connection(force_new=(consecutive_failures >= 2))
             if not mail:
                 consecutive_failures += 1
@@ -218,18 +218,18 @@ class GmailVerificationCode:
                 consecutive_failures = 0
                 if code:
                     if previous_code == code:
-                        logger.info("✓ Code confirmed: %s", code)
+                        logger.info("✓ 验证码确认成功: %s", code)
                         return code
                     previous_code = code
-                    logger.info("Code changed; waiting for next confirmation...")
+                    logger.info("验证码变化，等待下次确认...")
                 else:
                     previous_code = None
             except Exception as exc:
                 consecutive_failures += 1
-                logger.error("Error while fetching email: %s", exc)
+                logger.error("获取邮件时出错: %s", exc)
                 self._mail_connection = None
             if attempt < max_attempts:
                 time.sleep(check_interval)
 
-        logger.error("Verification code timeout (attempts: %s)", max_attempts)
+        logger.error("验证码获取超时（尝试 %s 次）", max_attempts)
         return None

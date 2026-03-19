@@ -82,7 +82,7 @@ def _enforce_queue_tabs(kind: str, body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class SampleCrawlerConsumer(ConsumerBase):
-    """Sample crawler core logic (shared Playwright session pool)."""
+    """样品爬虫核心逻辑（共享 Playwright 会话池）"""
 
     def __init__(self):
         amqp_url = (
@@ -102,7 +102,7 @@ class SampleCrawlerConsumer(ConsumerBase):
             max_reconnect_attempts=settings.RABBITMQ_MAX_RECONNECT_ATTEMPTS,
         )
         super().__init__(rabbitmq_conn)
-        # Playwright pool: keep warm browsers, reuse idle slots before spawning new.
+        # Playwright 会话池：常驻浏览器，优先复用空闲实例，无空闲时才新建。
         self.pool: List[Dict[str, Any]] = []
         self.pool_lock = asyncio.Lock()
         self.default_region = str(getattr(settings, "SAMPLE_DEFAULT_REGION", "MX") or "MX").upper()
@@ -148,19 +148,19 @@ class SampleCrawlerConsumer(ConsumerBase):
             if reserved:
                 self._release_reserved_account(region_key, spawn_account)
             self.pool.append(slot)
-            logger.info("Prewarmed Playwright session", pool_size=len(self.pool))
+            logger.info("预热 Playwright 会话完成", pool_size=len(self.pool))
 
     async def _spawn_service(self, region: str, account_name: Optional[str]) -> Dict[str, Any]:
         region_key = str(region or self.default_region or "MX").upper()
         svc = CrawlerRunnerService()
         profile = svc.resolve_profile(region=region_key, account_name=account_name)
         await svc.initialize(profile)
-        # Only complete login and stay on the page; tasks navigate later.
-        logger.info("Spawned Playwright session and logged in", login_email=profile.login_email)
+        # 仅完成登录，保持在当前页面；真正任务时再跳转 target_url
+        logger.info("新建 Playwright 会话并完成登录", login_email=profile.login_email)
         return {"service": svc, "in_use": False}
 
     async def _acquire_slot(self, region: str, account_name: Optional[str]) -> Dict[str, Any]:
-        # Wait for prewarm tasks (ignore failures)
+        # 等待预热任务（忽略失败）
         for task in list(self.prewarm_tasks):
             if not task.done():
                 try:
@@ -203,7 +203,7 @@ class SampleCrawlerConsumer(ConsumerBase):
                     1 for state in slot_states if not state["in_use"] and state["has_live_session"]
                 )
                 logger.info(
-                    "Checking session pool",
+                    "检查会话池",
                     pool_size=len(self.pool),
                     idle=idle,
                     max_size=self.pool_max,
@@ -215,9 +215,9 @@ class SampleCrawlerConsumer(ConsumerBase):
                     if slot["in_use"]:
                         continue
                     if not slot_state.get("has_live_session", svc.has_live_session()):
-                        # Drop invalid session to allow respawn
+                        # 清理失效会话，允许后续新建
                         logger.warning(
-                            "Detected invalid session; cleaning up",
+                            "检测到失效会话，将清理",
                             slot_index=slot_state.get("slot_index"),
                             login_email=slot_state.get("login_email"),
                             session_state=slot_state or svc.describe_session_state(),
@@ -233,7 +233,7 @@ class SampleCrawlerConsumer(ConsumerBase):
                         continue
                     if not svc.account_profile or svc.account_profile.login_email != desired_profile.login_email:
                         logger.info(
-                            "Session account mismatch; skipping",
+                            "会话账号不匹配，跳过",
                             slot_index=slot_state.get("slot_index"),
                             login_email=slot_state.get("login_email"),
                             desired_login=desired_profile.login_email,
@@ -241,14 +241,14 @@ class SampleCrawlerConsumer(ConsumerBase):
                         continue
                     slot["in_use"] = True
                     logger.info(
-                        "Reusing warm session",
+                        "复用常驻会话",
                         pool_size=len(self.pool),
                         idle=idle - 1 if idle else 0,
                         slot_index=slot_state.get("slot_index"),
                         login_email=slot_state.get("login_email"),
                     )
                     return slot
-                # Prefer rebuilding idle session to match account before spawning.
+                # 优先重建空闲会话以满足账号要求，尽量不新开浏览器
                 for slot in self.pool:
                     if slot["in_use"]:
                         continue
@@ -256,22 +256,22 @@ class SampleCrawlerConsumer(ConsumerBase):
                         await slot["service"].initialize(desired_profile)
                         slot["in_use"] = True
                         logger.info(
-                            "Rebuilt idle session for reuse",
+                            "重建空闲会话并复用",
                             pool_size=len(self.pool),
                             slot_index=state_map.get(id(slot), {}).get("slot_index"),
                             login_email=desired_profile.login_email,
                         )
                         return slot
                     except Exception:
-                        logger.warning("Failed to rebuild idle session; waiting for release", exc_info=True)
+                        logger.warning("空闲会话重建失败，等待其他会话释放", exc_info=True)
                         continue
-                # Scale up only if rebuild failed and below max.
+                # 无法重建且未达上限，才考虑扩容
                 if len(self.pool) < self.pool_max:
                     spawn_account, spawn_reserved = self._reserve_account_for_spawn(
                         region, account_name
                     )
                     spawn_needed = True
-                # Pool full and rebuild failed; wait for idle.
+                # 池已满且重建失败，只能等待空闲
             if spawn_needed:
                 try:
                     slot = await self._spawn_service(region, spawn_account)
@@ -285,7 +285,7 @@ class SampleCrawlerConsumer(ConsumerBase):
                         self._release_reserved_account(region, spawn_account)
                     slot["in_use"] = True
                     self.pool.append(slot)
-                    logger.info("Expanded Playwright session pool", pool_size=len(self.pool))
+                    logger.info("扩容 Playwright 会话池", pool_size=len(self.pool))
                     return slot
             await asyncio.sleep(1)
 
@@ -295,12 +295,12 @@ class SampleCrawlerConsumer(ConsumerBase):
         try:
             if svc._main_page and not svc._main_page.is_closed():
                 region = svc.account_profile.region if svc.account_profile else None
-                # Release by navigating + waiting; avoid DOM checks that may break on UI changes.
+                # 释放阶段只要执行过跳转 + 等待即可，不依赖首页 DOM 判定（避免 UI 变更导致卡死）
                 await asyncio.wait_for(svc._goto_home_soft(svc._main_page, region, wait_ms=5000), timeout=25)
         except asyncio.TimeoutError:
-            logger.warning("Release to home timed out; returning session for reuse")
+            logger.warning("释放会话回到首页超时，将直接归还会话以便复用")
         except Exception:
-            logger.warning("Release to home failed; returning session for reuse", exc_info=True)
+            logger.warning("释放会话回到首页失败，将直接归还会话以便复用", exc_info=True)
         async with self.pool_lock:
             if svc._browser:
                 slot["in_use"] = False
@@ -319,12 +319,12 @@ class SampleCrawlerConsumer(ConsumerBase):
                         if not slot_item["in_use"] and slot_item["service"].has_live_session()
                     )
                     pool_size = len(self.pool)
-                logger.info("Session released back to pool", pool_size=pool_size, idle=idle)
+                logger.info("会话已释放并归还池子", pool_size=pool_size, idle=idle)
             except Exception:
-                logger.info("Session released back to pool")
+                logger.info("会话已释放并归还池子")
 
     async def process_message_body(self, message_id: str, body: Dict[str, Any]) -> None:
-        """Handle crawler task."""
+        """处理爬虫任务"""
         function_name = str(body.get("function") or "sample").strip().lower()
         if function_name != "sample":
             raise MessageProcessingError(f"Unsupported function '{function_name}', only 'sample' is available")
@@ -360,7 +360,7 @@ class SampleCrawlerConsumer(ConsumerBase):
         if ctx_values:
             struct_contextvars.bind_contextvars(**ctx_values)
 
-        logger.info("Starting CrawlerConsumer", body=body)
+        logger.info("开始执行 CrawlerConsumer", body=body)
 
         slot: Optional[Dict[str, Any]] = None
         try:
@@ -378,7 +378,7 @@ class SampleCrawlerConsumer(ConsumerBase):
                 try:
                     await service.process_campaign_task(body)
                 except Exception:
-                    # By contract: no retries; swallow error so caller can ack.
+                    # 按约定：消息不允许重试，因此此处吞掉异常让上层 ack。
                     logger.error("Crawler task failed; message will be acked (no retry)", exc_info=True)
             finally:
                 if self.active_service is service:
@@ -389,14 +389,14 @@ class SampleCrawlerConsumer(ConsumerBase):
             if ctx_keys:
                 struct_contextvars.unbind_contextvars(*ctx_keys)
 
-        logger.info("Finished CrawlerConsumer")
+        logger.info("结束执行 CrawlerConsumer")
 
 
 class CrawlerConsumer(SampleCrawlerConsumer):
     """
-    Sample crawler (single process, dual queues):
-    - completed queue: only tabs=['completed'] (inject if missing)
-    - other queue: all non-completed tabs
+    样品爬虫（单进程双队列）：
+    - completed queue：只处理 tabs=['completed']（未传 tabs 则自动注入）
+    - other queue：处理除 completed 以外的 tab
     """
 
     def __init__(self) -> None:
@@ -555,7 +555,7 @@ class CrawlerConsumer(SampleCrawlerConsumer):
             await _publish_to_dead_letter(conn, body=message.body, message_id=message_id, reason=str(exc))
 
     async def stop(self) -> None:
-        """Stop MQ after closing all Playwright sessions."""
+        """关闭所有常驻 Playwright 实例后再停止 MQ 连接。"""
         for task in self.prewarm_tasks:
             if task and not task.done():
                 task.cancel()
@@ -573,7 +573,7 @@ class CrawlerConsumer(SampleCrawlerConsumer):
         await super().stop()
 
     def cancel_current_task(self) -> None:
-        """External cancel hook when no per-message API is available."""
+        """外部调用：请求中断当前任务（未提供消息级接口时的兜底）。"""
         if self.active_service:
             self.active_service.stop_event.set()
 

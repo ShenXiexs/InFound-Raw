@@ -128,7 +128,7 @@ async def publish_message(message: dict) -> None:
     async with conn:
         channel = await conn.channel()
         exchange = await channel.declare_exchange(exchange_name, aio_pika.ExchangeType.DIRECT, durable=True)
-        # Match consumer behavior: declare DLX + main queue (with DLQ).
+        # 与消费者保持一致：声明 DLX + 主队列（带死信）
         dlx_exchange = await channel.declare_exchange(dlx_name, aio_pika.ExchangeType.DIRECT, durable=True)
         dlq = await channel.declare_queue(f"{queue_name}.dead", durable=True)
         await dlq.bind(dlx_exchange, routing_key=dl_routing_key)
@@ -150,7 +150,7 @@ async def publish_message(message: dict) -> None:
             print("Publish failed: message was unroutable or delivery failed", exc)
             return
 
-        # Re-declare to fetch latest backlog.
+        # 重新声明一次以获得最新 backlog
         queue_after = await channel.declare_queue(queue_name, durable=True, arguments=queue_args)
         after_res = queue_after.declaration_result
         after = getattr(after_res, "message_count", None)

@@ -1,0 +1,833 @@
+{
+  "generated_at": "2026-03-19T15:06:10.847689+00:00",
+  "capture_type": "affiliate_outreach_filters",
+  "region": "FR",
+  "account_name": "FR_LOCAL_SHOP",
+  "shop_type": "local",
+  "target_url": "https://affiliate.tiktok.com/connection/creator?shop_region=FR",
+  "current_url": "https://affiliate.tiktok.com/connection/creator?shop_region=FR&shop_id=7494169257703343317",
+  "source": {
+    "service_name": "portal_tiktok_shop_collection",
+    "dsl_reference": "ref/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts",
+    "page_ready_text": "Find creators",
+    "module_button_selector": "button[data-tid=\"m4b_button\"] span",
+    "filter_title_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+    "script_region": "FR"
+  },
+  "modules": [
+    {
+      "module_key": "creatorFilters",
+      "module_title": "Creators",
+      "module_button": {
+        "text": "Creators",
+        "selector": "button[data-tid=\"m4b_button\"] span",
+        "dom_path": "div.filter-J7EF96.min-h-[208px] > div.mb-16.flex > div.arco-radio-group.arco-radio-size-default > label.arco-radio.arco-radio-checked > button.arco-btn.arco-btn-secondary > span",
+        "class_name": "",
+        "aria_expanded": "",
+        "data_tid": ""
+      },
+      "observed_filter_titles": [
+        "Product Category",
+        "Avg. commission rate",
+        "Content type",
+        "Creator agency"
+      ],
+      "filters": [
+        {
+          "filter_key": "productCategorySelections",
+          "filter_title": "Product category",
+          "status": "error",
+          "error": "Failed to find visible element by texts=['Product category'] selector='button[data-tid=\"m4b_button\"] .arco-typography'",
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "productCategorySelections",
+            "filter_title": "Product category",
+            "action_type": "selectCascaderOptionsByValue",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Product category"
+            ],
+            "panel_selector": "ul.arco-cascader-list.arco-cascader-list-multiple",
+            "option_selector": "ul.arco-cascader-list.arco-cascader-list-multiple li",
+            "scroll_container_selector": "ul.arco-cascader-list.arco-cascader-list-multiple"
+          }
+        },
+        {
+          "filter_key": "avgCommissionRate",
+          "filter_title": "Avg. commission rate",
+          "filter_kind": "single_select",
+          "status": "ok",
+          "trigger": {
+            "text": "Avg. commission rate",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "div.arco-form-item-control-children > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "avgCommissionRate",
+            "filter_title": "Avg. commission rate",
+            "action_type": "selectDropdownSingle",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Avg. commission rate"
+            ],
+            "wait_selector": "li.arco-select-option",
+            "option_selector": "li.arco-select-option"
+          },
+          "snapshot": {
+            "container_selector": "li.arco-select-option",
+            "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup",
+            "option_selector": "li.arco-select-option",
+            "option_count": 5,
+            "options": [
+              {
+                "label": "No threshold",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option arco-select-option-selected arco-select-option-hover",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-0.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": true
+              },
+              {
+                "label": "Less than 20%",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-0.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "Less than 15%",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-0.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "Less than 10%",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-0.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "Less than 5%",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-0.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              }
+            ],
+            "inputs": [],
+            "checkbox_labels": [],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Find creators Find creators . Filter by Creators Follower Performance Reset Product Category Avg. commission rate Content type Creator agency Rising Star Not invited in past 90 days VAT legible No threshold Less than 20% Less than 15% Less than 10% Less than 5% 0 creators selected Batch invite Batch add to Mana"
+          }
+        },
+        {
+          "filter_key": "contentType",
+          "filter_title": "Content type",
+          "filter_kind": "single_select",
+          "status": "ok",
+          "trigger": {
+            "text": "Content type",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "div.arco-form-item-control-children > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "contentType",
+            "filter_title": "Content type",
+            "action_type": "selectDropdownSingle",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Content type"
+            ],
+            "wait_selector": "li.arco-select-option",
+            "option_selector": "li.arco-select-option"
+          },
+          "snapshot": {
+            "container_selector": "li.arco-select-option",
+            "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup",
+            "option_selector": "li.arco-select-option",
+            "option_count": 3,
+            "options": [
+              {
+                "label": "All",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option arco-select-option-selected arco-select-option-hover",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-1.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": true
+              },
+              {
+                "label": "Video",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-1.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "LIVE",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-1.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              }
+            ],
+            "inputs": [],
+            "checkbox_labels": [],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Find creators Find creators . Filter by Creators Follower Performance Reset Product Category Avg. commission rate Content type Creator agency Rising Star Not invited in past 90 days VAT legible No threshold Less than 20% Less than 15% Less than 10% Less than 5% All Video LIVE 0 creators selected Batch invite Ba"
+          }
+        },
+        {
+          "filter_key": "creatorAgency",
+          "filter_title": "Creator agency",
+          "filter_kind": "single_select",
+          "status": "ok",
+          "trigger": {
+            "text": "Creator agency",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "div.arco-form-item-control-children > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "creatorAgency",
+            "filter_title": "Creator agency",
+            "action_type": "selectDropdownSingle",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Creator agency"
+            ],
+            "wait_selector": "li.arco-select-option",
+            "option_selector": "li.arco-select-option"
+          },
+          "snapshot": {
+            "container_selector": "li.arco-select-option",
+            "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup",
+            "option_selector": "li.arco-select-option",
+            "option_count": 3,
+            "options": [
+              {
+                "label": "All",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option arco-select-option-selected arco-select-option-hover",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-2.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": true
+              },
+              {
+                "label": "Managed by agency",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-2.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "Independent creators",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-2.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              }
+            ],
+            "inputs": [],
+            "checkbox_labels": [],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Find creators Find creators . Filter by Creators Follower Performance Reset Product Category Avg. commission rate Content type Creator agency Rising Star Not invited in past 90 days VAT legible No threshold Less than 20% Less than 15% Less than 10% Less than 5% All Video LIVE All Managed by agency Independent c"
+          }
+        },
+        {
+          "filter_key": "spotlightCreator",
+          "filter_title": "Spotlight Creator",
+          "filter_kind": "checkbox",
+          "status": "ok",
+          "trigger": null,
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "spotlightCreator",
+            "filter_title": "Spotlight Creator",
+            "action_type": "setCheckbox",
+            "trigger_selector": "label#isRisingStar_input",
+            "trigger_texts": [
+              "Spotlight Creator"
+            ]
+          },
+          "snapshot": {
+            "found": true,
+            "selector": "label#isRisingStar_input",
+            "label": "Rising Star",
+            "checked": false,
+            "dom_path": "div.arco-row.arco-row-align-start > div.arco-col.arco-col-24 > div.arco-form-item-control-wrapper > div#isRisingStar.arco-form-item-control > div.arco-form-item-control-children > label#isRisingStar_input.arco-checkbox.m4b-checkbox"
+          }
+        },
+        {
+          "filter_key": "fastGrowing",
+          "filter_title": "Fast growing",
+          "filter_kind": "checkbox",
+          "status": "ok",
+          "trigger": null,
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "fastGrowing",
+            "filter_title": "Fast growing",
+            "action_type": "setCheckbox",
+            "trigger_selector": "label#isFastGrowing_input",
+            "trigger_texts": [
+              "Fast growing"
+            ]
+          },
+          "snapshot": {
+            "found": false,
+            "selector": "label#isFastGrowing_input"
+          }
+        },
+        {
+          "filter_key": "notInvitedInPast90Days",
+          "filter_title": "Not invited in past 90 days",
+          "filter_kind": "checkbox",
+          "status": "ok",
+          "trigger": null,
+          "dsl_binding": {
+            "module_key": "creatorFilters",
+            "module_title": "Creators",
+            "filter_key": "notInvitedInPast90Days",
+            "filter_title": "Not invited in past 90 days",
+            "action_type": "setCheckbox",
+            "trigger_selector": "label#isInvitedBefore_input",
+            "trigger_texts": [
+              "Not invited in past 90 days"
+            ]
+          },
+          "snapshot": {
+            "found": true,
+            "selector": "label#isInvitedBefore_input",
+            "label": "Not invited in past 90 days",
+            "checked": false,
+            "dom_path": "div.arco-row.arco-row-align-start > div.arco-col.arco-col-24 > div.arco-form-item-control-wrapper > div#isInvitedBefore.arco-form-item-control > div.arco-form-item-control-children > label#isInvitedBefore_input.arco-checkbox.m4b-checkbox"
+          }
+        }
+      ]
+    },
+    {
+      "module_key": "followerFilters",
+      "module_title": "Followers",
+      "module_button": {
+        "text": "Follower",
+        "selector": "button[data-tid=\"m4b_button\"] span",
+        "dom_path": "div.filter-J7EF96.min-h-[208px] > div.mb-16.flex > div.arco-radio-group.arco-radio-size-default > label.arco-radio.arco-radio-checked > button.arco-btn.arco-btn-secondary > span",
+        "class_name": "",
+        "aria_expanded": "",
+        "data_tid": ""
+      },
+      "observed_filter_titles": [
+        "Follower age",
+        "Follower gender",
+        "Follower size"
+      ],
+      "filters": [
+        {
+          "filter_key": "followerAgeSelections",
+          "filter_title": "Follower age",
+          "filter_kind": "multi_select",
+          "status": "ok",
+          "trigger": {
+            "text": "Follower age",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "span > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "followerFilters",
+            "module_title": "Followers",
+            "filter_key": "followerAgeSelections",
+            "filter_title": "Follower age",
+            "action_type": "selectDropdownMultiple",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Follower age"
+            ],
+            "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+            "option_selector": "span.arco-select-option.m4b-select-option",
+            "scroll_container_selector": ".arco-select-popup-inner"
+          },
+          "snapshot": {
+            "container_selector": "div.arco-select-popup.arco-select-popup-multiple",
+            "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup",
+            "option_selector": "span.arco-select-option.m4b-select-option",
+            "option_count": 5,
+            "options": [
+              {
+                "label": "18 - 24",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option arco-select-option-hover",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper.arco-select-option-wrapper-hover > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "25 - 34",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "35 - 44",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "45 - 54",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "55+",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              }
+            ],
+            "inputs": [],
+            "checkbox_labels": [],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Chats Find creators Find creators . Filter by Creators Follower Performance Reset Follower age Follower gender Follower size No threshold Less than 20% Less than 15% Less than 10% Less than 5% All Video LIVE All Managed by agency Independent creators 18 - 24 25 - 34 35 - 44 45 - 54 55+ 0 creators selected Batch"
+          }
+        },
+        {
+          "filter_key": "followerGender",
+          "filter_title": "Follower gender",
+          "filter_kind": "single_select",
+          "status": "ok",
+          "trigger": {
+            "text": "Follower gender",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "div > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "followerFilters",
+            "module_title": "Followers",
+            "filter_key": "followerGender",
+            "filter_title": "Follower gender",
+            "action_type": "selectDropdownSingle",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Follower gender"
+            ],
+            "wait_selector": "li.arco-select-option",
+            "option_selector": "li.arco-select-option"
+          },
+          "snapshot": {
+            "container_selector": "li.arco-select-option",
+            "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup",
+            "option_selector": "li.arco-select-option",
+            "option_count": 3,
+            "options": [
+              {
+                "label": "All",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option arco-select-option-selected arco-select-option-hover",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-2.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": true
+              },
+              {
+                "label": "Managed by agency",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-2.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "Independent creators",
+                "value": "",
+                "tag_name": "li",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup > div#arco-select-popup-2.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              }
+            ],
+            "inputs": [],
+            "checkbox_labels": [],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Chats Find creators Find creators . Filter by Creators Follower Performance Reset Follower age Follower gender All Female Male Follower size No threshold Less than 20% Less than 15% Less than 10% Less than 5% All Video LIVE All Managed by agency Independent creators 18 - 24 25 - 34 35 - 44 45 - 54 55+ 0 creator"
+          }
+        },
+        {
+          "filter_key": "followerCountRange",
+          "filter_title": "Follower count",
+          "status": "error",
+          "error": "Failed to find visible element by texts=['Follower count', 'Follower c'] selector='button[data-tid=\"m4b_button\"] .arco-typography'",
+          "dsl_binding": {
+            "module_key": "followerFilters",
+            "module_title": "Followers",
+            "filter_key": "followerCountRange",
+            "filter_title": "Follower count",
+            "action_type": "fillDropdownRange",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Follower count",
+              "Follower c"
+            ],
+            "wait_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"]",
+            "min_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"] input[data-e2e=\"d9c26458-94d3-e920\"]",
+            "max_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"] input[data-e2e=\"b7512111-8b2f-a07b\"]"
+          }
+        }
+      ]
+    },
+    {
+      "module_key": "performanceFilters",
+      "module_title": "Performance",
+      "module_button": {
+        "text": "Performance",
+        "selector": "button[data-tid=\"m4b_button\"] span",
+        "dom_path": "div.filter-J7EF96.min-h-[208px] > div.mb-16.flex > div.arco-radio-group.arco-radio-size-default > label.arco-radio.arco-radio-checked > button.arco-btn.arco-btn-secondary > span",
+        "class_name": "",
+        "aria_expanded": "",
+        "data_tid": ""
+      },
+      "observed_filter_titles": [
+        "GMV",
+        "Units sold",
+        "Average views per video",
+        "Average viewers per Live",
+        "Engagement rate"
+      ],
+      "filters": [
+        {
+          "filter_key": "gmvSelections",
+          "filter_title": "GMV",
+          "filter_kind": "multi_select",
+          "status": "ok",
+          "trigger": {
+            "text": "GMV",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "span > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "gmvSelections",
+            "filter_title": "GMV",
+            "action_type": "selectDropdownMultiple",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "GMV"
+            ],
+            "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+            "option_selector": "span.arco-select-option.m4b-select-option",
+            "scroll_container_selector": ".arco-select-popup-inner"
+          },
+          "snapshot": {
+            "container_selector": "div.arco-select-popup.arco-select-popup-multiple",
+            "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup",
+            "option_selector": "span.arco-select-option.m4b-select-option",
+            "option_count": 5,
+            "options": [
+              {
+                "label": "18 - 24",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option arco-select-option-hover",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper.arco-select-option-wrapper-hover > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "25 - 34",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "35 - 44",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "45 - 54",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              },
+              {
+                "label": "55+",
+                "value": "",
+                "tag_name": "span",
+                "class_name": "arco-select-option m4b-select-option",
+                "dom_path": "div.arco-select-popup.m4b-select-popup > div#arco-select-popup-3.arco-select-popup-inner.m4b-select-popup-inner > div > div > li.arco-select-option-wrapper > span.arco-select-option.m4b-select-option",
+                "input_value": "",
+                "input_checked": false
+              }
+            ],
+            "inputs": [],
+            "checkbox_labels": [],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Chats Find creators Find creators . Filter by Creators Follower Performance Reset GMV Units sold Average views per video Average viewers per Live Engagement rate No threshold Less than 20% Less than 15% Less than 10% Less than 5% All Video LIVE All Managed by agency Independent creators 18 - 24 25 - 34 35 - 44 "
+          }
+        },
+        {
+          "filter_key": "itemsSoldSelections",
+          "filter_title": "Items sold",
+          "status": "error",
+          "error": "Failed to find visible element by texts=['Items sold'] selector='button[data-tid=\"m4b_button\"] .arco-typography'",
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "itemsSoldSelections",
+            "filter_title": "Items sold",
+            "action_type": "selectDropdownMultiple",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Items sold"
+            ],
+            "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+            "option_selector": "span.arco-select-option.m4b-select-option",
+            "scroll_container_selector": ".arco-select-popup-inner"
+          }
+        },
+        {
+          "filter_key": "averageViewsPerVideoMin",
+          "filter_title": "Average views per video",
+          "filter_kind": "threshold_input",
+          "status": "ok",
+          "trigger": {
+            "text": "Average views per video",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "div.arco-spin-children > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "averageViewsPerVideoMin",
+            "filter_title": "Average views per video",
+            "action_type": "fillDropdownThreshold",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Average views per video"
+            ],
+            "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+          },
+          "snapshot": {
+            "container_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "active_root_dom_path": "div.arco-spin.arco-spin-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4",
+            "option_selector": "",
+            "option_count": 0,
+            "options": [],
+            "inputs": [
+              {
+                "value": "0",
+                "placeholder": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default",
+                "input_type": ""
+              }
+            ],
+            "checkbox_labels": [
+              {
+                "label": "Only apply to ecommerce videos",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > label.arco-checkbox.m4b-checkbox"
+              }
+            ],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Chats Find creators Find creators . Filter by Creators Follower Performance Reset GMV Units sold Average views per video Average viewers per Live Engagement rate More than 0 100 1000 1 万 10 万+ Only apply to ecommerce videos No threshold Less than 20% Less than 15% Less than 10% Less than 5% All Video LIVE All M"
+          }
+        },
+        {
+          "filter_key": "averageViewersPerLiveMin",
+          "filter_title": "Average viewers per LIVE",
+          "status": "error",
+          "error": "Failed to find visible element by texts=['Average viewers per LIVE'] selector='button[data-tid=\"m4b_button\"] .arco-typography'",
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "averageViewersPerLiveMin",
+            "filter_title": "Average viewers per LIVE",
+            "action_type": "fillDropdownThreshold",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Average viewers per LIVE"
+            ],
+            "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+          }
+        },
+        {
+          "filter_key": "engagementRateMinPercent",
+          "filter_title": "Engagement rate",
+          "filter_kind": "threshold_input",
+          "status": "ok",
+          "trigger": {
+            "text": "Engagement rate",
+            "selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "dom_path": "div.arco-spin-children > button.arco-btn.arco-btn-outline > div.w-full.flex > div.flex.items-center > div.flex.flex-shrink > div.arco-typography",
+            "class_name": "arco-typography",
+            "aria_expanded": "",
+            "data_tid": ""
+          },
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "engagementRateMinPercent",
+            "filter_title": "Engagement rate",
+            "action_type": "fillDropdownThreshold",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Engagement rate"
+            ],
+            "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+          },
+          "snapshot": {
+            "container_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+            "active_root_dom_path": "div.arco-spin.arco-spin-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4",
+            "option_selector": "",
+            "option_count": 0,
+            "options": [],
+            "inputs": [
+              {
+                "value": "0",
+                "placeholder": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default",
+                "input_type": ""
+              },
+              {
+                "value": "0",
+                "placeholder": "",
+                "dom_path": "div.bg-white.px-16 > div.flex.items-center > div.arco-input-group-wrapper.arco-input-group-wrapper-default > span.arco-input-group > span.arco-input-inner-wrapper.arco-input-inner-wrapper-default > input.arco-input.arco-input-size-default",
+                "input_type": ""
+              }
+            ],
+            "checkbox_labels": [
+              {
+                "label": "Only apply to ecommerce videos",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > label.arco-checkbox.m4b-checkbox"
+              },
+              {
+                "label": "Only apply to ecommerce videos",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > label.arco-checkbox.m4b-checkbox"
+              }
+            ],
+            "body_text_preview": "Affiliate Center Creator Messages Help FR Home Collaborations Discover creators Find creators Creator Management Work with partners Sample Requests Insights Affiliate Orders Seller Center Chats Find creators Find creators . Filter by Creators Follower Performance Reset GMV Units sold Average views per video Average viewers per Live Engagement rate More than 0 100 1000 1 万 10 万+ Only apply to ecommerce videos More than % 0% 5% 10% 20+% Only apply to ecommerce videos No threshold Less than 20% Les"
+          }
+        },
+        {
+          "filter_key": "estPostRate",
+          "filter_title": "Est. post rate",
+          "status": "error",
+          "error": "Failed to find visible element by texts=['Est. post rate'] selector='button[data-tid=\"m4b_button\"] .arco-typography'",
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "estPostRate",
+            "filter_title": "Est. post rate",
+            "action_type": "selectDropdownSingle",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Est. post rate"
+            ],
+            "wait_selector": "li.arco-select-option",
+            "option_selector": "li.arco-select-option"
+          }
+        },
+        {
+          "filter_key": "brandCollaborationSelections",
+          "filter_title": "Brand collaborations",
+          "status": "error",
+          "error": "Failed to find visible element by texts=['Brand collaborations'] selector='button[data-tid=\"m4b_button\"] .arco-typography'",
+          "dsl_binding": {
+            "module_key": "performanceFilters",
+            "module_title": "Performance",
+            "filter_key": "brandCollaborationSelections",
+            "filter_title": "Brand collaborations",
+            "action_type": "selectDropdownMultiple",
+            "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+            "trigger_texts": [
+              "Brand collaborations"
+            ],
+            "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+            "option_selector": "span.arco-select-option.m4b-select-option",
+            "scroll_container_selector": ".arco-select-popup-inner"
+          }
+        }
+      ]
+    }
+  ],
+  "search_binding": {
+    "field_key": "searchKeyword",
+    "action_type": "fillSelector + clickByText + pressKey",
+    "selector": "input[data-tid=\"m4b_input_search\"]",
+    "dismiss_text": "Find creators"
+  }
+}
