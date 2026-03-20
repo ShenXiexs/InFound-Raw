@@ -1,0 +1,5 @@
+{
+  "region": "MX",
+  "headless": false,
+  "storageStatePath": "data/playwright/storage-state.json"
+}

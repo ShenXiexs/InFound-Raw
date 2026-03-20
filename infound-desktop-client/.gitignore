@@ -1,0 +1,45 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Install artifacts
+node_modules/
+**/node_modules/
+
+# Build artifacts
+dist
+**/dist/
+build
+**/build/
+out
+**/out/
+release
+**/release/
+.vite/
+**/.vite/
+.electron-vite/
+*.tsbuildinfo
+
+# Runtime data
+data
+**/data/
+
+# Local OS
+.DS_Store
+
+# Local app runtime
+/apps/frontend.rpa.simulation/userdata/
+/apps/frontend.rpa.simulation/trace/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test / coverage
+coverage
+**/coverage/

@@ -1,12 +1,22 @@
-# INFound Influencer Platform (Backend + Data Collection)
+# INFound Influencer Platform (Backend + Data Collection + Desktop Client)
 
-This workspace pairs FastAPI backend services with Playwright- and RabbitMQ-powered data collectors to showcase the sample ingestion, creator outreach, and chatbot automation flows that support the INFound influencer pipeline. The materials are curated for an UCSD MS committee presentation, so every sensitive string has been sanitized.
+This workspace combines FastAPI backend services, Playwright- and RabbitMQ-powered data collectors, and a desktop Electron client to showcase the sample ingestion, creator outreach, seller-side RPA, and chatbot automation flows that support the INFound influencer pipeline. The materials are curated for an UCSD MS committee presentation, so every sensitive string has been sanitized.
 
 ## Architecture snapshot
 
 - `infound-backend-services` houses the internal ingestion API, creator portals, request filters, scheduler, and MQ producers that run inside FastAPI processes.
 - `infound-data-collection` implements RabbitMQ consumers, Playwright crawlers, and chatbot dispatchers (now covering partner, creator, **and seller/shop** portals) that normalize TikTok data and hand it to the backend.
+- `infound-desktop-client` is a pnpm monorepo built with Electron + Vue 3 + TypeScript; it contains the operator desktop app plus an RPA simulation app for seller login, outreach, sample-management, chatbot, and creator-detail flows.
 - Shared helpers in `common/` modules centralize multi-environment config, structured logging, SQLAlchemy/Redis sessions, RabbitMQ connections, and model definitions so business logic can stay focused.
+
+## Workspace layout
+
+```text
+.
+├── infound-backend-services/   # FastAPI APIs, schedulers, MQ producers
+├── infound-data-collection/    # Playwright crawlers, RabbitMQ consumers, chatbots
+└── infound-desktop-client/     # Electron desktop app + seller RPA simulation app
+```
 
 ## Backend services
 
@@ -25,6 +35,13 @@ This workspace pairs FastAPI backend services with Playwright- and RabbitMQ-powe
 - `apps/sample_chatbot`, `apps/outreach_chatbot`, and `apps/unified_chatbot` consume the `chatbot.topic` exchange, respect DLQs, and use Playwright instances to send sample and outreach messages, while providing manual overrides for accounts/regions and retry limits.
 - `apps/portal_tiktok_shop_chatbot` consumes shop-outreach messages (topic-based) and drives seller-portal IM to creators with the same Playwright/Gmail fallback stack as other chatbots.
 - RabbitMQ tasks are routed through `crawler.direct`, `chatbot.topic`, and their DLQs; each consumer can also be run with `AT_MOST_ONCE` semantics or batched delivery and can export normalized rows to `data/manage_sample/` or `data/manage_campaign/` when `exportExcel` is enabled.
+
+## Desktop client
+
+- `apps/frontend.desktop` is the operator-facing Electron app. It splits logic across Electron main/preload/renderer layers, persists non-sensitive state via `electron-store`, and stores tokens in the OS credential store.
+- `apps/frontend.rpa.simulation` is a lightweight Electron shell for seller-side Playwright execution. It can start a reusable browser session and dispatch independent tasks for seller login, outreach, sample management, chatbot messaging, and creator-detail extraction.
+- `packages/frontend.desktop.shared` holds shared RPA abstractions, task executors, logger helpers, time helpers, and cross-app TypeScript types.
+- The desktop client complements the backend/data-collection services: it is primarily for interactive operator workflows and RPA debugging, while the Python services remain the production ingestion and MQ automation path.
 
 ## Committee showcase: sample crawler, campaign crawler, creator crawler, and chatbots
 
@@ -71,6 +88,23 @@ poetry run python main.py --consumer portal_tiktok_sample_crawler_html --env "$E
 - Swap `SERVICE_NAME`/`--consumer` to run `portal_tiktok_campaign_crawler`, `portal_tiktok_creator_crawler`, `sample_chatbot`, `outreach_chatbot`, or `unified_chatbot`.
 - Playwright credentials, Gmail app passwords, and RabbitMQ/inner API hosts are loaded through environment variables or local YAML overrides (see `common/core/config.py` for aliasing rules).
 - Replace every `<...>` placeholder in the YAML configs with real values before deploying (RabbitMQ hosts, MySQL credentials, inner API tokens, etc.).
+
+### Desktop client
+
+```bash
+cd infound-desktop-client
+pnpm install
+
+# Operator desktop app
+pnpm --filter frontend.desktop dev
+
+# Seller RPA simulation app
+pnpm --filter frontend.rpa.simulation dev
+```
+
+- Production/staging endpoints in `apps/frontend.desktop/.env.*` have been replaced with placeholders; define local values before running against a real environment.
+- The desktop app uses Electron main-process services for auth and state persistence, while the RPA simulation app expects local Playwright runtime data under ignored `data/` paths.
+- See `infound-desktop-client/README.md` and the `infound-desktop-client/docs/` folder for desktop architecture, IPC contracts, and RPA payload examples.
 
 ## Startup checklist (committee demo)
 
@@ -157,7 +191,7 @@ poetry run python main.py --consumer portal_tiktok_shop_chatbot --env "$ENV"
 
 ## Security & sanitization
 
-This presentation copy removes all secrets: IP addresses, hostnames, tokens, Gmail credentials, and passwords are shown as `<PLACEHOLDER>` or `example.com` domains. Treat the placeholders in every YAML (`infound-backend-services/configs/base.yaml`, `infound-data-collection/configs/base.yaml`, etc.) as prompts to load production values from a secure store before running.
+This presentation copy removes all secrets: IP addresses, hostnames, tokens, Gmail credentials, passwords, demo account identifiers, and embedded git remotes are shown as `<PLACEHOLDER>` values or `example.com` domains. Treat the placeholders in every YAML or `.env` file (`infound-backend-services/configs/base.yaml`, `infound-data-collection/configs/base.yaml`, `infound-desktop-client/apps/frontend.desktop/.env.*`, etc.) as prompts to load production values from a secure store before running.
 
 ## Additional pointers
 

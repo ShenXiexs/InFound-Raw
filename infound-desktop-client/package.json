@@ -1,0 +1,17 @@
+{
+  "name": "infound-desktop-client",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.30.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "playwright"
+    ]
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "INFound"
+}

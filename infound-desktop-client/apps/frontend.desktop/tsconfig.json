@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }],
+  "compilerOptions": {
+    // 关闭对隐式 any 的检查
+    "noImplicitAny": false,
+    // 禁用局部变量未使用警告
+    "noUnusedLocals": false,
+    // 禁用参数未使用警告
+    "noUnusedParameters": false
+  }
+}
