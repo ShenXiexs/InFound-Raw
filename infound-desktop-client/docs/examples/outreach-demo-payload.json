@@ -1,0 +1,44 @@
+{
+  "creatorFilters": {
+    "productCategorySelections": [
+      "Home Supplies",
+      "Beauty & Personal Care",
+      "Phones & Electronics"
+    ],
+    "avgCommissionRate": "Less than 20%",
+    "contentType": "Video",
+    "creatorAgency": "Independent creators",
+    "spotlightCreator": true,
+    "fastGrowing": true,
+    "notInvitedInPast90Days": true
+  },
+  "followerFilters": {
+    "followerAgeSelections": [
+      "18 - 24",
+      "25 - 34"
+    ],
+    "followerGender": "Female",
+    "followerCountMin": "10000",
+    "followerCountMax": "200000"
+  },
+  "performanceFilters": {
+    "gmvSelections": [
+      "MX$100-MX$1K",
+      "MX$1K-MX$10K"
+    ],
+    "itemsSoldSelections": [
+      "10-100",
+      "100-1K"
+    ],
+    "averageViewsPerVideoMin": "1000",
+    "averageViewsPerVideoShoppableVideosOnly": true,
+    "averageViewersPerLiveMin": "300",
+    "averageViewersPerLiveShoppableLiveOnly": true,
+    "engagementRateMinPercent": "5",
+    "engagementRateShoppableVideosOnly": true,
+    "estPostRate": "Good",
+    "brandCollaborationSelections": [
+    ]
+  },
+  "searchKeyword": ""
+}

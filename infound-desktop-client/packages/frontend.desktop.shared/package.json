@@ -1,0 +1,45 @@
+{
+  "name": "@infound/desktop-shared",
+  "version": "1.0.0",
+  "description": "Shared code for desktop applications",
+  "author": "infound.ai",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean && pnpm copy-assets",
+    "watch": "tsup src/index.ts --format cjs,esm --dts --watch --onSuccess \"pnpm copy-assets\"",
+    "copy-assets": "cpy \"src/i18n/*.json\" dist/i18n"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "naive-ui": "^2.43.2"
+  },
+  "peerDependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "electron": "^40.6.0",
+    "electron-log": "^5.4.3",
+    "playwright-core": "1.58.2",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.13",
+    "cpy-cli": "^6.0.0",
+    "sass": "^1.97.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.30.1"
+}
