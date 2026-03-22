@@ -1,8 +1,5 @@
-import type { SellerCreatorDetailContextInput, SellerCreatorDetailData, SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
 import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
-import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
-import type { SampleManagementExportResult } from '../sample-management/types'
-import { CREATOR_MARKETPLACE_DATA_KEY } from '../outreach/support'
+import { CREATOR_MARKETPLACE_DATA_KEY, mergeOutreachFilterConfig } from '../outreach/support'
 
 interface RuntimeWindow {
   region: string
@@ -11,8 +8,6 @@ interface RuntimeWindow {
 }
 
 const toIsoString = (value: Date): string => value.toISOString()
-
-const toDateOnly = (value: Date): string => value.toISOString().slice(0, 10)
 
 const toText = (value: unknown): string | undefined => {
   const text = String(value ?? '').trim()
@@ -42,54 +37,15 @@ const normalizeCreatorItems = (runtimeData: Record<string, unknown>): Array<Reco
       creator_name: toText(item.creator_name),
       avatar_url: toText(item.avatar_url),
       category: toText(item.category),
-      send: 1
+      send:
+        typeof item.send === 'boolean'
+          ? item.send
+            ? 1
+            : 0
+          : toInteger(item.send),
+      send_time: toText(item.send_time)
     }))
     .filter((item) => Boolean(item.platform_creator_id))
-}
-
-const normalizeCreatorDetailContext = (
-  input?: SellerCreatorDetailContextInput
-): Record<string, unknown> | undefined => {
-  if (!input) {
-    return undefined
-  }
-
-  const context: Record<string, unknown> = {}
-  const stringFields: Array<[keyof SellerCreatorDetailContextInput, string]> = [
-    ['platform', 'platform'],
-    ['platformCreatorId', 'platform_creator_id'],
-    ['platformCreatorUsername', 'platform_creator_username'],
-    ['platformCreatorDisplayName', 'platform_creator_display_name'],
-    ['chatUrl', 'chat_url'],
-    ['searchKeyword', 'search_keyword'],
-    ['searchKeywords', 'search_keywords'],
-    ['brandName', 'brand_name'],
-    ['currency', 'currency'],
-    ['email', 'email'],
-    ['whatsapp', 'whatsapp']
-  ]
-
-  stringFields.forEach(([sourceKey, targetKey]) => {
-    const value = toText(input[sourceKey])
-    if (value) {
-      context[targetKey] = value
-    }
-  })
-
-  if (input.categories !== undefined) {
-    context.categories = input.categories
-  }
-  if (input.connect !== undefined) {
-    context.connect = input.connect
-  }
-  if (input.reply !== undefined) {
-    context.reply = input.reply
-  }
-  if (input.send !== undefined) {
-    context.send = input.send
-  }
-
-  return Object.keys(context).length > 0 ? context : undefined
 }
 
 export const buildOutreachResultPayload = (
@@ -104,6 +60,7 @@ export const buildOutreachResultPayload = (
   }
 
   const creators = normalizeCreatorItems(runtimeData)
+  const mergedConfig = mergeOutreachFilterConfig(input)
   return {
     task_id: taskId,
     shop_id: shopId,
@@ -113,50 +70,16 @@ export const buildOutreachResultPayload = (
     status: 'completed',
     message_send_strategy: toInteger(input.messageSendStrategy),
     message: toText(input.message),
-    search_keyword: toText(input.searchKeyword),
+    search_keyword: toText(mergedConfig.searchKeyword),
     first_message: toText(input.firstMessage),
     second_message: toText(input.secondMessage),
     expect_count: toInteger(input.expectCount),
     real_count: creators.length,
     started_at: toIsoString(meta.startedAt),
     finished_at: toIsoString(meta.finishedAt),
+    creator_filters: mergedConfig.creatorFilters,
+    follower_filters: mergedConfig.followerFilters,
+    performance_filters: mergedConfig.performanceFilters,
     creators
-  }
-}
-
-export const buildSampleMonitorResultPayload = (
-  input: SampleManagementPayloadInput,
-  result: SampleManagementExportResult,
-  meta: RuntimeWindow
-): Record<string, unknown> | null => {
-  const shopId = toText(input.shopId)
-  if (!shopId) {
-    return null
-  }
-
-  return {
-    shop_id: shopId,
-    task_id: toText(input.taskId),
-    crawl_date: toText(input.crawlDate) || toDateOnly(meta.finishedAt),
-    result
-  }
-}
-
-export const buildCreatorDetailResultPayload = (
-  input: SellerCreatorDetailPayloadInput,
-  detail: SellerCreatorDetailData,
-  meta: RuntimeWindow
-): Record<string, unknown> | null => {
-  const shopId = toText(input.shopId)
-  if (!shopId) {
-    return null
-  }
-
-  return {
-    shop_id: shopId,
-    task_id: toText(input.taskId),
-    crawl_date: toText(input.crawlDate) || toText(detail.collected_at_utc)?.slice(0, 10) || toDateOnly(meta.finishedAt),
-    context: normalizeCreatorDetailContext(input.context),
-    result: detail
   }
 }

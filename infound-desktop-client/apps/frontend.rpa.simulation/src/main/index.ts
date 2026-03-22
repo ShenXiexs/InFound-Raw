@@ -15,6 +15,7 @@ import { LoggerController } from './modules/ipc/logger-controller'
 import { appWindowsAndViewsManager } from './windows/app-windows-and-views-manager'
 import { AppController } from './modules/ipc/app-controller'
 import { logger } from './utils/logger'
+import { SellerRpaInboxService } from './modules/rpa/inbox/seller-rpa-inbox-service'
 
 let userDataPath = path.join(app.getPath('appData'), app.getName())
 if (import.meta.env.MODE !== 'pro') {
@@ -54,7 +55,10 @@ const resolveCliJsonPath = (inputPath: string): string => {
   )
 }
 
-const setupTerminalRPACLI = (rpaController: RPAController): void => {
+const setupTerminalRPACLI = (
+  rpaController: RPAController,
+  sellerRpaInboxService: SellerRpaInboxService
+): void => {
   if (import.meta.env.MODE === 'pro') return
   if (!process.stdin.isTTY) return
 
@@ -66,7 +70,7 @@ const setupTerminalRPACLI = (rpaController: RPAController): void => {
 
   const printHelp = (): void => {
     logger.info(
-      '终端命令: login | start-simulation | start-simulation-headless | start-simulation-json <payload.json> | stop-simulation | sample-management [tab|tab1,tab2] | sample-management-json <payload.json> | outreach | outreach-demo | outreach-json <payload.json> | chatbot <creator_id> | chatbot-demo | chatbot-json <payload.json> | creator-detail <creator_id> | creator-detail-demo | creator-detail-json <payload.json> | help | exit'
+      '终端命令: login | start-simulation | start-simulation-headless | start-simulation-json <payload.json> | stop-simulation | sample-management [tab|tab1,tab2] | sample-management-json <payload.json> | outreach | outreach-demo | outreach-json <payload.json> | chatbot <creator_id> | chatbot-demo | chatbot-json <payload.json> | creator-detail <creator_id> | creator-detail-demo | creator-detail-json <payload.json> | seller-inbox-json <payload.json> | help | exit'
     )
   }
 
@@ -140,7 +144,7 @@ const setupTerminalRPACLI = (rpaController: RPAController): void => {
       } else if (command === 'chatbot') {
         const creatorId = trimmedLine.slice(commandToken.length).trim()
         if (!creatorId) {
-          logger.warn('缺少 creator_id，示例: chatbot <creator_id_demo>')
+          logger.warn('缺少 creator_id，示例: chatbot 7493999107359083121')
         } else {
           await rpaController.runSellerChatbot({ creatorId })
         }
@@ -160,7 +164,7 @@ const setupTerminalRPACLI = (rpaController: RPAController): void => {
       } else if (command === 'creator-detail') {
         const creatorId = trimmedLine.slice(commandToken.length).trim()
         if (!creatorId) {
-          logger.warn('缺少 creator_id，示例: creator-detail <creator_id_demo>')
+          logger.warn('缺少 creator_id，示例: creator-detail 7495400123324336701')
         } else {
           await rpaController.runSellerCreatorDetail({ creatorId })
         }
@@ -176,6 +180,17 @@ const setupTerminalRPACLI = (rpaController: RPAController): void => {
           const fileContent = await readFile(resolvedPayloadPath, 'utf8')
           const payload = JSON.parse(fileContent) as SellerCreatorDetailPayloadInput
           await rpaController.runSellerCreatorDetail(payload)
+        }
+      } else if (command === 'seller-inbox-json') {
+        const payloadPath = trimmedLine.slice(commandToken.length).trim()
+        if (!payloadPath) {
+          logger.warn('缺少 JSON 文件路径，示例: seller-inbox-json resources/examples/seller-inbox-outreach.json')
+        } else {
+          const resolvedPayloadPath = resolveCliJsonPath(payloadPath)
+          logger.info(`读取 seller inbox 测试消息 JSON: ${resolvedPayloadPath}`)
+          const fileContent = await readFile(resolvedPayloadPath, 'utf8')
+          const payload = JSON.parse(fileContent) as Record<string, unknown>
+          await sellerRpaInboxService.dispatchEnvelopeForTesting(payload, rpaController)
         }
       } else if (command === 'help') {
         printHelp()
@@ -225,6 +240,7 @@ app.whenReady().then(async () => {
   const loggerController = new LoggerController()
   const appController = new AppController()
   const rpaController = new RPAController()
+  const sellerRpaInboxService = SellerRpaInboxService.getInstance()
 
   IPCManager.register(loggerController)
   IPCManager.register(appController)
@@ -232,8 +248,10 @@ app.whenReady().then(async () => {
 
   await appWindowsAndViewsManager.initMainWindow()
   appWindowsAndViewsManager.mainWindow.showWindow()
-  setupTerminalRPACLI(rpaController)
+  setupTerminalRPACLI(rpaController, sellerRpaInboxService)
+  await sellerRpaInboxService.start(rpaController)
   app.on('before-quit', () => {
+    void sellerRpaInboxService.stop()
     void rpaController.closeSimulationSession()
   })
 

@@ -75,6 +75,8 @@ export interface OutreachFilterConfigInput extends SellerRpaTaskContextInput {
   followerFilters?: Partial<FollowerFilterConfig>
   performanceFilters?: Partial<PerformanceFilterConfig>
   searchKeyword?: string
+  filterScript?: Record<string, unknown> | string
+  filterScriptPath?: string
   message?: string
   firstMessage?: string
   secondMessage?: string

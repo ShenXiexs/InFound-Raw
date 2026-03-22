@@ -15,10 +15,15 @@ import type {
 } from '@common/types/rpa-outreach'
 import type { BrowserAction } from '../task-dsl/browser-actions'
 
+// This file is the frontend DSL implementation for MX outreach filters, aligned with
+// infound-data-collection/apps/portal_tiktok_shop_collection/scripts/outreach_filter_base.py
+// and outreach_filter_mx.py.
 interface CreatorProductCategoryOption {
   label: string
   value: string
 }
+
+type ScriptRecord = Record<string, unknown>
 
 const CREATOR_PRODUCT_CATEGORY_OPTIONS: CreatorProductCategoryOption[] = [
   { label: 'Home Supplies', value: '600001' },
@@ -67,6 +72,7 @@ const PERFORMANCE_GMV_OPTIONS: PerformanceGmvOption[] = ['MX$0-MX$100', 'MX$100-
 const PERFORMANCE_ITEMS_SOLD_OPTIONS: PerformanceItemsSoldOption[] = ['0-10', '10-100', '100-1K', '1K+']
 const PERFORMANCE_EST_POST_RATE_OPTIONS: PerformanceEstPostRateOption[] = ['All', 'OK', 'Good', 'Better']
 
+const MODULE_BUTTON_SELECTOR = 'button[data-tid="m4b_button"] span'
 const FILTER_TITLE_SELECTOR = 'button[data-tid="m4b_button"] .arco-typography'
 const PRODUCT_CATEGORY_PANEL_SELECTOR = 'ul.arco-cascader-list.arco-cascader-list-multiple'
 const SINGLE_SELECT_OPTION_SELECTOR = 'li.arco-select-option'
@@ -271,18 +277,52 @@ const normalizeFreeformSelections = (selections: string[]): string[] => {
   return normalized
 }
 
-const buildOutreachDismissPayload = () => ({
-  closeText: OUTREACH_FILTER_DISMISS_TEXT,
+const asRecord = (value: unknown): ScriptRecord | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as ScriptRecord) : null
+
+const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
+
+const readScriptValue = (record: ScriptRecord | null, ...keys: string[]): unknown => {
+  if (!record) {
+    return undefined
+  }
+  for (const key of keys) {
+    if (key in record) {
+      return record[key]
+    }
+  }
+  return undefined
+}
+
+const readScriptText = (record: ScriptRecord | null, ...keys: string[]): string => {
+  const value = readScriptValue(record, ...keys)
+  return String(value ?? '').trim()
+}
+
+const readScriptTextList = (record: ScriptRecord | null, ...keys: string[]): string[] => {
+  const value = readScriptValue(record, ...keys)
+  return asArray(value)
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean)
+}
+
+const buildOutreachDismissPayload = (dismissText = OUTREACH_FILTER_DISMISS_TEXT) => ({
+  closeText: dismissText,
   closeSelector: OUTREACH_FILTER_DISMISS_SELECTOR
 })
 
-const buildModuleButtonAction = (moduleTitle: string, postClickWaitMs = 350): BrowserAction => ({
+const buildModuleButtonAction = (
+  moduleTitle: string,
+  postClickWaitMs = 350,
+  selector = MODULE_BUTTON_SELECTOR,
+  fallbackTexts?: string[]
+): BrowserAction => ({
   id: `切换到${moduleTitle}筛选模块`,
   actionType: 'clickByText',
   payload: {
     text: moduleTitle,
-    fallbackTexts: MODULE_BUTTON_FALLBACK_TEXTS[moduleTitle] ?? [],
-    selector: 'button[data-tid="m4b_button"] span',
+    fallbackTexts: fallbackTexts ?? MODULE_BUTTON_FALLBACK_TEXTS[moduleTitle] ?? [],
+    selector,
     exact: true,
     caseSensitive: false,
     timeoutMs: 10000,
@@ -292,6 +332,637 @@ const buildModuleButtonAction = (moduleTitle: string, postClickWaitMs = 350): Br
   options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
   onError: OUTREACH_STEP_ERROR_POLICY
 })
+
+const resolveThresholdCheckboxLabel = (
+  filterKey: string,
+  filterSpec: ScriptRecord | null
+): string | undefined => {
+  const snapshot = asRecord(readScriptValue(filterSpec, 'snapshot'))
+  const checkboxLabels = asArray(readScriptValue(snapshot, 'checkboxLabels', 'checkbox_labels'))
+    .map((item) => readScriptText(asRecord(item), 'label'))
+    .filter(Boolean)
+
+  const matcher =
+    filterKey === 'averageViewersPerLiveMin'
+      ? (label: string) => label.toLowerCase().includes('shoppable live')
+      : (label: string) => label.toLowerCase().includes('shoppable videos')
+
+  return checkboxLabels.find(matcher)
+}
+
+const buildSearchKeywordStepsFromScript = (
+  keyword: string,
+  binding: ScriptRecord | null,
+  dismissText: string
+): BrowserAction[] => {
+  const normalizedKeyword = String(keyword || '').trim()
+  const selector = readScriptText(binding, 'selector') || SEARCH_INPUT_SELECTOR
+  const effectiveDismissText =
+    readScriptText(binding, 'dismissText', 'dismiss_text') || dismissText
+
+  return [
+    {
+      actionType: 'startJsonResponseCapture',
+      payload: {
+        captureKey: CREATOR_MARKETPLACE_CAPTURE_KEY,
+        urlIncludes: CREATOR_MARKETPLACE_FIND_URL_KEYWORD,
+        method: 'POST',
+        reset: true
+      },
+      options: { retryCount: 1 },
+      onError: 'abort'
+    },
+    {
+      actionType: 'fillSelector',
+      payload: {
+        selector,
+        value: normalizedKeyword,
+        waitForState: 'visible',
+        timeoutMs: 10000,
+        intervalMs: 250,
+        clearBeforeFill: true,
+        postFillWaitMs: 120
+      },
+      options: { retryCount: 2 },
+      onError: 'abort'
+    },
+    {
+      actionType: 'clickByText',
+      payload: {
+        text: effectiveDismissText,
+        selector: OUTREACH_FILTER_DISMISS_SELECTOR,
+        exact: true,
+        caseSensitive: false,
+        timeoutMs: 10000,
+        intervalMs: 250,
+        postClickWaitMs: 120
+      },
+      options: { retryCount: 2 },
+      onError: 'abort'
+    },
+    {
+      actionType: 'clickSelector',
+      payload: {
+        selector,
+        waitForState: 'visible',
+        timeoutMs: 5000,
+        intervalMs: 250,
+        postClickWaitMs: 80
+      },
+      options: { retryCount: 2 },
+      onError: 'abort'
+    },
+    {
+      actionType: 'pressKey',
+      payload: {
+        key: 'Enter',
+        postKeyWaitMs: 3000
+      },
+      options: { retryCount: 1 },
+      onError: 'abort'
+    }
+  ]
+}
+
+const buildScriptDrivenFilterSteps = (
+  filters: OutreachFilterConfig,
+  script: ScriptRecord
+): BrowserAction[] | null => {
+  const source = asRecord(readScriptValue(script, 'source'))
+  const modules = asArray(readScriptValue(script, 'modules'))
+  if (!modules.length) {
+    return null
+  }
+
+  const dismissText =
+    readScriptText(source, 'pageReadyText', 'page_ready_text') || OUTREACH_FILTER_DISMISS_TEXT
+  const moduleButtonSelector =
+    readScriptText(source, 'moduleButtonSelector', 'module_button_selector') ||
+    MODULE_BUTTON_SELECTOR
+  const filterTitleSelector =
+    readScriptText(source, 'filterTitleSelector', 'filter_title_selector') ||
+    FILTER_TITLE_SELECTOR
+
+  const allSteps: BrowserAction[] = []
+
+  for (const moduleValue of modules) {
+    const moduleSpec = asRecord(moduleValue)
+    if (!moduleSpec) {
+      continue
+    }
+    const moduleButton = asRecord(readScriptValue(moduleSpec, 'moduleButton', 'module_button'))
+    const moduleTitle =
+      readScriptText(moduleSpec, 'moduleTitle', 'module_title') ||
+      readScriptText(moduleButton, 'text')
+    if (!moduleTitle) {
+      continue
+    }
+
+    const moduleFilterSteps: BrowserAction[] = []
+    for (const filterValue of asArray(readScriptValue(moduleSpec, 'filters'))) {
+      const filterSpec = asRecord(filterValue)
+      const binding = asRecord(readScriptValue(filterSpec, 'dslBinding', 'dsl_binding'))
+      const filterKey =
+        readScriptText(binding, 'filterKey', 'filter_key') ||
+        readScriptText(filterSpec, 'filterKey', 'filter_key')
+      if (!filterKey) {
+        continue
+      }
+
+      const triggerTexts = readScriptTextList(binding, 'triggerTexts', 'trigger_texts')
+      const triggerText =
+        triggerTexts[0] ||
+        readScriptText(binding, 'filterTitle', 'filter_title') ||
+        readScriptText(filterSpec, 'filterTitle', 'filter_title')
+      const triggerFallbackTexts = triggerTexts.slice(1)
+      const triggerSelector =
+        readScriptText(binding, 'triggerSelector', 'trigger_selector') || filterTitleSelector
+      const actionType = readScriptText(binding, 'actionType', 'action_type')
+      const waitSelector = readScriptText(binding, 'waitSelector', 'wait_selector')
+      const optionSelector = readScriptText(binding, 'optionSelector', 'option_selector')
+      const panelSelector = readScriptText(binding, 'panelSelector', 'panel_selector')
+      const scrollContainerSelector =
+        readScriptText(binding, 'scrollContainerSelector', 'scroll_container_selector') ||
+        panelSelector
+
+      if (filterKey === 'productCategorySelections') {
+        const values = normalizeCreatorProductCategoryValues(filters.creatorFilters.productCategorySelections)
+        if (values.length && actionType === 'selectCascaderOptionsByValue') {
+          moduleFilterSteps.push({
+            actionType: 'selectCascaderOptionsByValue',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              panelSelector: panelSelector || PRODUCT_CATEGORY_PANEL_SELECTOR,
+              values,
+              inputSelector: 'input[type="checkbox"]',
+              scrollContainerSelector: scrollContainerSelector || PRODUCT_CATEGORY_PANEL_SELECTOR,
+              scrollStepPx: 320,
+              maxScrollAttempts: 20,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 300,
+              optionPostClickWaitMs: 180,
+              closeAfterSelect: true
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'avgCommissionRate') {
+        const optionText = normalizeSingleSelectOption(
+          filters.creatorFilters.avgCommissionRate,
+          AVG_COMMISSION_RATE_OPTIONS,
+          'Avg. commission rate'
+        )
+        if (optionText !== 'All' && actionType === 'selectDropdownSingle') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownSingle',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionText,
+              optionSelector: optionSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 250,
+              optionPostClickWaitMs: 160,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'contentType') {
+        const optionText = normalizeSingleSelectOption(
+          filters.creatorFilters.contentType,
+          CONTENT_TYPE_OPTIONS,
+          'Content type'
+        )
+        if (optionText !== 'All' && actionType === 'selectDropdownSingle') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownSingle',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionText,
+              optionSelector: optionSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 250,
+              optionPostClickWaitMs: 160,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'creatorAgency') {
+        const optionText = normalizeSingleSelectOption(
+          filters.creatorFilters.creatorAgency,
+          CREATOR_AGENCY_OPTIONS,
+          'Creator agency'
+        )
+        if (optionText !== 'All' && actionType === 'selectDropdownSingle') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownSingle',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionText,
+              optionSelector: optionSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 250,
+              optionPostClickWaitMs: 160,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (
+        (filterKey === 'spotlightCreator' && filters.creatorFilters.spotlightCreator) ||
+        (filterKey === 'fastGrowing' && filters.creatorFilters.fastGrowing) ||
+        (filterKey === 'notInvitedInPast90Days' &&
+          filters.creatorFilters.notInvitedInPast90Days)
+      ) {
+        if (actionType === 'setCheckbox') {
+          moduleFilterSteps.push({
+            actionType: 'setCheckbox',
+            payload: {
+              selector: triggerSelector,
+              checked: true,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              scrollContainerSelector: OUTREACH_SCROLL_CONTAINER_SELECTOR,
+              scrollStepPx: 420,
+              maxScrollAttempts: 20,
+              postClickWaitMs: 150
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'followerAgeSelections') {
+        const optionTexts = normalizeMultiSelectOptions(
+          filters.followerFilters.followerAgeSelections,
+          FOLLOWER_AGE_OPTIONS,
+          'Follower age'
+        )
+        if (optionTexts.length && actionType === 'selectDropdownMultiple') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownMultiple',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionTexts,
+              optionSelector: optionSelector || MULTI_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || MULTI_SELECT_POPUP_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              scrollContainerSelector: scrollContainerSelector || POPUP_SCROLL_CONTAINER_SELECTOR,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 300,
+              optionPostClickWaitMs: 180,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'followerGender') {
+        const optionText = normalizeSingleSelectOption(
+          filters.followerFilters.followerGender,
+          FOLLOWER_GENDER_OPTIONS,
+          'Follower gender'
+        )
+        if (optionText !== 'All' && actionType === 'selectDropdownSingle') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownSingle',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionText,
+              optionSelector: optionSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 250,
+              optionPostClickWaitMs: 160,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'followerCountRange') {
+        const hasRangeOverride =
+          String(filters.followerFilters.followerCountMin).trim() !== '0' ||
+          String(filters.followerFilters.followerCountMax).trim() !== '10,000,000+'
+        if (hasRangeOverride && actionType === 'fillDropdownRange') {
+          moduleFilterSteps.push({
+            actionType: 'fillDropdownRange',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              triggerExact: false,
+              waitSelector: waitSelector || FOLLOWER_COUNT_RANGE_SELECTOR,
+              minSelector:
+                readScriptText(binding, 'minSelector', 'min_selector') ||
+                FOLLOWER_COUNT_MIN_INPUT_SELECTOR,
+              minValue: String(filters.followerFilters.followerCountMin),
+              maxSelector:
+                readScriptText(binding, 'maxSelector', 'max_selector') ||
+                FOLLOWER_COUNT_MAX_INPUT_SELECTOR,
+              maxValue: String(filters.followerFilters.followerCountMax),
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 300,
+              fillPostWaitMs: 200,
+              closeAfterFill: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'gmvSelections' || filterKey === 'itemsSoldSelections') {
+        const optionTexts =
+          filterKey === 'gmvSelections'
+            ? normalizeMultiSelectOptions(
+                filters.performanceFilters.gmvSelections,
+                PERFORMANCE_GMV_OPTIONS,
+                'GMV'
+              )
+            : normalizeMultiSelectOptions(
+                filters.performanceFilters.itemsSoldSelections,
+                PERFORMANCE_ITEMS_SOLD_OPTIONS,
+                'Items sold'
+              )
+        if (optionTexts.length && actionType === 'selectDropdownMultiple') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownMultiple',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionTexts,
+              optionSelector: optionSelector || MULTI_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || MULTI_SELECT_POPUP_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              scrollContainerSelector: scrollContainerSelector || POPUP_SCROLL_CONTAINER_SELECTOR,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 300,
+              optionPostClickWaitMs: 180,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (
+        filterKey === 'averageViewsPerVideoMin' ||
+        filterKey === 'averageViewersPerLiveMin' ||
+        filterKey === 'engagementRateMinPercent'
+      ) {
+        const thresholdConfig =
+          filterKey === 'averageViewsPerVideoMin'
+            ? {
+                value: String(filters.performanceFilters.averageViewsPerVideoMin),
+                enabled:
+                  String(filters.performanceFilters.averageViewsPerVideoMin).trim() !== '0' ||
+                  filters.performanceFilters.averageViewsPerVideoShoppableVideosOnly,
+                checkbox:
+                  filters.performanceFilters.averageViewsPerVideoShoppableVideosOnly,
+                defaultCheckboxLabel: 'Filter by shoppable videos'
+              }
+            : filterKey === 'averageViewersPerLiveMin'
+              ? {
+                  value: String(filters.performanceFilters.averageViewersPerLiveMin),
+                  enabled:
+                    String(filters.performanceFilters.averageViewersPerLiveMin).trim() !== '0' ||
+                    filters.performanceFilters.averageViewersPerLiveShoppableLiveOnly,
+                  checkbox:
+                    filters.performanceFilters.averageViewersPerLiveShoppableLiveOnly,
+                  defaultCheckboxLabel: 'Filter by shoppable LIVE streams'
+                }
+              : {
+                  value: String(filters.performanceFilters.engagementRateMinPercent),
+                  enabled:
+                    String(filters.performanceFilters.engagementRateMinPercent).trim() !== '0' ||
+                    filters.performanceFilters.engagementRateShoppableVideosOnly,
+                  checkbox:
+                    filters.performanceFilters.engagementRateShoppableVideosOnly,
+                  defaultCheckboxLabel: 'Filter by shoppable videos'
+                }
+
+        if (thresholdConfig.enabled && actionType === 'fillDropdownThreshold') {
+          const checkboxLabelText = thresholdConfig.checkbox
+            ? resolveThresholdCheckboxLabel(filterKey, filterSpec) ||
+              thresholdConfig.defaultCheckboxLabel
+            : undefined
+          moduleFilterSteps.push({
+            actionType: 'fillDropdownThreshold',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              waitSelector: waitSelector || POPUP_THRESHOLD_INPUT_SELECTOR,
+              inputSelector:
+                readScriptText(binding, 'inputSelector', 'input_selector') ||
+                POPUP_THRESHOLD_INPUT_SELECTOR,
+              value: thresholdConfig.value,
+              checkboxLabelText,
+              checkboxLabelSelector: checkboxLabelText
+                ? readScriptText(binding, 'checkboxLabelSelector', 'checkbox_label_selector') ||
+                  POPUP_CHECKBOX_LABEL_SELECTOR
+                : undefined,
+              checkboxExact: false,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 300,
+              fillPostWaitMs: 120,
+              checkboxPostClickWaitMs: 150,
+              closeAfterFill: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'estPostRate') {
+        const optionText = normalizeSingleSelectOption(
+          filters.performanceFilters.estPostRate,
+          PERFORMANCE_EST_POST_RATE_OPTIONS,
+          'Est. post rate'
+        )
+        if (optionText !== 'All' && actionType === 'selectDropdownSingle') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownSingle',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionText,
+              optionSelector: optionSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || SINGLE_SELECT_OPTION_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 250,
+              optionPostClickWaitMs: 160,
+              closeAfterSelect: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+        continue
+      }
+
+      if (filterKey === 'brandCollaborationSelections') {
+        const optionTexts = normalizeFreeformSelections(
+          filters.performanceFilters.brandCollaborationSelections
+        )
+        if (optionTexts.length && actionType === 'selectDropdownMultiple') {
+          moduleFilterSteps.push({
+            actionType: 'selectDropdownMultiple',
+            payload: {
+              triggerText,
+              triggerFallbackTexts,
+              triggerSelector,
+              optionTexts,
+              optionSelector: optionSelector || MULTI_SELECT_OPTION_SELECTOR,
+              waitSelector: waitSelector || MULTI_SELECT_POPUP_SELECTOR,
+              waitState: 'visible',
+              exact: true,
+              caseSensitive: false,
+              scrollContainerSelector: scrollContainerSelector || POPUP_SCROLL_CONTAINER_SELECTOR,
+              scrollStepPx: 420,
+              maxScrollAttempts: 40,
+              timeoutMs: 10000,
+              intervalMs: 250,
+              triggerPostClickWaitMs: 300,
+              optionPostClickWaitMs: 180,
+              closeAfterSelect: true,
+              continueOnMissingOptions: true,
+              ...buildOutreachDismissPayload(dismissText)
+            },
+            options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+            onError: OUTREACH_STEP_ERROR_POLICY
+          })
+        }
+      }
+    }
+
+    if (moduleFilterSteps.length) {
+      allSteps.push(
+        buildModuleButtonAction(
+          moduleTitle,
+          350,
+          readScriptText(moduleButton, 'selector') || moduleButtonSelector,
+          MODULE_BUTTON_FALLBACK_TEXTS[moduleTitle] ?? []
+        ),
+        ...moduleFilterSteps
+      )
+    }
+  }
+
+  if (!allSteps.length) {
+    return null
+  }
+
+  const searchBinding = asRecord(readScriptValue(script, 'searchBinding', 'search_binding'))
+  return [
+    ...allSteps,
+    ...buildSearchKeywordStepsFromScript(filters.searchKeyword, searchBinding, dismissText),
+    ...buildCreatorCollectionSteps()
+  ]
+}
+
+export const isOutreachFilterScriptLike = (value: unknown): value is ScriptRecord =>
+  Boolean(asRecord(value) && asArray(readScriptValue(asRecord(value), 'modules')).length)
+
+export const resolveOutreachPageReadyText = (script?: ScriptRecord | null): string =>
+  readScriptText(asRecord(readScriptValue(script ?? null, 'source')), 'pageReadyText', 'page_ready_text') ||
+  OUTREACH_FILTER_DISMISS_TEXT
+
+export const buildOutreachFilterStepsFromScript = (
+  filters: OutreachFilterConfig,
+  script?: ScriptRecord | null
+): BrowserAction[] | null => {
+  if (!script) {
+    return null
+  }
+  return buildScriptDrivenFilterSteps(filters, script)
+}
 
 const buildCreatorFilterSteps = (config: CreatorFilterConfig): BrowserAction[] => {
   const categoryValues = normalizeCreatorProductCategoryValues(config.productCategorySelections)

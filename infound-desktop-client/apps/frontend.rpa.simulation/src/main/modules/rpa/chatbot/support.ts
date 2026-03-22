@@ -1,6 +1,10 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { SellerChatbotPayload, SellerChatbotPayloadInput } from '@common/types/rpa-chatbot'
+import type {
+  SellerChatbotPayload,
+  SellerChatbotPayloadInput,
+  SellerChatbotRecipient
+} from '@common/types/rpa-chatbot'
 import type { BrowserAction } from '../task-dsl/browser-actions'
 
 export const SELLER_CHATBOT_INPUT_SELECTOR =
@@ -24,25 +28,44 @@ const DEFAULT_SELLER_CHATBOT_MESSAGE = 'hi'
 
 const createDefaultSellerChatbotPayload = (): SellerChatbotPayload => ({
   creatorId: '',
-  message: DEFAULT_SELLER_CHATBOT_MESSAGE
+  message: DEFAULT_SELLER_CHATBOT_MESSAGE,
+  recipients: []
 })
 
 export const createDemoSellerChatbotPayload = (): SellerChatbotPayloadInput => ({
-  creatorId: '<creator_id_demo>',
+  creatorId: '7493999107359083121',
   message: DEFAULT_SELLER_CHATBOT_MESSAGE
 })
 
 export const mergeSellerChatbotPayload = (input?: SellerChatbotPayloadInput): SellerChatbotPayload => {
   const defaults = createDefaultSellerChatbotPayload()
+  const recipients = Array.isArray(input?.recipients)
+    ? input.recipients
+        .filter(
+          (item): item is SellerChatbotRecipient =>
+            Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+        )
+        .map((item) => ({
+          creatorId: String(item.creatorId ?? '').trim(),
+          message: String(item.message ?? '').trim() || undefined
+        }))
+        .filter((item) => Boolean(item.creatorId))
+    : defaults.recipients
+
   return {
     creatorId: String(input?.creatorId ?? defaults.creatorId).trim(),
-    message: String(input?.message ?? defaults.message).trim()
+    message: String(input?.message ?? defaults.message).trim(),
+    recipients
   }
 }
 
 export const isSellerChatbotPayloadInput = (value: unknown): value is SellerChatbotPayloadInput => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  return 'creatorId' in (value as Record<string, unknown>) || 'message' in (value as Record<string, unknown>)
+  return (
+    'creatorId' in (value as Record<string, unknown>) ||
+    'message' in (value as Record<string, unknown>) ||
+    'recipients' in (value as Record<string, unknown>)
+  )
 }
 
 const buildLocalTimestamp = (): string => {

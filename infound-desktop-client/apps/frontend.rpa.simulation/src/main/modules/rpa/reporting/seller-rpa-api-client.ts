@@ -7,15 +7,12 @@ interface LoggerLike {
 }
 
 export interface ResolvedSellerRpaReportConfig {
-  enabled: boolean
   baseUrl: string
   authToken: string
   authHeader: string
-  heartbeatIntervalSeconds: number
 }
 
 const DEFAULT_AUTH_HEADER = 'INFoundSellerAuth'
-const DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 60
 const REQUEST_TIMEOUT_MS = 30000
 
 const readEnv = (...keys: string[]): string => {
@@ -27,14 +24,6 @@ const readEnv = (...keys: string[]): string => {
 }
 
 const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '')
-
-const normalizeHeartbeatInterval = (value: unknown): number => {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return DEFAULT_HEARTBEAT_INTERVAL_SECONDS
-  }
-  return Math.max(Math.floor(numeric), 10)
-}
 
 const withTimeoutSignal = (timeoutMs: number): AbortSignal => {
   const controller = new AbortController()
@@ -70,17 +59,9 @@ export const resolveSellerRpaReportConfig = (
   ).trim()
 
   return {
-    enabled: true,
     baseUrl: normalizeBaseUrl(baseUrl),
     authToken,
-    authHeader: authHeader || DEFAULT_AUTH_HEADER,
-    heartbeatIntervalSeconds: normalizeHeartbeatInterval(
-      input?.heartbeatIntervalSeconds ||
-        readEnv(
-          'SELLER_RPA_HEARTBEAT_INTERVAL_SECONDS',
-          'VITE_SELLER_RPA_HEARTBEAT_INTERVAL_SECONDS'
-        )
-    )
+    authHeader: authHeader || DEFAULT_AUTH_HEADER
   }
 }
 
@@ -96,50 +77,13 @@ export class SellerRpaApiClient {
     return new SellerRpaApiClient(logger, config)
   }
 
-  public readonly heartbeatIntervalMs: number
-
   private constructor(
     private readonly logger: LoggerLike,
     private readonly config: ResolvedSellerRpaReportConfig
-  ) {
-    this.heartbeatIntervalMs = this.config.heartbeatIntervalSeconds * 1000
-  }
-
-  public async reportTaskStart(taskId: string, startedAt: string): Promise<void> {
-    await this.post(`/api/v1/rpa/tasks/${encodeURIComponent(taskId)}/start`, {
-      started_at: startedAt
-    })
-  }
-
-  public async reportTaskHeartbeat(taskId: string, heartbeatAt: string): Promise<void> {
-    await this.post(`/api/v1/rpa/tasks/${encodeURIComponent(taskId)}/heartbeat`, {
-      heartbeat_at: heartbeatAt
-    })
-  }
-
-  public async reportTaskComplete(taskId: string, finishedAt: string): Promise<void> {
-    await this.post(`/api/v1/rpa/tasks/${encodeURIComponent(taskId)}/complete`, {
-      finished_at: finishedAt
-    })
-  }
-
-  public async reportTaskFail(taskId: string, finishedAt: string, errorMsg: string): Promise<void> {
-    await this.post(`/api/v1/rpa/tasks/${encodeURIComponent(taskId)}/fail`, {
-      finished_at: finishedAt,
-      error_msg: errorMsg
-    })
-  }
+  ) {}
 
   public async reportOutreachResults(payload: Record<string, unknown>): Promise<void> {
     await this.post('/api/v1/rpa/outreach/results', payload)
-  }
-
-  public async reportSampleMonitorResults(payload: Record<string, unknown>): Promise<void> {
-    await this.post('/api/v1/rpa/sample-monitor/results', payload)
-  }
-
-  public async reportCreatorDetailResults(payload: Record<string, unknown>): Promise<void> {
-    await this.post('/api/v1/rpa/creator-details/results', payload)
   }
 
   private async post(path: string, payload: Record<string, unknown>): Promise<void> {
