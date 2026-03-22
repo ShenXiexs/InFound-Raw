@@ -3,7 +3,6 @@ export interface SellerRpaReportConfigInput {
   baseUrl?: string
   authToken?: string
   authHeader?: string
-  heartbeatIntervalSeconds?: number
 }
 
 export interface SellerRpaTaskContextInput {
@@ -12,6 +11,5 @@ export interface SellerRpaTaskContextInput {
   taskName?: string
   shopRegionCode?: string
   scheduledTime?: string
-  crawlDate?: string
   report?: SellerRpaReportConfigInput
 }

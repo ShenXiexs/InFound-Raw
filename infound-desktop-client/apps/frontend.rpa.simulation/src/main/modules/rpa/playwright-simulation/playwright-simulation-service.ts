@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
 import type { Browser, BrowserContext, Page } from 'playwright'
-import type { SellerChatbotPayloadInput } from '@common/types/rpa-chatbot'
+import type { SellerChatbotPayloadInput, SellerChatbotRecipient } from '@common/types/rpa-chatbot'
 import type { SellerCreatorDetailData, SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
 import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
 import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
@@ -38,13 +39,16 @@ import {
 } from '../chatbot/support'
 import {
   buildOutreachFilterSteps,
+  buildOutreachFilterStepsFromScript,
   createDemoOutreachFilterConfig,
   CREATOR_MARKETPLACE_DATA_KEY,
   CREATOR_MARKETPLACE_EXCEL_FILE_PATH_KEY,
   CREATOR_MARKETPLACE_FILE_PATH_KEY,
   CREATOR_MARKETPLACE_RAW_DIRECTORY_PATH_KEY,
   CREATOR_MARKETPLACE_RAW_FILE_PATH_KEY,
-  mergeOutreachFilterConfig
+  isOutreachFilterScriptLike,
+  mergeOutreachFilterConfig,
+  resolveOutreachPageReadyText
 } from '../outreach/support'
 import { describeSampleManagementTabs, mergeSampleManagementPayload } from '../sample-management/support'
 import type { SampleManagementExportResult } from '../sample-management/types'
@@ -53,17 +57,22 @@ import { PlaywrightJsonResponseCaptureManager } from './playwright-response-capt
 import { PlaywrightSampleManagementCrawler } from './sample-management-playwright'
 import { evaluatePageScript } from './shared'
 import { SellerRpaApiClient } from '../reporting/seller-rpa-api-client'
-import {
-  buildCreatorDetailResultPayload,
-  buildOutreachResultPayload,
-  buildSampleMonitorResultPayload
-} from '../reporting/seller-rpa-report-payloads'
+import { buildOutreachResultPayload } from '../reporting/seller-rpa-report-payloads'
 
 const DEFAULT_REGION = 'MX'
 const DEFAULT_STORAGE_STATE_PATH = join(process.cwd(), 'data', 'playwright', 'storage-state.json')
 const PLAYWRIGHT_LOGIN_URL = 'https://seller-mx.tiktok.com/'
+const SIMULATION_RUNTIME_ROLES = [
+  'outreach',
+  'creator_detail',
+  'chatbot',
+  'sample_management'
+] as const
+
+type SimulationRuntimeRole = (typeof SIMULATION_RUNTIME_ROLES)[number]
 
 interface PlaywrightSimulationRuntime {
+  role: SimulationRuntimeRole
   browser: Browser
   context: BrowserContext
   page: Page
@@ -72,6 +81,15 @@ interface PlaywrightSimulationRuntime {
   taskRunner: BrowserActionRunner
   sampleCrawler: PlaywrightSampleManagementCrawler
   payload: PlaywrightSimulationPayload
+}
+
+interface ChatbotSendResult {
+  creatorId: string
+  creatorName: string
+  message: string
+  send: 0 | 1
+  sendTime?: string
+  errorMessage?: string
 }
 
 export class PlaywrightSimulationService {
@@ -84,34 +102,221 @@ export class PlaywrightSimulationService {
     return PlaywrightSimulationService.instance
   }
 
-  private runtime: PlaywrightSimulationRuntime | null = null
-  private taskChain: Promise<void> = Promise.resolve()
-  private activeTaskName: string | null = null
+  private runtimes = new Map<SimulationRuntimeRole, PlaywrightSimulationRuntime>()
+  private taskChains = new Map<SimulationRuntimeRole, Promise<unknown>>()
+  private activeTaskNames = new Map<SimulationRuntimeRole, string>()
 
   private constructor(private readonly logger: TaskLoggerLike) {}
 
   public hasActiveSession(): boolean {
-    return this.runtime != null
+    return this.runtimes.size === SIMULATION_RUNTIME_ROLES.length
   }
 
   public async startSession(input?: PlaywrightSimulationPayloadInput): Promise<void> {
     const payload = this.normalizePayload(input)
 
-    if (this.runtime) {
-      if (this.activeTaskName) {
-        throw new Error(`Playwright 会话正在执行任务，暂时不能重建。当前任务: ${this.activeTaskName}`)
+    if (this.runtimes.size > 0) {
+      if (this.hasActiveTasks()) {
+        throw new Error(
+          `Playwright 会话正在执行任务，暂时不能重建。当前任务: ${this.buildActiveTaskSummary()}`
+        )
       }
 
-      if (this.isSameSessionPayload(this.runtime.payload, payload)) {
-        await this.runtime.page.bringToFront().catch(() => undefined)
-        this.logger.info(`Playwright 会话已存在，继续复用: ${this.buildIdleUrl(payload.region)}`)
+      if (this.areAllRuntimePayloadsSame(payload)) {
+        await this.bringAllRuntimesToFront()
+        this.logger.info(`Playwright 会话已存在，继续复用四个运行时: region=${payload.region}`)
         return
       }
 
-      this.logger.info('检测到新的 Playwright 会话配置，正在重建浏览器会话')
+      this.logger.info('检测到新的 Playwright 会话配置，正在重建四个浏览器会话')
       await this.dispose()
     }
 
+    const createdRuntimes: PlaywrightSimulationRuntime[] = []
+    try {
+      for (const role of SIMULATION_RUNTIME_ROLES) {
+        const runtime = await this.createRuntime(role, payload)
+        this.runtimes.set(role, runtime)
+        this.taskChains.set(role, Promise.resolve())
+        createdRuntimes.push(runtime)
+      }
+      await this.bringAllRuntimesToFront()
+      this.logger.info(
+        `Playwright RPA 四运行时已启动: headless=${payload.headless ? 'true' : 'false'} region=${payload.region} roles=${SIMULATION_RUNTIME_ROLES.join(',')}`
+      )
+    } catch (error) {
+      this.runtimes.clear()
+      this.taskChains.clear()
+      this.activeTaskNames.clear()
+      await Promise.all(
+        createdRuntimes.map(async (runtime) => {
+          await runtime.context.close().catch(() => undefined)
+          await runtime.browser.close().catch(() => undefined)
+        })
+      )
+      throw error
+    }
+  }
+
+  public async dispose(): Promise<void> {
+    const runtimes = [...this.runtimes.values()]
+    this.runtimes.clear()
+    this.activeTaskNames.clear()
+    this.taskChains.clear()
+
+    if (!runtimes.length) return
+
+    await Promise.all(
+      runtimes.map(async (runtime) => {
+        await runtime.context.close().catch(() => undefined)
+        await runtime.browser.close().catch(() => undefined)
+      })
+    )
+    this.logger.info('Playwright RPA 四运行时已关闭')
+  }
+
+  public async runOutreach(payload?: OutreachFilterConfigInput): Promise<void> {
+    const effectivePayload = payload ?? createDemoOutreachFilterConfig()
+    await this.ensureSession(this.buildSessionPayloadFromTaskContext(effectivePayload))
+    await this.enqueueTask('outreach', 'outreach', async (runtime) => {
+      const startedAt = new Date()
+      const result = await this.runOutreachTask(
+        runtime.taskRunner,
+        runtime.payload.region,
+        effectivePayload
+      )
+      const chatbotResults = await this.dispatchOutreachCreatorsToChatbot(
+        runtime.payload.region,
+        effectivePayload,
+        result
+      )
+      this.mergeChatbotResultsIntoRuntimeData(result, chatbotResults)
+      const finishedAt = new Date()
+      const client = SellerRpaApiClient.create(this.logger, effectivePayload.report)
+      if (!client) {
+        this.logger.warn('建联任务未配置 seller backend 回传，跳过结果上报')
+        return
+      }
+
+      const requestPayload = buildOutreachResultPayload(effectivePayload, result, {
+        region: runtime.payload.region,
+        startedAt,
+        finishedAt
+      })
+      if (!requestPayload) {
+        this.logger.warn('建联任务缺少 taskId/shopId，跳过结果上报')
+        return
+      }
+      await client.reportOutreachResults(requestPayload)
+    })
+  }
+
+  public async runSampleManagement(payload?: SampleManagementPayloadInput): Promise<void> {
+    const effectivePayload = mergeSampleManagementPayload(payload)
+    await this.ensureSession(this.buildSessionPayloadFromTaskContext(effectivePayload))
+    await this.enqueueTask('sample_management', 'sample_management', async (runtime) => {
+      await this.runSampleManagementTask(
+        runtime.page,
+        runtime.sampleCrawler,
+        runtime.payload.region,
+        effectivePayload.tabs
+      )
+    })
+  }
+
+  public async runChatbot(payload?: SellerChatbotPayloadInput): Promise<void> {
+    const effectivePayload = payload ?? createDemoSellerChatbotPayload()
+    await this.ensureSession(this.buildSessionPayloadFromTaskContext(effectivePayload))
+    await this.enqueueTask('chatbot', 'chatbot', async (runtime) => {
+      await this.runChatbotPayload(runtime.taskRunner, runtime.payload.region, effectivePayload)
+    })
+  }
+
+  public async runCreatorDetail(payload?: SellerCreatorDetailPayloadInput): Promise<void> {
+    const effectivePayload = payload ?? createDemoSellerCreatorDetailPayload()
+    await this.ensureSession(this.buildSessionPayloadFromTaskContext(effectivePayload))
+    await this.enqueueTask('creator_detail', 'creator_detail', async (runtime) => {
+      await this.runCreatorDetailTask(
+        runtime.taskRunner,
+        runtime.page,
+        runtime.payload.region,
+        effectivePayload
+      )
+    })
+  }
+
+  private async enqueueTask<T>(
+    role: SimulationRuntimeRole,
+    taskName: string,
+    handler: (runtime: PlaywrightSimulationRuntime) => Promise<T>
+  ): Promise<T> {
+    const previousChain = this.taskChains.get(role) ?? Promise.resolve()
+    const runTask = previousChain.then(async () => {
+      const runtime = this.requireRuntime(role)
+      this.activeTaskNames.set(role, taskName)
+      this.logger.info(`开始执行 Playwright 会话任务: role=${role} task=${taskName}`)
+      try {
+        const result = await handler(runtime)
+        this.logger.info(`Playwright 会话任务执行完成: role=${role} task=${taskName}`)
+        return result
+      } finally {
+        this.activeTaskNames.delete(role)
+      }
+    })
+
+    this.taskChains.set(role, runTask.then(() => undefined, () => undefined))
+    return runTask
+  }
+
+  private requireRuntime(role: SimulationRuntimeRole): PlaywrightSimulationRuntime {
+    const runtime = this.runtimes.get(role)
+    if (!runtime) {
+      throw new Error('Playwright 会话尚未启动。请先点击“启动RPA模拟”或发送 RPA_EXECUTE_SIMULATION。')
+    }
+    return runtime
+  }
+
+  private async ensureSession(input?: PlaywrightSimulationPayloadInput): Promise<void> {
+    if (this.hasActiveSession()) {
+      return
+    }
+    await this.startSession(input)
+  }
+
+  private hasActiveTasks(): boolean {
+    return this.activeTaskNames.size > 0
+  }
+
+  private buildActiveTaskSummary(): string {
+    return [...this.activeTaskNames.entries()]
+      .map(([role, taskName]) => `${role}:${taskName}`)
+      .join(', ')
+  }
+
+  private areAllRuntimePayloadsSame(payload: PlaywrightSimulationPayload): boolean {
+    if (!this.hasActiveSession()) {
+      return false
+    }
+    return SIMULATION_RUNTIME_ROLES.every((role) => {
+      const runtime = this.runtimes.get(role)
+      return runtime ? this.isSameSessionPayload(runtime.payload, payload) : false
+    })
+  }
+
+  private async bringAllRuntimesToFront(): Promise<void> {
+    for (const role of SIMULATION_RUNTIME_ROLES) {
+      const runtime = this.runtimes.get(role)
+      if (!runtime) {
+        continue
+      }
+      await runtime.page.bringToFront().catch(() => undefined)
+    }
+  }
+
+  private async createRuntime(
+    role: SimulationRuntimeRole,
+    payload: PlaywrightSimulationPayload
+  ): Promise<PlaywrightSimulationRuntime> {
     const browser = await chromium.launch({
       headless: payload.headless
     })
@@ -130,13 +335,24 @@ export class PlaywrightSimulationService {
       const target = new PlaywrightBrowserActionTarget(page, this.logger, captureManager)
       const taskRunner = new BrowserActionRunner(this.logger, target)
       const sampleCrawler = new PlaywrightSampleManagementCrawler()
-      const idleUrl = this.buildIdleUrl(payload.region)
+      const idleUrl = this.buildRuntimeIdleUrl(role, payload.region)
       const bootUrl = payload.useStorageState ? idleUrl : PLAYWRIGHT_LOGIN_URL
 
       await page.goto(bootUrl, { waitUntil: 'domcontentloaded' })
       await page.bringToFront().catch(() => undefined)
 
-      this.runtime = {
+      if (payload.useStorageState) {
+        this.logger.info(
+          `Playwright 运行时已启动: role=${role} headless=${payload.headless ? 'true' : 'false'} region=${payload.region} idle=${idleUrl}`
+        )
+      } else {
+        this.logger.warn(
+          `找不到 storage state，已启动手动登录运行时: role=${role} headless=${payload.headless ? 'true' : 'false'} region=${payload.region} login=${PLAYWRIGHT_LOGIN_URL}`
+        )
+      }
+
+      return {
+        role,
         browser,
         context,
         page,
@@ -146,284 +362,31 @@ export class PlaywrightSimulationService {
         sampleCrawler,
         payload
       }
-
-      if (payload.useStorageState) {
-        this.logger.info(
-          `Playwright RPA 模拟会话已启动: headless=${payload.headless ? 'true' : 'false'} region=${payload.region} idle=${idleUrl}`
-        )
-      } else {
-        this.logger.warn(
-          `找不到 storage state，已启动手动登录会话: headless=${payload.headless ? 'true' : 'false'} region=${payload.region} login=${PLAYWRIGHT_LOGIN_URL}`
-        )
-      }
     } catch (error) {
       await browser.close().catch(() => undefined)
       throw error
     }
   }
 
-  public async dispose(): Promise<void> {
-    const runtime = this.runtime
-    this.runtime = null
-    this.activeTaskName = null
-    this.taskChain = Promise.resolve()
-
-    if (!runtime) return
-
-    await runtime.context.close().catch(() => undefined)
-    await runtime.browser.close().catch(() => undefined)
-    this.logger.info('Playwright RPA 模拟会话已关闭')
-  }
-
-  public async runOutreach(payload?: OutreachFilterConfigInput): Promise<void> {
-    const effectivePayload = payload ?? createDemoOutreachFilterConfig()
-    await this.enqueueTask('outreach', async (runtime) => {
-      await this.executeWithReporting<Record<string, unknown>>({
-        taskLabel: 'outreach',
-        taskId: effectivePayload.taskId,
-        reportConfig: effectivePayload.report,
-        run: async () =>
-          await this.runOutreachTask(runtime.taskRunner, runtime.payload.region, effectivePayload),
-        onSuccess: async (client, meta, result) => {
-          const requestPayload = buildOutreachResultPayload(effectivePayload, result, {
-            region: runtime.payload.region,
-            startedAt: meta.startedAt,
-            finishedAt: meta.finishedAt
-          })
-          if (!requestPayload) {
-            this.logger.warn('建联任务缺少 taskId/shopId，跳过结果上报')
-            return
-          }
-          await client.reportOutreachResults(requestPayload)
-        }
-      })
-    })
-  }
-
-  public async runSampleManagement(payload?: SampleManagementPayloadInput): Promise<void> {
-    const effectivePayload = mergeSampleManagementPayload(payload)
-    await this.enqueueTask('sample_management', async (runtime) => {
-      await this.executeWithReporting<SampleManagementExportResult>({
-        taskLabel: 'sample_management',
-        taskId: effectivePayload.taskId,
-        reportConfig: effectivePayload.report,
-        run: async () =>
-          await this.runSampleManagementTask(
-            runtime.page,
-            runtime.sampleCrawler,
-            runtime.payload.region,
-            effectivePayload.tabs
-          ),
-        onSuccess: async (client, meta, result) => {
-          const requestPayload = buildSampleMonitorResultPayload(effectivePayload, result, {
-            region: runtime.payload.region,
-            startedAt: meta.startedAt,
-            finishedAt: meta.finishedAt
-          })
-          if (!requestPayload) {
-            this.logger.warn('样品管理任务缺少 shopId，跳过结果上报')
-            return
-          }
-          await client.reportSampleMonitorResults(requestPayload)
-        }
-      })
-    })
-  }
-
-  public async runChatbot(payload?: SellerChatbotPayloadInput): Promise<void> {
-    const effectivePayload = payload ?? createDemoSellerChatbotPayload()
-    await this.enqueueTask('chatbot', async (runtime) => {
-      await this.executeWithReporting<void>({
-        taskLabel: 'chatbot',
-        taskId: effectivePayload.taskId,
-        reportConfig: effectivePayload.report,
-        run: async () =>
-          await this.runChatbotTask(runtime.taskRunner, runtime.payload.region, effectivePayload)
-      })
-    })
-  }
-
-  public async runCreatorDetail(payload?: SellerCreatorDetailPayloadInput): Promise<void> {
-    const effectivePayload = payload ?? createDemoSellerCreatorDetailPayload()
-    await this.enqueueTask('creator_detail', async (runtime) => {
-      await this.executeWithReporting<SellerCreatorDetailData>({
-        taskLabel: 'creator_detail',
-        taskId: effectivePayload.taskId,
-        reportConfig: effectivePayload.report,
-        run: async () =>
-          await this.runCreatorDetailTask(
-            runtime.taskRunner,
-            runtime.page,
-            runtime.payload.region,
-            effectivePayload
-          ),
-        onSuccess: async (client, meta, result) => {
-          const requestPayload = buildCreatorDetailResultPayload(effectivePayload, result, {
-            region: runtime.payload.region,
-            startedAt: meta.startedAt,
-            finishedAt: meta.finishedAt
-          })
-          if (!requestPayload) {
-            this.logger.warn('达人详情任务缺少 shopId，跳过结果上报')
-            return
-          }
-          await client.reportCreatorDetailResults(requestPayload)
-        }
-      })
-    })
-  }
-
-  private async enqueueTask(
-    taskName: 'outreach' | 'sample_management' | 'chatbot' | 'creator_detail',
-    handler: (runtime: PlaywrightSimulationRuntime) => Promise<void>
-  ): Promise<void> {
-    const runTask = this.taskChain.then(async () => {
-      const runtime = this.requireRuntime()
-      this.activeTaskName = taskName
-      this.logger.info(`开始执行 Playwright 会话任务: ${taskName}`)
-      try {
-        await handler(runtime)
-        this.logger.info(`Playwright 会话任务执行完成: ${taskName}`)
-      } finally {
-        this.activeTaskName = null
-      }
-    })
-
-    this.taskChain = runTask.catch(() => undefined)
-    return runTask
-  }
-
-  private async executeWithReporting<T>(options: {
-    taskLabel: string
-    taskId?: string
-    reportConfig?: OutreachFilterConfigInput['report']
-    run: () => Promise<T>
-    onSuccess?: (
-      client: SellerRpaApiClient,
-      meta: { startedAt: Date; finishedAt: Date },
-      result: T
-    ) => Promise<void>
-  }): Promise<T> {
-    const client = SellerRpaApiClient.create(this.logger, options.reportConfig)
-    const startedAt = new Date()
-
-    await this.safeReportTaskStart(client, options.taskId, startedAt, options.taskLabel)
-    const heartbeatTimer = this.startHeartbeatLoop(client, options.taskId, options.taskLabel)
-
-    try {
-      const result = await options.run()
-      const finishedAt = new Date()
-
-      if (client && options.onSuccess) {
-        await options.onSuccess(client, { startedAt, finishedAt }, result)
-      }
-
-      await this.safeReportTaskComplete(client, options.taskId, finishedAt, options.taskLabel)
-      return result
-    } catch (error) {
-      const finishedAt = new Date()
-      await this.safeReportTaskFail(client, options.taskId, finishedAt, error, options.taskLabel)
-      throw error
-    } finally {
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-      }
+  private buildRuntimeIdleUrl(role: SimulationRuntimeRole, region: string): string {
+    switch (role) {
+      case 'outreach':
+        return `https://affiliate.tiktok.com/connection/creator?shop_region=${encodeURIComponent(region)}`
+      case 'sample_management':
+        return `https://affiliate.tiktok.com/product/sample-request?shop_region=${encodeURIComponent(region)}`
+      case 'chatbot':
+      case 'creator_detail':
+      default:
+        return this.buildIdleUrl(region)
     }
   }
 
-  private startHeartbeatLoop(
-    client: SellerRpaApiClient | null,
-    taskId: string | undefined,
-    taskLabel: string
-  ): ReturnType<typeof setInterval> | null {
-    if (!client || !taskId) {
-      return null
+  private buildSessionPayloadFromTaskContext(context?: {
+    shopRegionCode?: string
+  }): PlaywrightSimulationPayloadInput {
+    return {
+      region: String(context?.shopRegionCode || DEFAULT_REGION).trim().toUpperCase() || DEFAULT_REGION
     }
-
-    return setInterval(() => {
-      void this.safeReportTaskHeartbeat(client, taskId, new Date(), taskLabel)
-    }, client.heartbeatIntervalMs)
-  }
-
-  private async safeReportTaskStart(
-    client: SellerRpaApiClient | null,
-    taskId: string | undefined,
-    startedAt: Date,
-    taskLabel: string
-  ): Promise<void> {
-    if (!client || !taskId) {
-      return
-    }
-    try {
-      await client.reportTaskStart(taskId, startedAt.toISOString())
-    } catch (error) {
-      this.logger.warn(
-        `[${taskLabel}] start 上报失败: ${taskId} ${(error as Error)?.message || error}`
-      )
-    }
-  }
-
-  private async safeReportTaskHeartbeat(
-    client: SellerRpaApiClient | null,
-    taskId: string | undefined,
-    heartbeatAt: Date,
-    taskLabel: string
-  ): Promise<void> {
-    if (!client || !taskId) {
-      return
-    }
-    try {
-      await client.reportTaskHeartbeat(taskId, heartbeatAt.toISOString())
-    } catch (error) {
-      this.logger.warn(
-        `[${taskLabel}] heartbeat 上报失败: ${taskId} ${(error as Error)?.message || error}`
-      )
-    }
-  }
-
-  private async safeReportTaskComplete(
-    client: SellerRpaApiClient | null,
-    taskId: string | undefined,
-    finishedAt: Date,
-    taskLabel: string
-  ): Promise<void> {
-    if (!client || !taskId) {
-      return
-    }
-    try {
-      await client.reportTaskComplete(taskId, finishedAt.toISOString())
-    } catch (error) {
-      this.logger.warn(
-        `[${taskLabel}] complete 上报失败: ${taskId} ${(error as Error)?.message || error}`
-      )
-    }
-  }
-
-  private async safeReportTaskFail(
-    client: SellerRpaApiClient | null,
-    taskId: string | undefined,
-    finishedAt: Date,
-    error: unknown,
-    taskLabel: string
-  ): Promise<void> {
-    if (!client || !taskId) {
-      return
-    }
-    const errorMessage = (error as Error)?.message || String(error)
-    try {
-      await client.reportTaskFail(taskId, finishedAt.toISOString(), errorMessage)
-    } catch (failError) {
-      this.logger.warn(
-        `[${taskLabel}] fail 上报失败: ${taskId} ${(failError as Error)?.message || failError}`
-      )
-    }
-  }
-
-  private requireRuntime(): PlaywrightSimulationRuntime {
-    if (!this.runtime) {
-      throw new Error('Playwright 会话尚未启动。请先点击“启动RPA模拟”或发送 RPA_EXECUTE_SIMULATION。')
-    }
-    return this.runtime
   }
 
   private normalizePayload(input?: PlaywrightSimulationPayloadInput): PlaywrightSimulationPayload {
@@ -470,6 +433,11 @@ export class PlaywrightSimulationService {
     payload?: OutreachFilterConfigInput
   ): Promise<Record<string, unknown>> {
     const filterConfig = mergeOutreachFilterConfig(payload)
+    const externalFilterScript = await this.resolveOutreachFilterScript(payload)
+    const pageReadyText = resolveOutreachPageReadyText(externalFilterScript)
+    const filterSteps =
+      buildOutreachFilterStepsFromScript(filterConfig, externalFilterScript) ||
+      buildOutreachFilterSteps(filterConfig)
     const targetUrl = `https://affiliate.tiktok.com/connection/creator?shop_region=${encodeURIComponent(region)}`
 
     const taskData = {
@@ -493,7 +461,7 @@ export class PlaywrightSimulationService {
         {
           actionType: 'waitForBodyText',
           payload: {
-            text: 'Find creators',
+            text: pageReadyText,
             timeoutMs: 30000,
             intervalMs: 500
           },
@@ -504,10 +472,19 @@ export class PlaywrightSimulationService {
           options: { retryCount: 5 },
           onError: 'abort'
         },
-        ...buildOutreachFilterSteps(filterConfig)
+        ...filterSteps
       ]
     } as BrowserTask
 
+    if (externalFilterScript) {
+      this.logger.info(
+        `[${taskData.taskId}] 建联任务使用外部筛选脚本: region=${region} source=task-input`
+      )
+    } else {
+      this.logger.info(
+        `[${taskData.taskId}] 建联任务使用内置筛选脚本: region=${region} source=fallback`
+      )
+    }
     this.logger.info(`[${taskData.taskId}] 启动建联任务(Playwright): region=${region} steps=${taskData.steps.length}`)
 
     const runtimeData = (await taskRunner.execute(taskData)) as Record<string, unknown>
@@ -523,6 +500,184 @@ export class PlaywrightSimulationService {
       `[${taskData.taskId}] 建联任务执行完成(Playwright): creators=${creatorCount}${filePath ? ` file=${filePath}` : ''}${excelFilePath ? ` excel=${excelFilePath}` : ''}${rawFilePath ? ` raw_file=${rawFilePath}` : ''}${rawDirectoryPath ? ` raw_dir=${rawDirectoryPath}` : ''}`
     )
     return runtimeData
+  }
+
+  private async resolveOutreachFilterScript(
+    payload?: OutreachFilterConfigInput
+  ): Promise<Record<string, unknown> | null> {
+    const inlineScript =
+      payload?.filterScript && typeof payload.filterScript === 'object'
+        ? payload.filterScript
+        : null
+    if (isOutreachFilterScriptLike(inlineScript)) {
+      return inlineScript
+    }
+
+    const candidatePath =
+      (typeof payload?.filterScript === 'string' ? payload.filterScript : '') ||
+      String(payload?.filterScriptPath || '').trim()
+    if (!candidatePath) {
+      return null
+    }
+
+    const resolvedPath = this.resolveTaskJsonPath(candidatePath)
+    const fileContent = await readFile(resolvedPath, 'utf8')
+    const parsed = JSON.parse(fileContent) as unknown
+    if (!isOutreachFilterScriptLike(parsed)) {
+      throw new Error(`建联外部筛选脚本格式不正确: ${resolvedPath}`)
+    }
+    return parsed
+  }
+
+  private resolveTaskJsonPath(inputPath: string): string {
+    const trimmedPath = String(inputPath || '').trim()
+    if (!trimmedPath) {
+      throw new Error('建联外部筛选脚本路径为空')
+    }
+
+    const candidatePaths = new Set<string>()
+    if (trimmedPath.startsWith('{') || trimmedPath.startsWith('[')) {
+      throw new Error('建联外部筛选脚本路径不能是内联 JSON 字符串')
+    }
+    if (trimmedPath.startsWith('/')) {
+      candidatePaths.add(trimmedPath)
+    } else {
+      candidatePaths.add(resolve(process.cwd(), trimmedPath))
+      candidatePaths.add(resolve(process.cwd(), '..', trimmedPath))
+      candidatePaths.add(resolve(process.cwd(), '..', '..', trimmedPath))
+      candidatePaths.add(resolve(process.cwd(), '..', '..', '..', trimmedPath))
+    }
+
+    for (const candidatePath of candidatePaths) {
+      if (existsSync(candidatePath)) {
+        return candidatePath
+      }
+    }
+
+    throw new Error(`找不到建联外部筛选脚本文件: ${trimmedPath}`)
+  }
+
+  private resolveOutreachMessage(payload?: OutreachFilterConfigInput): string {
+    return String(payload?.message ?? payload?.firstMessage ?? '').trim()
+  }
+
+  private buildOutreachChatRecipients(
+    payload: OutreachFilterConfigInput,
+    runtimeData: Record<string, unknown>
+  ): SellerChatbotRecipient[] {
+    const message = this.resolveOutreachMessage(payload)
+    if (!message) {
+      return []
+    }
+
+    const rawItems = runtimeData[CREATOR_MARKETPLACE_DATA_KEY]
+    if (!Array.isArray(rawItems)) {
+      return []
+    }
+
+    const recipients: SellerChatbotRecipient[] = []
+    const seenCreatorIds = new Set<string>()
+    for (const rawItem of rawItems) {
+      if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) {
+        continue
+      }
+      const item = rawItem as Record<string, unknown>
+      const creatorId = String(item.creator_id ?? item.platform_creator_id ?? '').trim()
+      if (!creatorId || seenCreatorIds.has(creatorId)) {
+        continue
+      }
+      recipients.push({
+        creatorId,
+        message
+      })
+      seenCreatorIds.add(creatorId)
+    }
+    return recipients
+  }
+
+  private async dispatchOutreachCreatorsToChatbot(
+    region: string,
+    payload: OutreachFilterConfigInput,
+    runtimeData: Record<string, unknown>
+  ): Promise<ChatbotSendResult[]> {
+    const message = this.resolveOutreachMessage(payload)
+    if (!message) {
+      this.logger.info('[outreach->chatbot] 建联任务未配置 message/firstMessage，跳过自动聊天')
+      return []
+    }
+
+    const recipients = this.buildOutreachChatRecipients(payload, runtimeData)
+    if (!recipients.length) {
+      this.logger.warn('[outreach->chatbot] 建联任务未采集到可发送聊天的达人，跳过自动聊天')
+      return []
+    }
+
+    this.logger.info(
+      `[outreach->chatbot] 建联任务准备移交聊天机器人: creators=${recipients.length} region=${region}`
+    )
+    return this.enqueueTask('chatbot', 'chatbot_from_outreach', async (runtime) =>
+      this.runChatbotPayload(runtime.taskRunner, runtime.payload.region, {
+        ...payload,
+        creatorId: recipients[0]?.creatorId ?? '',
+        message,
+        recipients
+      })
+    )
+  }
+
+  private mergeChatbotResultsIntoRuntimeData(
+    runtimeData: Record<string, unknown>,
+    chatbotResults: ChatbotSendResult[]
+  ): void {
+    const rawItems = runtimeData[CREATOR_MARKETPLACE_DATA_KEY]
+    if (!Array.isArray(rawItems)) {
+      return
+    }
+
+    const resultMap = new Map(chatbotResults.map((item) => [item.creatorId, item] as const))
+    for (const rawItem of rawItems) {
+      if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) {
+        continue
+      }
+      const item = rawItem as Record<string, unknown>
+      const creatorId = String(item.creator_id ?? item.platform_creator_id ?? '').trim()
+      const sendResult = creatorId ? resultMap.get(creatorId) : undefined
+      item.send = sendResult?.send ?? 0
+      if (sendResult?.sendTime) {
+        item.send_time = sendResult.sendTime
+      }
+    }
+  }
+
+  private resolveChatbotRecipients(payload: {
+    creatorId?: string
+    message?: string
+    recipients?: SellerChatbotRecipient[]
+  }): SellerChatbotRecipient[] {
+    const recipients = Array.isArray(payload.recipients)
+      ? payload.recipients
+          .map((item) => ({
+            creatorId: String(item.creatorId ?? '').trim(),
+            message: String(item.message ?? '').trim() || undefined
+          }))
+          .filter((item) => Boolean(item.creatorId))
+      : []
+
+    if (recipients.length) {
+      return recipients
+    }
+
+    const creatorId = String(payload.creatorId ?? '').trim()
+    if (!creatorId) {
+      return []
+    }
+
+    return [
+      {
+        creatorId,
+        message: String(payload.message ?? '').trim() || undefined
+      }
+    ]
   }
 
   private async runSampleManagementTask(
@@ -567,11 +722,77 @@ export class PlaywrightSimulationService {
     return result
   }
 
+  private async runChatbotPayload(
+    taskRunner: BrowserActionRunner,
+    region: string,
+    payload?: SellerChatbotPayloadInput
+  ): Promise<ChatbotSendResult[]> {
+    const chatbotPayload = mergeSellerChatbotPayload(payload)
+    const recipients = this.resolveChatbotRecipients(chatbotPayload)
+    if (!recipients.length) {
+      throw new Error('聊天机器人缺少 creatorId 或 recipients')
+    }
+
+    if (recipients.length === 1) {
+      const recipient = recipients[0]
+      return [
+        await this.runChatbotTask(taskRunner, region, {
+          ...chatbotPayload,
+          recipients: undefined,
+          creatorId: recipient.creatorId,
+          message: recipient.message ?? chatbotPayload.message
+        })
+      ]
+    }
+
+    const results: ChatbotSendResult[] = []
+    for (const recipient of recipients) {
+      const message = String(recipient.message ?? chatbotPayload.message).trim()
+      if (!message) {
+        results.push({
+          creatorId: recipient.creatorId,
+          creatorName: '',
+          message,
+          send: 0,
+          errorMessage: '聊天机器人缺少 message'
+        })
+        continue
+      }
+
+      try {
+        const result = await this.runChatbotTask(taskRunner, region, {
+          ...chatbotPayload,
+          recipients: undefined,
+          creatorId: recipient.creatorId,
+          message
+        })
+        results.push(result)
+      } catch (error) {
+        const errorMessage = (error as Error)?.message || String(error)
+        this.logger.error(
+          `[chatbot-batch] 聊天消息发送失败(Playwright): creator_id=${recipient.creatorId} error=${errorMessage}`
+        )
+        results.push({
+          creatorId: recipient.creatorId,
+          creatorName: '',
+          message,
+          send: 0,
+          errorMessage
+        })
+      }
+    }
+
+    if (results.every((item) => item.send !== 1)) {
+      throw new Error('聊天机器人批量任务全部失败')
+    }
+    return results
+  }
+
   private async runChatbotTask(
     taskRunner: BrowserActionRunner,
     region: string,
     payload?: SellerChatbotPayloadInput
-  ): Promise<void> {
+  ): Promise<ChatbotSendResult> {
     const chatbotPayload = mergeSellerChatbotPayload(payload)
     if (!chatbotPayload.creatorId) {
       throw new Error('聊天机器人缺少 creatorId')
@@ -625,6 +846,7 @@ export class PlaywrightSimulationService {
 
     let sendVerified = false
     let sendAttempts = 0
+    let sendTime: string | undefined
 
     for (let attempt = 1; attempt <= SELLER_CHATBOT_MAX_SEND_ATTEMPTS; attempt += 1) {
       sendAttempts = attempt
@@ -645,6 +867,7 @@ export class PlaywrightSimulationService {
 
       if (inputCount && inputCount !== '0' && inputCountAfter === '0') {
         sendVerified = true
+        sendTime = new Date().toISOString()
         this.logger.info(
           `[${taskData.taskId}] 聊天消息发送校验通过(Playwright): creator_id=${chatbotPayload.creatorId} attempt=${attempt} input_count=${inputCount} input_count_after=${inputCountAfter}`
         )
@@ -689,6 +912,13 @@ export class PlaywrightSimulationService {
     this.logger.info(
       `[${taskData.taskId}] 聊天机器人任务执行完成(Playwright): creator_id=${chatbotPayload.creatorId}${creatorName ? ` creator_name=${creatorName}` : ''} attempts=${sendAttempts} md=${sessionMarkdownPath}`
     )
+    return {
+      creatorId: chatbotPayload.creatorId,
+      creatorName,
+      message: chatbotPayload.message,
+      send: sendVerified ? 1 : 0,
+      sendTime
+    }
   }
 
   private async runCreatorDetailTask(

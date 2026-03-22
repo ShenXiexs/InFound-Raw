@@ -1,0 +1,83 @@
+{
+  "eventType": "RPA_TASK_READY",
+  "messageId": "11111111-1111-1111-1111-111111111111",
+  "userId": "replace-with-seller-user-id",
+  "taskId": "22222222-2222-2222-2222-222222222222",
+  "taskType": "OUTREACH",
+  "scheduledTime": "2026-03-22T09:00:00Z",
+  "expiresAt": "2099-12-31T23:59:59Z",
+  "payload": {
+    "executor": {
+      "host": "frontend.rpa.simulation",
+      "requiresSession": true
+    },
+    "task": {
+      "taskId": "22222222-2222-2222-2222-222222222222",
+      "taskType": "OUTREACH",
+      "taskName": "Seller Inbox Outreach Demo",
+      "shopId": "replace-with-shop-id",
+      "shopRegionCode": "MX"
+    },
+    "input": {
+      "session": {
+        "region": "MX",
+        "headless": false
+      },
+      "payload": {
+        "taskId": "22222222-2222-2222-2222-222222222222",
+        "shopId": "replace-with-shop-id",
+        "taskName": "Seller Inbox Outreach Demo",
+        "shopRegionCode": "MX",
+        "filterScriptPath": "../../../infound-data-collection/apps/portal_tiktok_shop_collection/data/outreach-filter-snapshots/outreach_filters_mx_mx_local_shop_20260319_212634.json",
+        "searchKeyword": "lipstick",
+        "messageSendStrategy": 1,
+        "message": "hola",
+        "firstMessage": "hola",
+        "secondMessage": "follow up",
+        "expectCount": 20,
+        "creatorFilters": {
+          "productCategorySelections": [
+            "Home Supplies",
+            "Beauty & Personal Care"
+          ],
+          "avgCommissionRate": "Less than 20%",
+          "contentType": "Video",
+          "creatorAgency": "Independent creators",
+          "spotlightCreator": true,
+          "fastGrowing": true,
+          "notInvitedInPast90Days": true
+        },
+        "followerFilters": {
+          "followerAgeSelections": [
+            "18 - 24",
+            "25 - 34"
+          ],
+          "followerGender": "Female",
+          "followerCountMin": "10000",
+          "followerCountMax": "200000"
+        },
+        "performanceFilters": {
+          "gmvSelections": [
+            "MX$100-MX$1K",
+            "MX$1K-MX$10K"
+          ],
+          "itemsSoldSelections": [
+            "10-100",
+            "100-1K"
+          ],
+          "averageViewsPerVideoMin": "1000",
+          "averageViewsPerVideoShoppableVideosOnly": true,
+          "averageViewersPerLiveMin": "300",
+          "averageViewersPerLiveShoppableLiveOnly": true,
+          "engagementRateMinPercent": "5",
+          "engagementRateShoppableVideosOnly": true,
+          "estPostRate": "Good",
+          "brandCollaborationSelections": [
+            "Maybelline New York",
+            "NYX Professional Makeup"
+          ]
+        }
+      }
+    }
+  }
+}

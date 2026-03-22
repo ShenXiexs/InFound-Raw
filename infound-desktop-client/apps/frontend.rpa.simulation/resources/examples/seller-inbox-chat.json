@@ -1,0 +1,36 @@
+{
+  "eventType": "RPA_TASK_READY",
+  "messageId": "33333333-3333-3333-3333-333333333333",
+  "userId": "replace-with-seller-user-id",
+  "taskId": "44444444-4444-4444-4444-444444444444",
+  "taskType": "CHAT",
+  "scheduledTime": "2026-03-22T09:05:00Z",
+  "expiresAt": "2099-12-31T23:59:59Z",
+  "payload": {
+    "executor": {
+      "host": "frontend.rpa.simulation",
+      "requiresSession": true
+    },
+    "task": {
+      "taskId": "44444444-4444-4444-4444-444444444444",
+      "taskType": "CHAT",
+      "taskName": "Seller Inbox Chat Demo",
+      "shopId": "replace-with-shop-id",
+      "shopRegionCode": "MX"
+    },
+    "input": {
+      "session": {
+        "region": "MX",
+        "headless": false
+      },
+      "payload": {
+        "taskId": "44444444-4444-4444-4444-444444444444",
+        "shopId": "replace-with-shop-id",
+        "taskName": "Seller Inbox Chat Demo",
+        "shopRegionCode": "MX",
+        "creatorId": "7493999107359083121",
+        "message": "hola"
+      }
+    }
+  }
+}
