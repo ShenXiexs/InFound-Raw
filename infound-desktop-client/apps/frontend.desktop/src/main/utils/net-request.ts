@@ -1,6 +1,7 @@
 import { IncomingMessage, net } from 'electron'
 import { logger } from './logger'
 import { AppConfig } from '@common/app-config'
+import { HTTP_HEADERS } from '@common/app-constants'
 import { CookieMap, parseSetCookie } from './set-cookie-parser'
 import { appStore } from '../modules/store/app-store'
 
@@ -59,8 +60,20 @@ export default class NetRequest {
         const headersWithCookie = {
           ...config.headers
         }
+
+        headersWithCookie[HTTP_HEADERS.DEVICE_TYPE] = 'desktop'
+
+        // 自动解析 xunda_token
         if (this._axiosApiCookie) {
+          //logger.info('Cookie: ' + this._axiosApiCookie)
           headersWithCookie['Cookie'] = this._axiosApiCookie
+          const cookieMap: CookieMap = parseSetCookie(this._axiosApiCookie, { map: true })
+          const tokenName = cookieMap['xunda_token_name']
+          const tokenValue = cookieMap['xunda_token_value']
+          if (tokenName && tokenValue) {
+            //logger.info('Token: ' + tokenName.value + '=' + tokenValue.value)
+            headersWithCookie[tokenName.value] = tokenValue.value
+          }
         }
 
         const finalConfig = this._interceptorHooks?.requestInterceptor?.({
@@ -69,16 +82,6 @@ export default class NetRequest {
         }) || {
           ...config,
           headers: headersWithCookie
-        }
-
-        // 自动解析 xunda_token
-        if (this._axiosApiCookie) {
-          const cookieMap: CookieMap = parseSetCookie(this._axiosApiCookie, { map: true })
-          const tokenName = cookieMap['xunda_token_name']
-          const tokenValue = cookieMap['xunda_token_value']
-          if (tokenName && tokenValue) {
-            finalConfig.headers![tokenName.value] = tokenValue.value
-          }
         }
 
         const request = net.request({
@@ -127,6 +130,7 @@ export default class NetRequest {
             if (setCookie) {
               this._axiosApiCookie = setCookie as string
               appStore.set('apiCookie', this._axiosApiCookie)
+              logger.info('Set-Cookie: ' + this._axiosApiCookie)
             }
 
             const netResponse: NetResponse<T> = {

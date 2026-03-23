@@ -13,6 +13,10 @@ import { AppController } from '../modules/ipc/app-controller'
 import { MonitorController } from '../modules/ipc/monitor-controller'
 import { TkShopController } from '../modules/ipc/tk-shop-controller'
 import { splashStatusMap } from '../windows/splash-window'
+import { AuthController } from '../modules/ipc/openapi/auth-controller'
+import { TabController } from '../modules/ipc/tab-controller'
+import { WebSocketController } from '../modules/ipc/web-socket-controller'
+import { RPAController } from '../modules/ipc/rpa-controller'
 
 export class AppAdapter {
   private static instance: AppAdapter
@@ -50,7 +54,11 @@ export class AppAdapter {
     IPCManager.register(new GlobalStateController())
     IPCManager.register(new AppController())
     IPCManager.register(MonitorController.getInstance())
+    IPCManager.register(new TabController())
+    IPCManager.register(new WebSocketController())
     IPCManager.register(new TkShopController())
+    IPCManager.register(new AuthController())
+    IPCManager.register(new RPAController())
     IPCManager.bootstrap()
 
     await appWindowsAndViewsManager.splashWindow.initWindow()

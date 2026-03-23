@@ -1,4 +1,4 @@
-import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
+import type { OutreachFilterConfigInput } from '@sim-common/types/rpa-outreach'
 import { CREATOR_MARKETPLACE_DATA_KEY, mergeOutreachFilterConfig } from '../outreach/support'
 
 interface RuntimeWindow {

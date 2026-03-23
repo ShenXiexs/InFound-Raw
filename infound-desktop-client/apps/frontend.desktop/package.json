@@ -1,10 +1,10 @@
 {
   "name": "xunda",
-  "version": "0.0.1",
+  "version": "1.0.1",
   "description": "TK达人营销增长引擎",
   "main": "./out/main/index.js",
-  "author": "INFound",
-  "homepage": "https://www.example.com",
+  "author": "xunda.club",
+  "homepage": "https://www.xunda.club",
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
@@ -13,13 +13,53 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
-    "dev": "chcp 65001 && electron-vite dev --mode dev",
+    "dev": "electron-vite dev --mode dev",
+    "dev:win": "chcp 65001 && electron-vite dev --mode dev",
     "build": "npm run typecheck && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
+    "build:stg:win": "npm run build:stg && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps && cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium"
+    "postinstall": "electron-builder install-app-deps && cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
+    "pack:dir": "electron-builder --dir",
+    "pack": "electron-builder",
+    "dist": "pnpm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.infound.desktop",
+    "productName": "Infound Desktop",
+    "artifactName": "${productName}-win32_x64-${version}-signed.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "node_modules/**/*",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/chrome-headless-shell-win64.zip",
+        "to": "browser/chrome-headless-shell.zip"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "license": "build/license.txt",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeader": "build/logo.bmp",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Infound Desktop"
+    }
   },
   "dependencies": {
     "@infound/desktop-shared": "workspace:*",

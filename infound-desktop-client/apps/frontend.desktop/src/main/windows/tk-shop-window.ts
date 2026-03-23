@@ -5,6 +5,7 @@ import { AppConfig } from '@common/app-config'
 import { is } from '@electron-toolkit/utils'
 import { TkShopSetting } from '@common/types/tk-type'
 import { TkTabItemManager } from './tk-tab-item-manager'
+import { getFilePath } from '../utils/path-helper'
 
 export class TkShopWindow {
   public baseWindow: BrowserWindow | null = null
@@ -37,7 +38,7 @@ export class TkShopWindow {
       minimizable: true,
       resizable: true,
       webPreferences: {
-        preload: path.join(AppConfig.DIR_NAME, '../preload/index.cjs'),
+        preload: path.join(getFilePath(), '../preload/index.cjs'),
         webSecurity: false,
         sandbox: false,
         devTools: !AppConfig.IS_PRO,
@@ -56,8 +57,11 @@ export class TkShopWindow {
       shopSetting.osWinAppId = uniqueAppId
     }
 
+    //todo: 有关是否真正的关闭？我认为应该真关，如果只是隐藏，正在执行的脚本和流文件依然占据内存，只要保证tab状态持久化，加载也不太影响用户体验
     this.baseWindow.on('close', (e) => {
       e.preventDefault()
+      this.tabItemManager!.saveTabItemSettings() //关闭时保存Tab页状态
+      this.tabItemManager!.closeTabItems()
       this.baseWindow?.hide()
     })
 
@@ -85,7 +89,7 @@ export class TkShopWindow {
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       await this.baseWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/tkshop.html`)
     } else {
-      await this.baseWindow.loadFile(path.join(AppConfig.DIR_NAME, '../renderer/tkshop.html'))
+      await this.baseWindow.loadFile(path.join(getFilePath(), '../renderer/tkshop.html'))
     }
 
     if (this.baseWindow.isVisible()) {

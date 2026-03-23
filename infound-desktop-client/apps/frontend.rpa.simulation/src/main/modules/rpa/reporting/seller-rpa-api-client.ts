@@ -1,4 +1,4 @@
-import type { SellerRpaReportConfigInput } from '@common/types/seller-rpa-report'
+import type { SellerRpaReportConfigInput } from '@sim-common/types/seller-rpa-report'
 
 interface LoggerLike {
   info(message: string, ...args: unknown[]): void

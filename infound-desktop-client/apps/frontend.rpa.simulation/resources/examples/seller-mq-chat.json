@@ -1,0 +1,21 @@
+{
+  "queue": "chat",
+  "session": {
+    "region": "MX",
+    "headless": false,
+    "loginStatePath": "../../参考文件_tk_MX_login_info.json"
+  },
+  "metadata": {
+    "messageId": "8B410246-CF45-11F0-AA98-2AA7A70856D4",
+    "source": "local-cli",
+    "parentTaskId": "8B4100E0-CF45-11F0-AA98-2AA7A70856D4"
+  },
+  "payload": {
+    "taskId": "8B410392-CF45-11F0-AA98-2AA7A70856D4",
+    "shopId": "replace-with-shop-id",
+    "taskName": "Internal MQ Chat Demo",
+    "shopRegionCode": "MX",
+    "creatorId": "7493999107359083121",
+    "message": "hola"
+  }
+}

@@ -10,7 +10,8 @@ export enum IPCGateway {
   MONITOR = 'gateway:monitor',
   TK = 'gateway:tk',
   RPA = 'gateway:rpa',
-  API = 'gateway:api'
+  API = 'gateway:api',
+  WS = 'gateway:ws'
 }
 
 export enum IPCType {

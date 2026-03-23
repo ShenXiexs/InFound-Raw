@@ -9,6 +9,8 @@ import { IPCGateway } from '../../main/modules/ipc/base/ipc-decorator'
 function getGatewayByChannel(channel: string): string {
   if (channel.startsWith('app-')) {
     return IPCGateway.APP
+  } else if (channel.startsWith('websocket-')) {
+    return IPCGateway.WS
   } else if (channel.startsWith('tk-')) {
     return IPCGateway.TK
   } else if (channel.startsWith('rpa-')) {

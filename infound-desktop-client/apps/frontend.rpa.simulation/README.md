@@ -11,24 +11,30 @@ An Electron application with Vue and TypeScript
 ### Install
 
 ```bash
-$ pnpm install
+$ npm install
 ```
 
 ### Development
 
 ```bash
-$ pnpm dev
+$ npm run dev
+```
+
+Windows only:
+
+```bash
+$ npm run dev:win
 ```
 
 ### Build
 
 ```bash
 # For windows
-$ pnpm build:win
+$ npm run build:win
 
 # For macOS
-$ pnpm build:mac
+$ npm run build:mac
 
 # For Linux
-$ pnpm build:linux
+$ npm run build:linux
 ```

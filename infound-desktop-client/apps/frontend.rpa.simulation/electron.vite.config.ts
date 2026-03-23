@@ -20,7 +20,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@main': resolve(__dirname, 'src/main'),
-        '@common': resolve(__dirname, 'src/common')
+        '@common': resolve(__dirname, 'src/common'),
+        '@sim-common': resolve(__dirname, 'src/common')
       }
     }
   },
@@ -38,7 +39,8 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@common': resolve(__dirname, 'src/common')
+        '@common': resolve(__dirname, 'src/common'),
+        '@sim-common': resolve(__dirname, 'src/common')
       }
     }
   },
@@ -46,6 +48,7 @@ export default defineConfig({
     resolve: {
       alias: {
         '@common': resolve(__dirname, 'src/common'),
+        '@sim-common': resolve(__dirname, 'src/common'),
         '@renderer': resolve('src/renderer/src')
       }
     },

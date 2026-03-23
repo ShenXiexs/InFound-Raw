@@ -11,5 +11,6 @@ export interface SellerRpaTaskContextInput {
   taskName?: string
   shopRegionCode?: string
   scheduledTime?: string
+  executionMode?: 'desktop_worker' | 'debug_simulation'
   report?: SellerRpaReportConfigInput
 }

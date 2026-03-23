@@ -81,6 +81,10 @@ export class AppConfig {
     readRuntimeEnv('VITE_SELLER_RPA_WS_ENABLED', 'SELLER_RPA_WS_ENABLED'),
     true
   )
+  public static readonly SELLER_RPA_DEBUG_INBOX_ENABLED: boolean = toBoolean(
+    readRuntimeEnv('VITE_SELLER_RPA_DEBUG_INBOX_ENABLED', 'SELLER_RPA_DEBUG_INBOX_ENABLED'),
+    false
+  )
   public static readonly SELLER_RPA_WS_BASE_URL: string = deriveSellerRpaWsBaseUrl()
   public static readonly SELLER_RPA_WS_AUTH_HEADER: string =
     readRuntimeEnv(

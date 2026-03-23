@@ -1,4 +1,4 @@
-import type { SampleManagementPayload, SampleManagementPayloadInput, SampleManagementTabKey } from '@common/types/rpa-sample-management'
+import type { SampleManagementPayload, SampleManagementPayloadInput, SampleManagementTabKey } from '@sim-common/types/rpa-sample-management'
 import { SAMPLE_MANAGEMENT_TAB_KEYS, TAB_CONFIG } from './config'
 
 const SAMPLE_MANAGEMENT_TAB_ALIASES = new Map<string, SampleManagementTabKey>([

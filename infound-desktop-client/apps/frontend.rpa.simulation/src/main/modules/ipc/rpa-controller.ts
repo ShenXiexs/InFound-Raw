@@ -20,7 +20,7 @@ import { IPCHandle, IPCType } from './base/ipc-decorator'
 const SELLER_LOGIN_URL = 'https://seller-mx.tiktok.com/'
 
 export class RPAController {
-  private getSimulationService(): PlaywrightSimulationService {
+  public getSimulationService(): PlaywrightSimulationService {
     return PlaywrightSimulationService.getInstance(logger)
   }
 

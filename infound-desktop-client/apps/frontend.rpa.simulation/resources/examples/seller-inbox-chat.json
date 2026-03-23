@@ -1,8 +1,8 @@
 {
   "eventType": "RPA_TASK_READY",
-  "messageId": "33333333-3333-3333-3333-333333333333",
+  "messageId": "8B40FCC6-CF45-11F0-AA98-2AA7A70856D4",
   "userId": "replace-with-seller-user-id",
-  "taskId": "44444444-4444-4444-4444-444444444444",
+  "taskId": "8B40FE10-CF45-11F0-AA98-2AA7A70856D4",
   "taskType": "CHAT",
   "scheduledTime": "2026-03-22T09:05:00Z",
   "expiresAt": "2099-12-31T23:59:59Z",
@@ -12,7 +12,7 @@
       "requiresSession": true
     },
     "task": {
-      "taskId": "44444444-4444-4444-4444-444444444444",
+      "taskId": "8B40FE10-CF45-11F0-AA98-2AA7A70856D4",
       "taskType": "CHAT",
       "taskName": "Seller Inbox Chat Demo",
       "shopId": "replace-with-shop-id",
@@ -21,10 +21,11 @@
     "input": {
       "session": {
         "region": "MX",
-        "headless": false
+        "headless": false,
+        "loginStatePath": "../../参考文件_tk_MX_login_info.json"
       },
       "payload": {
-        "taskId": "44444444-4444-4444-4444-444444444444",
+        "taskId": "8B40FE10-CF45-11F0-AA98-2AA7A70856D4",
         "shopId": "replace-with-shop-id",
         "taskName": "Seller Inbox Chat Demo",
         "shopRegionCode": "MX",

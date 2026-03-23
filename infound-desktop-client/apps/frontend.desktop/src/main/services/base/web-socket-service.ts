@@ -1,12 +1,55 @@
-import { BrowserWindow } from 'electron'
-import { Client } from '@stomp/stompjs' // 使用官方 STOMP 库
+import { Client, Message } from '@stomp/stompjs' // 使用官方 STOMP 库
 import WebSocket from 'ws'
 import { logger } from '../../utils/logger'
 import { CookieMap, parseSetCookie } from '../../utils/set-cookie-parser'
 import { AppConfig } from '@common/app-config'
 import { appStore } from '../../modules/store/app-store'
-import { WebSocketMessage } from '@infound/desktop-shared'
-import { IPC_CHANNELS } from '@common/types/ipc-type'
+import { HTTP_HEADERS } from '@common/app-constants'
+import { globalState } from '../../modules/state/global-state'
+import { taskWorkersManager } from '../../modules/rpa/task-workers-manager'
+import { TaskType } from '../task-service'
+
+type NotificationPayload = Record<string, unknown>
+
+const parseNotificationPayload = (body: string): NotificationPayload | undefined => {
+  const text = body.trim()
+  if (!text) {
+    return undefined
+  }
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as NotificationPayload
+    }
+  } catch {
+    /* non-json notification */
+  }
+  return undefined
+}
+
+const extractTaskType = (payload?: NotificationPayload): TaskType | undefined => {
+  if (!payload) {
+    return undefined
+  }
+
+  const candidates = [
+    payload.taskType,
+    payload.task_type,
+    (payload.data as NotificationPayload | undefined)?.taskType,
+    (payload.data as NotificationPayload | undefined)?.task_type,
+    (payload.payload as NotificationPayload | undefined)?.taskType,
+    (payload.payload as NotificationPayload | undefined)?.task_type
+  ]
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '').trim().toUpperCase()
+    if (Object.values(TaskType).includes(normalized as TaskType)) {
+      return normalized as TaskType
+    }
+  }
+
+  return undefined
+}
 
 // 消息类型定义
 export class WebSocketService {
@@ -45,7 +88,10 @@ export class WebSocketService {
     this.client = new Client({
       webSocketFactory: () => {
         const ws = new WebSocket(this.serverUrl, {
-          headers: { [tokenName.value]: tokenValue.value },
+          headers: {
+            [tokenName.value]: tokenValue.value,
+            [HTTP_HEADERS.DEVICE_TYPE]: 'client'
+          },
           rejectUnauthorized: true
         })
 
@@ -60,56 +106,33 @@ export class WebSocketService {
 
         return ws
       }, // 使用原生 WebSocket 实例
-      heartbeatIncoming: 10000,
+      heartbeatIncoming: 0,
       heartbeatOutgoing: 10000,
       connectHeaders: {}, // 无需额外参数，认证已通过 WebSocket headers 传递
       //debug: (str) => logger.info('STOMP debug:', str), // 开发环境调试
       onConnect: () => {
         this.connected = true
-        logger.info('WebSocket 连接成功')
+        logger.info('✅ STOMP 连接成功 - 代理已自动订阅用户专属队列')
 
-        // 订阅公共主题
-        this.client?.subscribe('/topic/notice', (msg) => {
-          logger.info('收到公共广播消息:', msg.body)
-          //this.sendToRenderer({ type: 'public', data: msg.body })
-        })
-
-        /*
-        // 订阅私人主题
-        this.client?.subscribe(
-          '/user/queue/notice',
-          async (msg): Promise<void> => {
-            logger.info('收到私有消息:', msg.body)
-            if (!msg.body) return
-            const message: { [key: string]: any } = JSON.parse(msg.body)
-            if (!message.messages || message.messages.length === 0) return
-
-            const firstMessageId = message.messages[0].id
-            const url = EMBED_BASE_URL + '/message.html#modal/' + firstMessageId
-            await appWindowsAndViewsManager.modalWindow.openWindow(url, 500, 350)
-          },
-          {
-            // STOMP 协议中控制 RabbitMQ 队列属性的常用 Headers
-            'auto-delete': 'true', //后一个消费者断开后自动删除队列
-            durable: 'false' // 队列不持久化，重启即消失，配合你的 transient_nonexcl 需求
-          }
-        )
-
-        /*
-        // 订阅私人主题
-        this.client?.subscribe(
-          '/user/queue/order',
-          (msg) => {
-            logger.info('收到订单消息:', msg.body)
-            const order: { [key: string]: any } = JSON.parse(msg.body)
-            this.sendOrderResultRenderer({ type: 'order', data: order })
-          },
-          {
-            // STOMP 协议中控制 RabbitMQ 队列属性的常用 Headers
-            'auto-delete': 'true', // 最后一个消费者断开后自动删除队列
-            durable: 'false' // 队列不持久化，重启即消失，配合你的 transient_nonexcl 需求
-          }
-        )*/
+        const userId = globalState.currentState.currentUser?.userId
+        if (userId) {
+          this.client?.subscribe(
+            `/exchange/xunda.topic/user.notification.${userId}`,
+            (message: Message) => {
+              logger.info('📨 收到用户专属通知:', message.body)
+              void this.handleNotificationMessage(message.body)
+            },
+            {
+              ack: 'auto',
+              durable: 'true', // ✅ 队列持久化
+              'auto-delete': 'false', // ✅ 不自动删除
+              'x-declare': JSON.stringify({
+                durable: true,
+                autoDelete: false
+              })
+            }
+          )
+        }
 
         return true
       },
@@ -143,66 +166,18 @@ export class WebSocketService {
     return this.connected
   }
 
-  /*public registerModule(): void {
-    ipcManager.registerAsync(IPCChannel.WEBSOCKET_SEND, async (message: WebSocketMessage) => {
-      if (!this.connected) throw new Error('未连接')
-      if (!this.client || !this.connected) {
-        throw new Error('未连接到服务端')
-      }
-      try {
-        logger.info('发送消息:', message)
-        this.client.publish({
-          destination: '/app/message', // 与后端 @MessageMapping 对应
-          body: JSON.stringify(message)
-        })
-        return { success: true }
-      } catch (error) {
-        logger.error('发送消息失败:', error)
-        throw new Error('发送消息失败')
-      }
-    })
-
-    ipcManager.registerAsync(IPCChannel.WEBSOCKET_TEST, async (message: WebSocketMessage) => {
-      if (!this.connected) throw new Error('未连接')
-      if (!this.client || !this.connected) {
-        throw new Error('未连接到服务端')
-      }
-      try {
-        logger.info('发送消息:', message)
-        this.client.publish({
-          destination: '/app/test-message', // 与后端 @MessageMapping 对应
-          body: JSON.stringify(message)
-        })
-        return { success: true }
-      } catch (error) {
-        logger.error('发送消息失败:', error)
-        throw new Error('发送消息失败')
-      }
-    })
-
-    ipcManager.registerAsync(IPCChannel.WEBSOCKET_CONNECT, async () => {
-      logger.info('开始连接 WebSocket')
-      await this.connect()
-    })
-
-    ipcManager.registerAsync(IPCChannel.WEBSOCKET_DISCONNECT, async () => {
-      logger.info('开始断开 WebSocket')
-      await this.disconnect()
-    })
-  }*/
-
-  private sendToRenderer(message: WebSocketMessage): void {
-    logger.info('发送到渲染进程:', message)
-    const mainWindow = BrowserWindow.getFocusedWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send(IPC_CHANNELS.RENDERER_MONITOR_WEBSOCKET_RECEIVE, message)
+  private async handleNotificationMessage(body: string): Promise<void> {
+    const payload = parseNotificationPayload(body)
+    const taskType = extractTaskType(payload)
+    if (taskType) {
+      logger.info(`任务通知命中 taskType=${taskType}，唤醒对应 worker`)
+      await taskWorkersManager.wakeUp(taskType)
+      return
     }
-  }
 
-  /*private sendOrderResultRenderer(message: WebSocketMessage): void {
-    logger.info('发送到渲染进程:', message)
-    appWindowsAndViewsManager.embedWebContentView.broadcastOrderResultToView(message)
-  }*/
+    logger.info('任务通知未包含可识别 taskType，唤醒全部 worker')
+    await taskWorkersManager.wakeUp()
+  }
 }
 
 export const webSocketService = new WebSocketService()

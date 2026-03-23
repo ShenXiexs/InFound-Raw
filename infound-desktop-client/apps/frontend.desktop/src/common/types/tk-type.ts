@@ -1,5 +1,3 @@
-import { WebContentsView } from 'electron'
-
 export interface TkShopSetting {
   id: string
   name: string
@@ -12,11 +10,9 @@ export interface TkShopSetting {
 }
 
 export interface TkShopTabItemSetting {
-  id: string
-  type: 'tk' | 'xunda'
-  name: string
+  id: string //todo:这个需要持久化吗？我觉得也不用吧...待定
+  type: string //TAB_TYPES.XUNDA or TAB_TYPES.TIKTOK
   url: string
-  icon: string
   focused: boolean
   enabled: boolean
 }
@@ -25,10 +21,4 @@ export enum PageLoadStatus {
   Loading = 'Loading',
   TargetPage = 'TargetPage',
   ErrorPage = 'ErrorPage'
-}
-
-export interface TkShopTabItemView {
-  targetUrl: string
-  webContentsView: WebContentsView
-  pageLoadStatus: PageLoadStatus
 }

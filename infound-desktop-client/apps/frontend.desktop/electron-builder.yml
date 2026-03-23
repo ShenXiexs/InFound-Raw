@@ -1,29 +1,57 @@
 appId: if.xunda.desktop
-productName: xunda
+productName: XunDa
+copyright: Copyright © 2026 寻达（XunDa）
 directories:
-  buildResources: build
+  output: dist/${version}
+  buildResources: build-dist
 files:
+  - 'out/**/*'  # 确保包含构建输出目录
+  - 'package.json'
   - '!**/.vscode/*'
   - '!src/*'
+  - '!dist/*'
+  - '!logs/*'
+  - '!src/renderer/src/assets/bak/*'
+  - '!node_modules/@electron-toolkit/eslint*'                         # 排除 ESLint 配置相关
+  - '!node_modules/{eslint,prettier,typescript}/**'                   # 核心开发工具链
+  - '!node_modules/@vitejs/**'                                        # Vite 构建工具
+  - '!node_modules/unplugin*/**'                                      # 自动导入插件
+  - '!node_modules/vue-tsc/**'                                        # Vue 类型检查器
+  - '!node_modules/sass/**'                                           # CSS 预处理器
+  - '!node_modules/**/{*.md,*.ts,*.map,test,tests,__tests__}'
+  - '!node_modules/@swiftmychat/desktop-shared/**/src/**'             # 排除源码
+  - 'node_modules/@swiftmychat/desktop-shared/**'                     # 保留编译后的文件
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{tsconfig.base.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
-  - resources/**
-  - "**/chromium/**/*"
-build:
-  extraResources:
-    - from: "node_modules/playwright-core/.local-browsers/chromium-*"
-      to: "chromium"
-      filter: [ "**/*" ]
+  # - resources/**
+  - '**/chromium/**/*'
+  - '!node_modules/@types/**'
+extraResources:
+  - from: ./resources/
+    to: ./
+    filter:
+      - '!**/bak/**'
+  - from: 'node_modules/playwright-core/.local-browsers/chromium-*'
+    to: 'chromium'
+    filter: [ '**/*' ]
+electronLanguages:
+  - zh-CN
+  - zh-TW
+  - en-US
 win:
-  executableName: infound
+  icon: ./resources/icon.png
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  oneClick: false
+  runAfterFinish: true
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -33,19 +61,23 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
 linux:
   target:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: xunda.club
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
+npmArgs:
+  - --omit=dev
 npmRebuild: false
 publish:
   provider: generic
-  url: https://example.com/auto-updates
+  url: https://download.xunda.club/
 electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/
+  mirror: https://mirrors.huaweicloud.com/electron/
+releaseInfo:
+  releaseNotesFile: release-notes.md

@@ -1,5 +1,5 @@
-import type { SampleManagementTabKey } from '@common/types/rpa-sample-management'
-export type { SampleManagementTabKey } from '@common/types/rpa-sample-management'
+import type { SampleManagementTabKey } from '@sim-common/types/rpa-sample-management'
+export type { SampleManagementTabKey } from '@sim-common/types/rpa-sample-management'
 
 export interface SampleManagementRow {
   crawl_time: string

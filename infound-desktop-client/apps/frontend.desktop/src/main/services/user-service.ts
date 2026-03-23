@@ -1,13 +1,43 @@
 import { AuthenticationException } from '../modules/exception/exception-types'
-import { LoginTokenResponse, loginByPassword } from './api/auth-api'
 import { BaseApiResponse } from '../utils/net-request'
-import { checkTokenApi, getCurrentUserApi } from './api/user-api'
-import { UserInfoResponse } from './dtos/user-info'
+import openapiRequest from './base/open-api-service'
+import { API_ENDPOINTS } from './endpoints'
+
+export interface UserInfoResponse {
+  userId: string
+  username: string
+  nickname?: string
+  avatar?: string
+  email?: string
+  phoneNumber?: string
+  enableDebug?: boolean
+  permission: PermissionSetting
+  updateTime?: number
+  inviteCode?: string
+  menuItemCount?: number
+}
+
+export interface PermissionSetting {
+  availableCount?: number
+  availableStartDate?: string
+  availableEndDate?: string
+  enableDebug: boolean
+  startTime?: string
+  endTime?: string
+  maxTabs?: number
+}
 
 export interface LoginResult {
   loginId: string
   tokenName: string
   tokenValue: string
+}
+
+export interface LoginTokenResponse {
+  success?: boolean
+  jti?: string
+  header?: string
+  token?: string
 }
 
 const isLoginSuccess = (result: any): boolean => {
@@ -48,7 +78,7 @@ export async function loginAsync(mobile: string, password: string): Promise<Logi
     password: normalizedPassword
   }
 
-  const result = await loginByPassword(loginPayload)
+  const result = await openapiRequest.post<BaseApiResponse<LoginTokenResponse>>(API_ENDPOINTS.auth.login, loginPayload)
 
   if (isLoginSuccess(result)) {
     const loginData = (result.data || {}) as LoginTokenResponse
@@ -67,9 +97,9 @@ export async function loginAsync(mobile: string, password: string): Promise<Logi
 }
 
 export async function getCurrentUserAsync(): Promise<BaseApiResponse<UserInfoResponse>> {
-  return await getCurrentUserApi()
+  return await openapiRequest.get<BaseApiResponse<UserInfoResponse>>(API_ENDPOINTS.user.current)
 }
 
 export async function checkTokenAsync(): Promise<BaseApiResponse<Record<string, any>>> {
-  return await checkTokenApi()
+  return await openapiRequest.get<BaseApiResponse<Record<string, any>>>(API_ENDPOINTS.user.checkToken)
 }

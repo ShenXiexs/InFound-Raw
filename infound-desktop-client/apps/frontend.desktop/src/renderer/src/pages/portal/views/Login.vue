@@ -1,39 +1,42 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { FormInst, FormRules } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { rendererStore } from '@renderer/store/renderer-store'
 import { resolveResourceAssetUrl } from '@renderer/utils/asset-url'
+import { REGEX } from '@common/app-constants'
+import { AppConfig } from '@common/app-config'
 
 interface LoginForm {
   username: string
   password: string
 }
 
-const PHONE_REGEX = /^\d{6,20}$/
-
-const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const isSubmitting = ref(false)
-const SIGNUP_URL = 'https://www.example.com/signup'
+const showAlert = ref(false)
+const alertMessage = ref('')
+const signUpUrl = AppConfig.OFFICIAL_WEBSITE_BASE_URL + '/signup'
 
 const formValue = ref<LoginForm>({
   username: '',
   password: ''
 })
-
+const onlyAllowNumber = (value: string): boolean => !value || REGEX.NUMBER.test(value)
 const rules = computed<FormRules>(() => ({
   username: [
     {
       required: true,
+      len: 11,
+      message: '请输入正确的手机号',
       validator: () => {
         const username = formValue.value.username.trim()
         if (!username) return new Error('请输入手机号')
-        if (!PHONE_REGEX.test(username)) return new Error('请输入正确的手机号')
+        if (!REGEX.PHONE.test(username)) return new Error('请输入正确的手机号')
         return true
       },
       trigger: ['input', 'blur']
@@ -43,6 +46,17 @@ const rules = computed<FormRules>(() => ({
     {
       required: true,
       message: '请输入密码',
+      validator: () => {
+        // 密码长度范围 8 ~ 16，字母、数字、特殊符号 三选二，不允许中间有空格
+        const password = formValue.value.password.trim()
+        if (!password) return new Error('请输入密码')
+        // 明确检查长度范围
+        if (password.length < 8 || password.length > 16) {
+          return new Error('密码长度必须在 8 到 16 位之间')
+        }
+        //if (!REGEX.PASSWORD.test(password)) return new Error('密码长度范围 8 ~ 16，字母、数字、特殊符号 三选二，不允许中间有空格')
+        return true
+      },
       trigger: ['input', 'blur']
     }
   ]
@@ -56,16 +70,12 @@ const logo = computed(() => {
   return resolveResourceAssetUrl(rendererStore.currentState.appSetting.resourcesPath, 'logo.png')
 })
 
-onMounted(() => {
-  if (route.query.needLogin === '1') {
-    message.warning('请先登录')
-  }
-})
-
 const onSubmit = async (): Promise<void> => {
   if (!canSubmit.value || isSubmitting.value) return
 
   try {
+    showAlert.value = false
+    alertMessage.value = ''
     await formRef.value?.validate()
   } catch {
     return
@@ -76,9 +86,10 @@ const onSubmit = async (): Promise<void> => {
   const password = formValue.value.password.trim()
 
   try {
-    const result = await window.ipc.invoke(IPC_CHANNELS.APP_AUTH_LOGIN, username, password)
+    const result = await window.ipc.invoke(IPC_CHANNELS.API_AUTH_LOGIN, username, password)
     if (!result.success) {
-      message.error(result.error || '登录失败，请稍后重试')
+      showAlert.value = true
+      alertMessage.value = result.error || '登录失败，请稍后重试'
       return
     }
 
@@ -91,7 +102,8 @@ const onSubmit = async (): Promise<void> => {
 
     const token = rendererStore.currentState.currentUser?.tokenValue?.trim()
     if (!rendererStore.currentState.isLogin || !token) {
-      message.error('登录状态同步失败，请重试')
+      showAlert.value = true
+      alertMessage.value = '登录状态同步失败，请重试'
       return
     }
 
@@ -99,20 +111,27 @@ const onSubmit = async (): Promise<void> => {
     await router.replace('/')
   } catch (error) {
     window.logger.error('登录失败', error)
-    message.error('登录失败，请稍后重试')
+    showAlert.value = true
+    alertMessage.value = '登录失败，请稍后重试'
   } finally {
     isSubmitting.value = false
   }
 }
 
 const onSignup = (): void => {
-  window.ipc.send(IPC_CHANNELS.APP_OPEN_EXTERNAL_LINK, SIGNUP_URL)
+  window.ipc.send(IPC_CHANNELS.APP_OPEN_EXTERNAL_LINK, signUpUrl)
 }
+
+/*onMounted(() => {
+  if (route.query.needLogin === '1') {
+    message.warning('请先登录')
+  }
+})*/
 </script>
 
 <template>
   <div class="login-page">
-    <n-card class="login-card" :bordered="false">
+    <n-card :bordered="false" class="login-card">
       <template #header>
         <div class="header-block">
           <img :src="logo" alt="Xunda" class="brand-logo" />
@@ -120,30 +139,30 @@ const onSignup = (): void => {
       </template>
 
       <n-form ref="formRef" :model="formValue" :rules="rules" class="auth-form">
-        <n-form-item path="username" :show-label="false">
+        <n-form-item :show-label="false" path="username">
           <div class="input-shell">
             <div class="prefix">中国大陆 +86</div>
-            <n-input v-model:value="formValue.username" :bordered="false" placeholder="请输入您的手机号" class="input-core" />
+            <n-input v-model:value="formValue.username" :allow-input="onlyAllowNumber" :bordered="false" class="input-core" placeholder="请输入您的手机号" />
           </div>
         </n-form-item>
 
-        <n-form-item path="password" :show-label="false">
+        <n-form-item :show-label="false" path="password">
           <div class="input-shell">
             <n-input
               v-model:value="formValue.password"
-              type="password"
               :bordered="false"
-              show-password-on="click"
-              placeholder="请输入账号密码"
               class="input-core"
+              placeholder="请输入账号密码"
+              show-password-on="click"
+              type="password"
               @keydown.enter="onSubmit"
             />
           </div>
         </n-form-item>
-
-        <n-button type="primary" block size="large" :disabled="!canSubmit || isSubmitting" :loading="isSubmitting" @click="onSubmit">
-          立即登录
-        </n-button>
+        <n-space :size="[0, 20]" vertical>
+          <n-alert v-if="showAlert" type="warning">{{ alertMessage }}</n-alert>
+          <n-button :disabled="!canSubmit || isSubmitting" :loading="isSubmitting" block size="large" type="primary" @click="onSubmit">立即登录</n-button>
+        </n-space>
       </n-form>
 
       <template #footer>
@@ -164,26 +183,31 @@ const onSignup = (): void => {
   padding: 24px;
   box-sizing: border-box;
   background:
-    radial-gradient(circle at 15% 10%, #eaf5ff 0, #eaf5ff 24%, transparent 45%),
-    radial-gradient(circle at 85% 90%, #f3f6ff 0, #f3f6ff 20%, transparent 44%),
+    radial-gradient(circle at 15% 10%, #eaf5ff 0, #eaf5ff 24%, transparent 45%), radial-gradient(circle at 85% 90%, #f3f6ff 0, #f3f6ff 20%, transparent 44%),
     linear-gradient(135deg, #f8fbff 0%, #ffffff 42%, #f5f8ff 100%);
 }
 
 .login-card {
   width: min(440px, 92vw);
+  height: 600px;
   border-radius: 16px;
   box-shadow: 0 14px 36px rgba(14, 34, 70, 0.08);
 }
 
 .header-block {
+  margin: 0;
+  padding: 0;
   text-align: center;
 }
 
 .brand-logo {
-  width: min(200px, 80vw);
+  width: clamp(176px, 40vw, 240px);
   height: auto;
-  aspect-ratio: 813 / 328;
+  aspect-ratio: 1 / 1;
   object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .auth-form {
@@ -203,12 +227,14 @@ const onSignup = (): void => {
   display: flex;
   align-items: stretch;
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .input-shell:focus-within {
-  border-color: #18a058;
-  box-shadow: 0 0 0 2px rgba(24, 160, 88, 0.15);
+  border-color: #8142f6;
+  box-shadow: 0 0 0 2px rgba(129, 66, 246, 0.18);
 }
 
 .prefix {

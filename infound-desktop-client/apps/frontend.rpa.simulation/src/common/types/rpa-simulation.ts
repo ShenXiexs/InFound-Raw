@@ -1,7 +1,22 @@
+export interface LoginStateCookieInput {
+  name: string
+  value: string
+  domain?: string
+  hostOnly?: boolean
+  path?: string
+  secure?: boolean
+  httpOnly?: boolean
+  session?: boolean
+  expirationDate?: number
+  sameSite?: string
+}
+
 export interface PlaywrightSimulationPayloadInput {
   region?: string
   headless?: boolean
   storageStatePath?: string
+  loginState?: LoginStateCookieInput[]
+  loginStatePath?: string
 }
 
 export interface PlaywrightSimulationPayload {
@@ -9,6 +24,8 @@ export interface PlaywrightSimulationPayload {
   headless: boolean
   storageStatePath: string
   useStorageState: boolean
+  loginState: LoginStateCookieInput[]
+  useLoginState: boolean
 }
 
 export const isPlaywrightSimulationPayloadInput = (
@@ -19,5 +36,11 @@ export const isPlaywrightSimulationPayloadInput = (
   }
 
   const candidate = value as Record<string, unknown>
-  return 'region' in candidate || 'headless' in candidate || 'storageStatePath' in candidate
+  return (
+    'region' in candidate ||
+    'headless' in candidate ||
+    'storageStatePath' in candidate ||
+    'loginState' in candidate ||
+    'loginStatePath' in candidate
+  )
 }

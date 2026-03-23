@@ -12,7 +12,7 @@ import type {
   PerformanceFilterConfig,
   PerformanceGmvOption,
   PerformanceItemsSoldOption
-} from '@common/types/rpa-outreach'
+} from '@sim-common/types/rpa-outreach'
 import type { BrowserAction } from '../task-dsl/browser-actions'
 
 // This file is the frontend DSL implementation for MX outreach filters, aligned with

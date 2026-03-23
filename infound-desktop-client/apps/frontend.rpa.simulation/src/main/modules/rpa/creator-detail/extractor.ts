@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { SellerCreatorDetailData } from '@common/types/rpa-creator-detail'
+import type { SellerCreatorDetailData } from '@sim-common/types/rpa-creator-detail'
 
 const buildLocalTimestamp = (): string => {
   const now = new Date()

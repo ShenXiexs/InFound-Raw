@@ -12,9 +12,8 @@
     "composite": true,
     "types": ["electron-vite/node"],
     "paths": {
-      "@common/*": [
-        "src/common/*"
-      ]
+      "@common/*": ["src/common/*"],
+      "@sim-common/*": ["src/common/*"]
     },
     "module": "ESNext",
     "target": "ESNext",

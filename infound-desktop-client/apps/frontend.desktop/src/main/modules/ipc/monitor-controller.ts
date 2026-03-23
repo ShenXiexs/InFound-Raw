@@ -33,4 +33,14 @@ export class MonitorController {
   syncTkShopAllTabItemSettings(_webContents: WebContents, _payload: Record<string, TkShopTabItemSetting>): void {
     // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑
   }
+
+  @IPCHandle(IPCGateway.MONITOR, IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED, IPCType.ON)
+  syncTabsUpdated(_webContents: WebContents, _payload: { activeId: string; tabs: any[] }): void {
+    // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑
+  }
+
+  @IPCHandle(IPCGateway.MONITOR, IPC_CHANNELS.RENDERER_MONITOR_TABS_NAVIGATION_STATE, IPCType.ON)
+  syncTabsNavigationState(_webContents: WebContents, _payload: { canGoBack: boolean; canGoForward: boolean }): void {
+    // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑
+  }
 }

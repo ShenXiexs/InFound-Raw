@@ -2,10 +2,12 @@ import { app, BrowserWindow, WebContentsView } from 'electron'
 import { join } from 'path'
 import { AppConfig } from '@common/app-config'
 import { resetWCVSize, resetWCVSizeToZero } from '../utils/mcv-helper'
+import { logger } from '../utils/logger'
 
 export class TransitionWcv {
   public transitionWcv: WebContentsView | null = null
   private readonly baseWindow: BrowserWindow | null = null
+  private isVisible: boolean = false
 
   constructor(baseWindow: BrowserWindow) {
     this.baseWindow = baseWindow
@@ -49,24 +51,35 @@ export class TransitionWcv {
   }
 
   public showTransitionLoadingWCV(): void {
-    if (this.transitionWcv) {
-      this.baseWindow!.contentView.addChildView(this.transitionWcv)
-      resetWCVSize(this.baseWindow!, this.transitionWcv)
+    if (this.transitionWcv && this.baseWindow && !this.isVisible) {
+      if (!this.baseWindow.contentView.children.includes(this.transitionWcv)) {
+        this.baseWindow!.contentView.addChildView(this.transitionWcv)
+        resetWCVSize(this.baseWindow!, this.transitionWcv)
+        this.isVisible = true
+        logger.info('showTransitionLoadingWCV: added')
+      }
     }
   }
 
   public displayTransitionLoadingWCV(): void {
-    if (this.transitionWcv && this.baseWindow) {
-      //resetWCVSizeToZero(this.transitionWcv)
+    //added by Phoenix：hide loading window
+    if (this.transitionWcv && this.baseWindow && this.isVisible) {
+      logger.info('Removing transitionWcv, current children:', this.baseWindow.contentView.children.length)
+      this.baseWindow.contentView.removeChildView(this.transitionWcv)
+      resetWCVSizeToZero(this.transitionWcv)
+      this.isVisible = false
+      logger.info('After removal, children:', this.baseWindow.contentView.children.length)
     }
   }
 
   public closeTransitionWCV(): void {
     if (this.transitionWcv && this.baseWindow) {
+      this.displayTransitionLoadingWCV() // 先隐藏
       resetWCVSizeToZero(this.transitionWcv)
       this.transitionWcv.webContents.close()
       this.baseWindow.contentView.removeChildView(this.transitionWcv)
       this.transitionWcv = null
+      logger.info('closeTransitionWCV: destroyed')
     }
   }
 

@@ -41,6 +41,7 @@ export class RendererStore {
       // 2. 明确的初始化方法
       async initSync() {
         const result = await window.ipc.invoke(IPC_CHANNELS.APP_GLOBAL_STATE_GET_ALL)
+        window.logger.info(`Renderer state synced: ${JSON.stringify(result.data)}`)
         if (result.success) {
           this.$patch(result.data) // 使用 $patch 批量更新
           this.isReady = true

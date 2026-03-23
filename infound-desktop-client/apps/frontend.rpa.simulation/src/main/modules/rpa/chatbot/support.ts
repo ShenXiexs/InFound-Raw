@@ -4,7 +4,7 @@ import type {
   SellerChatbotPayload,
   SellerChatbotPayloadInput,
   SellerChatbotRecipient
-} from '@common/types/rpa-chatbot'
+} from '@sim-common/types/rpa-chatbot'
 import type { BrowserAction } from '../task-dsl/browser-actions'
 
 export const SELLER_CHATBOT_INPUT_SELECTOR =

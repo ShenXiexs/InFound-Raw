@@ -12,9 +12,9 @@
     "composite": true,
     "types": ["electron-vite/node"],
     "paths": {
-      "@common/*": [
-        "src/common/*"
-      ]
+      "@common/*": ["src/common/*"],
+      "@sim-common/*": ["../frontend.rpa.simulation/src/common/*"],
+      "@sim-rpa/*": ["../frontend.rpa.simulation/src/main/modules/rpa/*"]
     },
     "module": "ESNext",
     "target": "ESNext",

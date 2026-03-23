@@ -34,7 +34,7 @@ const loginRPA = (): void => {
 }
 
 const startRPASimulation = (): void => {
-  window.logger.info('开始启动 RPA 模拟会话')
+  window.logger.info('开始启动 RPA 调试会话')
   window.ipc.send(IPC_CHANNELS.RPA_EXECUTE_SIMULATION)
 }
 </script>
@@ -46,7 +46,7 @@ const startRPASimulation = (): void => {
       <n-layout>
         <n-layout-header class="header">
           <div class="header-left">
-            <span class="header-title">寻达 RPA 模拟器</span>
+            <span class="header-title">寻达 RPA 调试器</span>
           </div>
           <div class="header-right">
             <n-button :focusable="false" circle quaternary @click="onOpenDevTools">
@@ -90,10 +90,14 @@ const startRPASimulation = (): void => {
         <n-layout-content>
           <n-flex vertical style="padding: 20px; gap: 16px">
             <n-button @click="loginRPA">登录店铺</n-button>
-            <n-button type="primary" @click="startRPASimulation">启动RPA模拟</n-button>
-            <n-alert type="info" title="当前执行模型">
-              登录店铺只负责准备登录态。启动RPA模拟只会启动一个 Playwright 会话并停留在 affiliate 首页待命，不会自动执行任何机器人。
-              如果没有 storage-state，Playwright 会直接打开登录页等待手动操作。会话启动后，再通过特定任务指令投送建联、样品管理、聊天机器人或达人详情。
+            <n-button type="primary" @click="startRPASimulation">启动调试会话</n-button>
+            <n-alert type="info" title="当前定位">
+              <code>frontend.desktop</code> 才是 seller RPA 的正式宿主。这里仅保留 Playwright 执行引擎与本地调试能力。
+              启动调试会话只会拉起一组待命运行时，不代表正式任务入口。
+            </n-alert>
+            <n-alert type="warning" title="登录态说明">
+              正式任务优先使用 <code>input.session.loginState</code> 注入登录态；本地调试仍可使用
+              <code>loginStatePath</code> 或手动登录。默认区域仍为 MX。
             </n-alert>
           </n-flex>
         </n-layout-content>

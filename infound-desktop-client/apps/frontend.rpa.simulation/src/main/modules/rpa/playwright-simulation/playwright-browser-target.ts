@@ -10,6 +10,34 @@ const normalizeText = (value: string, caseSensitive: boolean): string => {
   return caseSensitive ? text : text.toLowerCase()
 }
 
+const NUMBER_SUFFIX_MULTIPLIER: Record<string, number> = {
+  k: 1_000,
+  m: 1_000_000,
+  b: 1_000_000_000
+}
+
+const expandNumericSuffixes = (value: string): string =>
+  value.replace(/(\d+(?:\.\d+)?)\s*([kmb])/gi, (_match, numericPart: string, suffix: string) => {
+    const multiplier = NUMBER_SUFFIX_MULTIPLIER[suffix.toLowerCase()]
+    const numericValue = Number.parseFloat(numericPart)
+    if (!multiplier || !Number.isFinite(numericValue)) {
+      return `${numericPart}${suffix}`
+    }
+    return String(Math.round(numericValue * multiplier))
+  })
+
+const normalizeComparableText = (value: string, caseSensitive: boolean): string => {
+  const text = normalizeText(value, caseSensitive)
+  return expandNumericSuffixes(text)
+    .replace(/mx\$/gi, '')
+    .replace(/\$/g, '')
+    .replace(/,/g, '')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s*\+\s*/g, '+')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export class PlaywrightBrowserActionTarget implements BrowserActionTarget {
   constructor(
     private readonly page: Page,
@@ -108,7 +136,12 @@ export class PlaywrightBrowserActionTarget implements BrowserActionTarget {
         const currentText = await current.innerText().catch(async () => String((await current.textContent().catch(() => '')) || ''))
         const normalizedCurrent = normalizeText(currentText, caseSensitive)
         const normalizedExpected = normalizeText(expected, caseSensitive)
-        const matched = exact ? normalizedCurrent === normalizedExpected : normalizedCurrent.includes(normalizedExpected)
+        const comparableCurrent = normalizeComparableText(currentText, caseSensitive)
+        const comparableExpected = normalizeComparableText(expected, caseSensitive)
+        const matched = exact
+          ? normalizedCurrent === normalizedExpected || comparableCurrent === comparableExpected
+          : normalizedCurrent.includes(normalizedExpected) ||
+            comparableCurrent.includes(comparableExpected)
         if (!matched) continue
 
         await current.scrollIntoViewIfNeeded().catch(() => {})

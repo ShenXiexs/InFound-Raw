@@ -4,6 +4,7 @@ import { is } from '@electron-toolkit/utils'
 import { AppConfig } from '@common/app-config'
 import { appWindowsAndViewsManager } from './app-windows-and-views-manager'
 import { globalState } from '../modules/state/global-state'
+import { getFilePath } from '../utils/path-helper'
 
 export class MainWindow {
   public baseWindow: BrowserWindow | null = null
@@ -39,7 +40,7 @@ export class MainWindow {
       minimizable: true,
       resizable: true,
       webPreferences: {
-        preload: path.join(AppConfig.DIR_NAME, '../preload/index.cjs'),
+        preload: path.join(getFilePath(), '../preload/index.cjs'),
         webSecurity: false,
         sandbox: false,
         devTools: !AppConfig.IS_PRO,
@@ -73,7 +74,7 @@ export class MainWindow {
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       await this.baseWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
     } else {
-      await this.baseWindow.loadFile(path.join(AppConfig.DIR_NAME, '../renderer/index.html'))
+      await this.baseWindow.loadFile(path.join(getFilePath(), '../renderer/index.html'))
     }
 
     if (this.baseWindow.isVisible()) {

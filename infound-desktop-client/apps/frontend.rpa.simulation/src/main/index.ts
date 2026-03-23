@@ -4,8 +4,10 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { AppConfig } from '@common/app-config'
 import type { SellerChatbotPayloadInput } from '@common/types/rpa-chatbot'
 import type { SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
+import type { SellerRpaMqMessage } from '@common/types/seller-rpa-mq'
 import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
 import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
 import type { PlaywrightSimulationPayloadInput } from '@common/types/rpa-simulation'
@@ -16,6 +18,7 @@ import { appWindowsAndViewsManager } from './windows/app-windows-and-views-manag
 import { AppController } from './modules/ipc/app-controller'
 import { logger } from './utils/logger'
 import { SellerRpaInboxService } from './modules/rpa/inbox/seller-rpa-inbox-service'
+import { SellerRpaTaskMqService } from './modules/rpa/mq/seller-rpa-task-mq-service'
 
 let userDataPath = path.join(app.getPath('appData'), app.getName())
 if (import.meta.env.MODE !== 'pro') {
@@ -70,7 +73,7 @@ const setupTerminalRPACLI = (
 
   const printHelp = (): void => {
     logger.info(
-      '终端命令: login | start-simulation | start-simulation-headless | start-simulation-json <payload.json> | stop-simulation | sample-management [tab|tab1,tab2] | sample-management-json <payload.json> | outreach | outreach-demo | outreach-json <payload.json> | chatbot <creator_id> | chatbot-demo | chatbot-json <payload.json> | creator-detail <creator_id> | creator-detail-demo | creator-detail-json <payload.json> | seller-inbox-json <payload.json> | help | exit'
+      '终端命令: login | start-simulation | start-simulation-headless | start-simulation-json <payload.json> | stop-simulation | sample-management [tab|tab1,tab2] | sample-management-json <payload.json> | outreach | outreach-demo | outreach-json <payload.json> | chatbot <creator_id> | chatbot-demo | chatbot-json <payload.json> | creator-detail <creator_id> | creator-detail-demo | creator-detail-json <payload.json> | seller-inbox-json <payload.json> | seller-mq-json <payload.json> | help | exit'
     )
   }
 
@@ -192,6 +195,17 @@ const setupTerminalRPACLI = (
           const payload = JSON.parse(fileContent) as Record<string, unknown>
           await sellerRpaInboxService.dispatchEnvelopeForTesting(payload, rpaController)
         }
+      } else if (command === 'seller-mq-json') {
+        const payloadPath = trimmedLine.slice(commandToken.length).trim()
+        if (!payloadPath) {
+          logger.warn('缺少 JSON 文件路径，示例: seller-mq-json resources/examples/seller-mq-outreach.json')
+        } else {
+          const resolvedPayloadPath = resolveCliJsonPath(payloadPath)
+          logger.info(`读取 seller 内部 MQ 测试消息 JSON: ${resolvedPayloadPath}`)
+          const fileContent = await readFile(resolvedPayloadPath, 'utf8')
+          const payload = JSON.parse(fileContent) as SellerRpaMqMessage
+          await SellerRpaTaskMqService.getInstance().publishForTesting(payload)
+        }
       } else if (command === 'help') {
         printHelp()
       } else if (command === 'exit' || command === 'quit') {
@@ -249,7 +263,11 @@ app.whenReady().then(async () => {
   await appWindowsAndViewsManager.initMainWindow()
   appWindowsAndViewsManager.mainWindow.showWindow()
   setupTerminalRPACLI(rpaController, sellerRpaInboxService)
-  await sellerRpaInboxService.start(rpaController)
+  if (AppConfig.SELLER_RPA_DEBUG_INBOX_ENABLED) {
+    await sellerRpaInboxService.start(rpaController)
+  } else {
+    logger.info('seller 收件箱调试订阅已禁用，正式任务宿主由 frontend.desktop 承载')
+  }
   app.on('before-quit', () => {
     void sellerRpaInboxService.stop()
     void rpaController.closeSimulationSession()

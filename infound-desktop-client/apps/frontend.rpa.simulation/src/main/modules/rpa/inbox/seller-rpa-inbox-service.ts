@@ -2,13 +2,17 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { AppConfig } from '@common/app-config'
 import type { SellerChatbotPayloadInput } from '@common/types/rpa-chatbot'
+import type { SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
 import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
+import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
+import type { SellerRpaMqMessage } from '@common/types/seller-rpa-mq'
 import type { PlaywrightSimulationPayloadInput } from '@common/types/rpa-simulation'
 import type { SellerRpaReportConfigInput } from '@common/types/seller-rpa-report'
 import type { RPAController } from '../../ipc/rpa-controller'
+import { SellerRpaTaskMqService } from '../mq/seller-rpa-task-mq-service'
 import { logger } from '../../../utils/logger'
 
-type TaskType = 'OUTREACH' | 'CHAT'
+type TaskType = 'OUTREACH' | 'CHAT' | 'CREATOR_DETAIL' | 'SAMPLE'
 
 interface SellerRpaTaskReadyEnvelope {
   eventType?: unknown
@@ -124,6 +128,7 @@ export class SellerRpaInboxService {
 
   public async start(rpaController: RPAController): Promise<void> {
     this.rpaController = rpaController
+    SellerRpaTaskMqService.getInstance().start(rpaController.getSimulationService())
 
     if (!AppConfig.SELLER_RPA_WS_ENABLED) {
       logger.info('[seller-rpa-inbox] 收件箱订阅已禁用')
@@ -186,6 +191,7 @@ export class SellerRpaInboxService {
     }
     this.client = null
     this.connected = false
+    SellerRpaTaskMqService.getInstance().stop()
   }
 
   public isConnected(): boolean {
@@ -302,31 +308,16 @@ export class SellerRpaInboxService {
       return
     }
 
-    const dispatchCommand = this.resolveDispatchCommand(executor, normalizedTaskType)
-    const requiresSession = toBoolean(executor.requiresSession, normalizedTaskType !== 'CHAT' ? true : true)
-    if (requiresSession) {
-      await this.rpaController.startSimulationSession(
-        this.buildSessionPayload(task, input)
-      )
-    }
-
-    if (dispatchCommand === 'RPA_SELLER_OUT_REACH' || normalizedTaskType === 'OUTREACH') {
-      await this.rpaController.runSellerOutReach(
-        this.buildOutreachPayload(envelope, task, inputPayload)
+    const message = this.buildMqMessage(envelope, normalizedTaskType, task, input, inputPayload)
+    if (!message) {
+      const dispatchCommand = this.resolveDispatchCommand(executor, normalizedTaskType)
+      logger.warn(
+        `[seller-rpa-inbox] 暂不支持的任务类型: taskType=${normalizedTaskType} dispatchCommand=${dispatchCommand}`
       )
       return
     }
 
-    if (dispatchCommand === 'RPA_SELLER_CHATBOT' || normalizedTaskType === 'CHAT') {
-      await this.rpaController.runSellerChatbot(
-        this.buildChatbotPayload(envelope, task, inputPayload)
-      )
-      return
-    }
-
-    logger.warn(
-      `[seller-rpa-inbox] 暂不支持的任务类型: taskType=${normalizedTaskType} dispatchCommand=${dispatchCommand}`
-    )
+    await this.dispatchMqMessage(message)
   }
 
   private resolveDispatchCommand(
@@ -342,6 +333,12 @@ export class SellerRpaInboxService {
     }
     if (taskType === 'CHAT') {
       return 'RPA_SELLER_CHATBOT'
+    }
+    if (taskType === 'CREATOR_DETAIL') {
+      return 'RPA_SELLER_CREATOR_DETAIL'
+    }
+    if (taskType === 'SAMPLE') {
+      return 'RPA_SAMPLE_MANAGEMENT'
     }
     return ''
   }
@@ -365,6 +362,15 @@ export class SellerRpaInboxService {
     const storageStatePath = toText(session.storageStatePath)
     if (storageStatePath) {
       payload.storageStatePath = storageStatePath
+    }
+
+    const loginStatePath = toText(session.loginStatePath)
+    if (loginStatePath) {
+      payload.loginStatePath = loginStatePath
+    }
+
+    if (Array.isArray(session.loginState)) {
+      payload.loginState = session.loginState as PlaywrightSimulationPayloadInput['loginState']
     }
 
     return payload
@@ -419,6 +425,108 @@ export class SellerRpaInboxService {
         toText(task.scheduledTime) || toText(envelope.scheduledTime) || undefined,
       creatorId: toText(inputPayload.creatorId) || toText(inputPayload.creator_id) || undefined,
       message: toText(inputPayload.message) || undefined
+    }
+  }
+
+  private buildCreatorDetailPayload(
+    envelope: SellerRpaTaskReadyEnvelope,
+    task: Record<string, unknown>,
+    inputPayload: Record<string, unknown>
+  ): SellerCreatorDetailPayloadInput {
+    return {
+      ...inputPayload,
+      taskId: toText(task.taskId) || toText(envelope.taskId) || undefined,
+      shopId: toText(task.shopId) || toText(inputPayload.shopId) || undefined,
+      taskName: toText(task.taskName) || toText(inputPayload.taskName) || undefined,
+      shopRegionCode:
+        toText(task.shopRegionCode) || toText(inputPayload.shopRegionCode) || undefined,
+      scheduledTime:
+        toText(task.scheduledTime) || toText(envelope.scheduledTime) || undefined,
+      creatorId: toText(inputPayload.creatorId) || toText(inputPayload.creator_id) || undefined
+    }
+  }
+
+  private buildSamplePayload(
+    envelope: SellerRpaTaskReadyEnvelope,
+    task: Record<string, unknown>,
+    inputPayload: Record<string, unknown>
+  ): SampleManagementPayloadInput {
+    return {
+      ...inputPayload,
+      taskId: toText(task.taskId) || toText(envelope.taskId) || undefined,
+      shopId: toText(task.shopId) || toText(inputPayload.shopId) || undefined,
+      taskName: toText(task.taskName) || toText(inputPayload.taskName) || undefined,
+      shopRegionCode:
+        toText(task.shopRegionCode) || toText(inputPayload.shopRegionCode) || undefined,
+      scheduledTime:
+        toText(task.scheduledTime) || toText(envelope.scheduledTime) || undefined
+    }
+  }
+
+  private buildMqMessage(
+    envelope: SellerRpaTaskReadyEnvelope,
+    taskType: TaskType | '',
+    task: Record<string, unknown>,
+    input: Record<string, unknown>,
+    inputPayload: Record<string, unknown>
+  ): SellerRpaMqMessage | null {
+    const session = this.buildSessionPayload(task, input)
+    const metadata = {
+      messageId: toText(envelope.messageId) || undefined,
+      source: 'seller_inbox'
+    }
+    if (taskType === 'OUTREACH') {
+      return {
+        queue: 'outreach',
+        session,
+        metadata,
+        payload: this.buildOutreachPayload(envelope, task, inputPayload)
+      }
+    }
+    if (taskType === 'CHAT') {
+      return {
+        queue: 'chat',
+        session,
+        metadata,
+        payload: this.buildChatbotPayload(envelope, task, inputPayload)
+      }
+    }
+    if (taskType === 'CREATOR_DETAIL') {
+      return {
+        queue: 'creator_detail',
+        session,
+        metadata,
+        payload: this.buildCreatorDetailPayload(envelope, task, inputPayload)
+      }
+    }
+    if (taskType === 'SAMPLE') {
+      return {
+        queue: 'sample',
+        session,
+        metadata,
+        payload: this.buildSamplePayload(envelope, task, inputPayload)
+      }
+    }
+    return null
+  }
+
+  private async dispatchMqMessage(message: SellerRpaMqMessage): Promise<void> {
+    const mqService = SellerRpaTaskMqService.getInstance()
+    switch (message.queue) {
+      case 'outreach':
+        await mqService.publishOutreach(message)
+        return
+      case 'chat':
+        await mqService.publishChat(message)
+        return
+      case 'creator_detail':
+        await mqService.publishCreatorDetail(message)
+        return
+      case 'sample':
+        await mqService.publishSample(message)
+        return
+      default:
+        throw new Error(`unsupported seller mq message queue: ${(message as SellerRpaMqMessage).queue}`)
     }
   }
 

@@ -17,4 +17,5 @@ await rendererStore.init()
 
 app.use(router)
 
+await router.isReady()
 app.mount('#app')

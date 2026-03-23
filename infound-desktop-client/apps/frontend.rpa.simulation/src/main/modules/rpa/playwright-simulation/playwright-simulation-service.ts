@@ -1,14 +1,24 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
 import type { Browser, BrowserContext, Page } from 'playwright'
-import type { SellerChatbotPayloadInput, SellerChatbotRecipient } from '@common/types/rpa-chatbot'
-import type { SellerCreatorDetailData, SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
-import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
-import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
-import type { PlaywrightSimulationPayload, PlaywrightSimulationPayloadInput } from '@common/types/rpa-simulation'
+import type { SellerChatbotPayloadInput, SellerChatbotRecipient } from '@sim-common/types/rpa-chatbot'
+import type { SellerCreatorDetailData, SellerCreatorDetailPayloadInput } from '@sim-common/types/rpa-creator-detail'
+import type {
+  SellerRpaChatMqMessage,
+  SellerRpaCreatorDetailMqMessage,
+  SellerRpaOutreachMqMessage,
+  SellerRpaSampleMqMessage
+} from '@sim-common/types/seller-rpa-mq'
+import type { OutreachFilterConfigInput } from '@sim-common/types/rpa-outreach'
+import type { SampleManagementPayloadInput } from '@sim-common/types/rpa-sample-management'
+import type {
+  LoginStateCookieInput,
+  PlaywrightSimulationPayload,
+  PlaywrightSimulationPayloadInput
+} from '@sim-common/types/rpa-simulation'
 import type { BrowserTask } from '../task-dsl/browser-actions'
 import { BrowserActionRunner } from '../task-dsl/browser-action-runner'
 import type { TaskLoggerLike } from '../task-dsl/types'
@@ -58,10 +68,16 @@ import { PlaywrightSampleManagementCrawler } from './sample-management-playwrigh
 import { evaluatePageScript } from './shared'
 import { SellerRpaApiClient } from '../reporting/seller-rpa-api-client'
 import { buildOutreachResultPayload } from '../reporting/seller-rpa-report-payloads'
+import {
+  type SellerRpaChatMqResult,
+  type SellerRpaTaskMqExecutor,
+  SellerRpaTaskMqService
+} from '../mq/seller-rpa-task-mq-service'
 
 const DEFAULT_REGION = 'MX'
 const DEFAULT_STORAGE_STATE_PATH = join(process.cwd(), 'data', 'playwright', 'storage-state.json')
 const PLAYWRIGHT_LOGIN_URL = 'https://seller-mx.tiktok.com/'
+const ALLOWED_LOGIN_STATE_DOMAIN_SUFFIXES = ['tiktok.com']
 const SIMULATION_RUNTIME_ROLES = [
   'outreach',
   'creator_detail',
@@ -70,6 +86,10 @@ const SIMULATION_RUNTIME_ROLES = [
 ] as const
 
 type SimulationRuntimeRole = (typeof SIMULATION_RUNTIME_ROLES)[number]
+
+const generateUppercaseUuid = (): string => randomUUID().toUpperCase()
+
+type PlaywrightCookie = Parameters<BrowserContext['addCookies']>[0][number]
 
 interface PlaywrightSimulationRuntime {
   role: SimulationRuntimeRole
@@ -83,7 +103,7 @@ interface PlaywrightSimulationRuntime {
   payload: PlaywrightSimulationPayload
 }
 
-interface ChatbotSendResult {
+interface ChatbotSendResult extends SellerRpaChatMqResult {
   creatorId: string
   creatorName: string
   message: string
@@ -92,7 +112,11 @@ interface ChatbotSendResult {
   errorMessage?: string
 }
 
-export class PlaywrightSimulationService {
+const isDesktopWorkerExecution = (
+  payload?: { executionMode?: string } | null
+): boolean => String(payload?.executionMode || '').trim().toLowerCase() === 'desktop_worker'
+
+export class PlaywrightSimulationService implements SellerRpaTaskMqExecutor {
   private static instance: PlaywrightSimulationService | null = null
 
   public static getInstance(logger: TaskLoggerLike): PlaywrightSimulationService {
@@ -185,12 +209,24 @@ export class PlaywrightSimulationService {
         runtime.payload.region,
         effectivePayload
       )
-      const chatbotResults = await this.dispatchOutreachCreatorsToChatbot(
-        runtime.payload.region,
-        effectivePayload,
-        result
-      )
-      this.mergeChatbotResultsIntoRuntimeData(result, chatbotResults)
+      if (!isDesktopWorkerExecution(effectivePayload)) {
+        void this.dispatchOutreachCreatorsToCreatorDetail(
+          runtime.payload.region,
+          effectivePayload,
+          result
+        ).catch((error) => {
+          this.logger.error(
+            `[outreach->creator-detail] 派发失败: ${(error as Error)?.message || error}`
+          )
+        })
+        const chatbotResults = await this.dispatchOutreachCreatorsToChatbot(
+          runtime.payload.region,
+          effectivePayload,
+          result
+        )
+        this.mergeChatbotResultsIntoRuntimeData(result, chatbotResults)
+      }
+
       const finishedAt = new Date()
       const client = SellerRpaApiClient.create(this.logger, effectivePayload.report)
       if (!client) {
@@ -243,6 +279,46 @@ export class PlaywrightSimulationService {
         effectivePayload
       )
     })
+  }
+
+  public async executeOutreachMqMessage(message: SellerRpaOutreachMqMessage): Promise<void> {
+    await this.ensureSession(message.session ?? this.buildSessionPayloadFromTaskContext(message.payload))
+    await this.runOutreach(message.payload)
+  }
+
+  public async executeCreatorDetailMqMessage(
+    message: SellerRpaCreatorDetailMqMessage
+  ): Promise<SellerCreatorDetailData> {
+    const effectivePayload = message.payload ?? createDemoSellerCreatorDetailPayload()
+    await this.ensureSession(message.session ?? this.buildSessionPayloadFromTaskContext(effectivePayload))
+    return this.enqueueTask('creator_detail', 'creator_detail_mq', async (runtime) =>
+      this.runCreatorDetailTask(runtime.taskRunner, runtime.page, runtime.payload.region, effectivePayload)
+    )
+  }
+
+  public async executeChatMqMessage(
+    message: SellerRpaChatMqMessage
+  ): Promise<SellerRpaChatMqResult[]> {
+    const effectivePayload = message.payload ?? createDemoSellerChatbotPayload()
+    await this.ensureSession(message.session ?? this.buildSessionPayloadFromTaskContext(effectivePayload))
+    return this.enqueueTask('chatbot', 'chatbot_mq', async (runtime) =>
+      this.runChatbotPayload(runtime.taskRunner, runtime.payload.region, effectivePayload)
+    )
+  }
+
+  public async executeSampleMqMessage(
+    message: SellerRpaSampleMqMessage
+  ): Promise<SampleManagementExportResult> {
+    const effectivePayload = mergeSampleManagementPayload(message.payload)
+    await this.ensureSession(message.session ?? this.buildSessionPayloadFromTaskContext(effectivePayload))
+    return this.enqueueTask('sample_management', 'sample_management_mq', async (runtime) =>
+      this.runSampleManagementTask(
+        runtime.page,
+        runtime.sampleCrawler,
+        runtime.payload.region,
+        effectivePayload.tabs
+      )
+    )
   }
 
   private async enqueueTask<T>(
@@ -330,13 +406,17 @@ export class PlaywrightSimulationService {
       }
 
       const context = await browser.newContext(contextOptions)
+      if (payload.useLoginState && payload.loginState.length) {
+        await context.addCookies(this.convertLoginStateCookies(payload.loginState))
+      }
       const page = await context.newPage()
       const captureManager = new PlaywrightJsonResponseCaptureManager(this.logger)
       const target = new PlaywrightBrowserActionTarget(page, this.logger, captureManager)
       const taskRunner = new BrowserActionRunner(this.logger, target)
       const sampleCrawler = new PlaywrightSampleManagementCrawler()
       const idleUrl = this.buildRuntimeIdleUrl(role, payload.region)
-      const bootUrl = payload.useStorageState ? idleUrl : PLAYWRIGHT_LOGIN_URL
+      const bootUrl =
+        payload.useStorageState || payload.useLoginState ? idleUrl : PLAYWRIGHT_LOGIN_URL
 
       await page.goto(bootUrl, { waitUntil: 'domcontentloaded' })
       await page.bringToFront().catch(() => undefined)
@@ -344,6 +424,10 @@ export class PlaywrightSimulationService {
       if (payload.useStorageState) {
         this.logger.info(
           `Playwright 运行时已启动: role=${role} headless=${payload.headless ? 'true' : 'false'} region=${payload.region} idle=${idleUrl}`
+        )
+      } else if (payload.useLoginState) {
+        this.logger.info(
+          `Playwright 运行时已启动(登录态注入): role=${role} headless=${payload.headless ? 'true' : 'false'} region=${payload.region} cookies=${payload.loginState.length} idle=${idleUrl}`
         )
       } else {
         this.logger.warn(
@@ -394,9 +478,11 @@ export class PlaywrightSimulationService {
     const requestedHeadless = Boolean(input?.headless ?? false)
     const storageStatePath = resolve(String(input?.storageStatePath || DEFAULT_STORAGE_STATE_PATH).trim())
     const useStorageState = existsSync(storageStatePath)
+    const loginState = this.resolveLoginState(input)
+    const useLoginState = loginState.length > 0
     let headless = requestedHeadless
 
-    if (!useStorageState) {
+    if (!useStorageState && !useLoginState) {
       const parentDir = dirname(storageStatePath)
       mkdirSync(parentDir, { recursive: true })
       if (requestedHeadless) {
@@ -410,8 +496,95 @@ export class PlaywrightSimulationService {
       region,
       headless,
       storageStatePath,
-      useStorageState
+      useStorageState,
+      loginState,
+      useLoginState
     }
+  }
+
+  private resolveLoginState(input?: PlaywrightSimulationPayloadInput): LoginStateCookieInput[] {
+    const inlineState = Array.isArray(input?.loginState) ? input?.loginState : []
+    if (inlineState.length) {
+      return this.filterLoginStateCookies(inlineState)
+    }
+
+    const loginStatePath = String(input?.loginStatePath || '').trim()
+    if (!loginStatePath) {
+      return []
+    }
+
+    const resolvedPath = this.resolveTaskJsonPath(loginStatePath)
+    try {
+      const fileContent = readFileSync(resolvedPath, 'utf8')
+      const parsed = JSON.parse(fileContent) as unknown
+      if (!Array.isArray(parsed)) {
+        throw new Error('loginState JSON must be an array')
+      }
+      return this.filterLoginStateCookies(parsed as LoginStateCookieInput[])
+    } catch (error) {
+      this.logger.error(
+        `读取 loginState 失败: path=${resolvedPath} error=${(error as Error)?.message || error}`
+      )
+      return []
+    }
+  }
+
+  private filterLoginStateCookies(cookies: LoginStateCookieInput[]): LoginStateCookieInput[] {
+    const normalized: LoginStateCookieInput[] = []
+    for (const rawCookie of cookies) {
+      if (!rawCookie || typeof rawCookie !== 'object' || Array.isArray(rawCookie)) {
+        continue
+      }
+      const name = String(rawCookie.name || '').trim()
+      const value = String(rawCookie.value || '').trim()
+      const domain = String(rawCookie.domain || '').trim().toLowerCase()
+      if (!name || !value || !domain) {
+        continue
+      }
+      const normalizedDomain = domain.startsWith('.') ? domain.slice(1) : domain
+      const allowed = ALLOWED_LOGIN_STATE_DOMAIN_SUFFIXES.some(
+        (suffix) => normalizedDomain === suffix || normalizedDomain.endsWith(`.${suffix}`)
+      )
+      if (!allowed) {
+        continue
+      }
+      normalized.push({
+        ...rawCookie,
+        name,
+        value,
+        domain
+      })
+    }
+    return normalized
+  }
+
+  private convertLoginStateCookies(cookies: LoginStateCookieInput[]): PlaywrightCookie[] {
+    return cookies.map((cookie) => {
+      const converted: PlaywrightCookie = {
+        name: String(cookie.name || '').trim(),
+        value: String(cookie.value || '').trim(),
+        domain: String(cookie.domain || '').trim(),
+        path: String(cookie.path || '/').trim() || '/',
+        secure: Boolean(cookie.secure),
+        httpOnly: Boolean(cookie.httpOnly)
+      }
+
+      const expires = Number(cookie.expirationDate)
+      if (Number.isFinite(expires) && !cookie.session) {
+        converted.expires = Math.floor(expires)
+      }
+
+      const sameSite = String(cookie.sameSite || '').trim().toLowerCase()
+      if (sameSite === 'lax') {
+        converted.sameSite = 'Lax'
+      } else if (sameSite === 'strict') {
+        converted.sameSite = 'Strict'
+      } else if (sameSite === 'none' || sameSite === 'no_restriction') {
+        converted.sameSite = 'None'
+      }
+
+      return converted
+    })
   }
 
   private buildIdleUrl(region: string): string {
@@ -441,7 +614,7 @@ export class PlaywrightSimulationService {
     const targetUrl = `https://affiliate.tiktok.com/connection/creator?shop_region=${encodeURIComponent(region)}`
 
     const taskData = {
-      taskId: randomUUID(),
+      taskId: generateUppercaseUuid(),
       taskName: '建联任务(Playwright)',
       version: '1.0.0',
       config: {
@@ -615,14 +788,96 @@ export class PlaywrightSimulationService {
     this.logger.info(
       `[outreach->chatbot] 建联任务准备移交聊天机器人: creators=${recipients.length} region=${region}`
     )
-    return this.enqueueTask('chatbot', 'chatbot_from_outreach', async (runtime) =>
-      this.runChatbotPayload(runtime.taskRunner, runtime.payload.region, {
-        ...payload,
-        creatorId: recipients[0]?.creatorId ?? '',
-        message,
-        recipients
-      })
+    const taskMqService = SellerRpaTaskMqService.getInstance()
+    return taskMqService.publishChatBatch(
+      recipients.map((recipient) => ({
+        queue: 'chat',
+        session: this.buildSessionPayloadFromTaskContext(payload),
+        metadata: {
+          source: 'outreach_runtime',
+          parentTaskId: String(payload.taskId || '').trim() || undefined,
+          messageId: generateUppercaseUuid()
+        },
+        payload: {
+          ...payload,
+          creatorId: recipient.creatorId,
+          message: recipient.message ?? message,
+          recipients: [
+            {
+              creatorId: recipient.creatorId,
+              message: recipient.message ?? message
+            }
+          ]
+        }
+      }))
     )
+  }
+
+  private buildOutreachCreatorDetailMessages(
+    region: string,
+    payload: OutreachFilterConfigInput,
+    runtimeData: Record<string, unknown>
+  ): SellerRpaCreatorDetailMqMessage[] {
+    const rawItems = runtimeData[CREATOR_MARKETPLACE_DATA_KEY]
+    if (!Array.isArray(rawItems)) {
+      return []
+    }
+
+    const messages: SellerRpaCreatorDetailMqMessage[] = []
+    const seenCreatorIds = new Set<string>()
+    rawItems.forEach((rawItem) => {
+      if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) {
+        return
+      }
+      const item = rawItem as Record<string, unknown>
+      const creatorId = String(item.creator_id ?? item.platform_creator_id ?? '').trim()
+      if (!creatorId || seenCreatorIds.has(creatorId)) {
+        return
+      }
+      seenCreatorIds.add(creatorId)
+      messages.push({
+        queue: 'creator_detail',
+        session: this.buildSessionPayloadFromTaskContext({
+          shopRegionCode: payload.shopRegionCode || region
+        }),
+        metadata: {
+          source: 'outreach_runtime',
+          parentTaskId: String(payload.taskId || '').trim() || undefined,
+          messageId: generateUppercaseUuid()
+        },
+        payload: {
+          taskId: payload.taskId,
+          shopId: payload.shopId,
+          taskName: payload.taskName,
+          shopRegionCode: payload.shopRegionCode || region,
+          creatorId,
+          context: {
+            platform: 'TIKTOK',
+            platformCreatorId: creatorId,
+            platformCreatorDisplayName: String(item.creator_name ?? '').trim() || undefined,
+            searchKeyword: String(payload.searchKeyword ?? '').trim() || undefined,
+            categories: String(item.category ?? '').trim() || undefined
+          }
+        }
+      })
+    })
+    return messages
+  }
+
+  private async dispatchOutreachCreatorsToCreatorDetail(
+    region: string,
+    payload: OutreachFilterConfigInput,
+    runtimeData: Record<string, unknown>
+  ): Promise<void> {
+    const messages = this.buildOutreachCreatorDetailMessages(region, payload, runtimeData)
+    if (!messages.length) {
+      this.logger.warn('[outreach->creator-detail] 建联任务未采集到达人，跳过达人详情队列派发')
+      return
+    }
+    this.logger.info(
+      `[outreach->creator-detail] 建联任务准备移交达人详情机器人: creators=${messages.length} region=${region}`
+    )
+    await SellerRpaTaskMqService.getInstance().publishCreatorDetailBatch(messages)
   }
 
   private mergeChatbotResultsIntoRuntimeData(
@@ -804,7 +1059,7 @@ export class PlaywrightSimulationService {
     const targetUrl = `https://affiliate.tiktok.com/seller/im?creator_id=${encodeURIComponent(chatbotPayload.creatorId)}&shop_region=${encodeURIComponent(region)}`
 
     const taskData = {
-      taskId: randomUUID(),
+      taskId: generateUppercaseUuid(),
       taskName: '聊天机器人任务(Playwright)',
       version: '1.0.0',
       config: {
@@ -851,7 +1106,7 @@ export class PlaywrightSimulationService {
     for (let attempt = 1; attempt <= SELLER_CHATBOT_MAX_SEND_ATTEMPTS; attempt += 1) {
       sendAttempts = attempt
       const sendTaskData = {
-        taskId: randomUUID(),
+        taskId: generateUppercaseUuid(),
         taskName: `聊天机器人发送尝试 #${attempt}(Playwright)`,
         version: '1.0.0',
         config: {
@@ -884,7 +1139,7 @@ export class PlaywrightSimulationService {
     }
 
     const finalizeTaskData = {
-      taskId: randomUUID(),
+      taskId: generateUppercaseUuid(),
       taskName: '聊天机器人收尾任务(Playwright)',
       version: '1.0.0',
       config: {
@@ -934,7 +1189,7 @@ export class PlaywrightSimulationService {
 
     const targetUrl = `https://affiliate.tiktok.com/connection/creator/detail?cid=${encodeURIComponent(creatorDetailPayload.creatorId)}&shop_region=${encodeURIComponent(region)}`
     const taskData = {
-      taskId: randomUUID(),
+      taskId: generateUppercaseUuid(),
       taskName: '达人详细信息爬取任务(Playwright)',
       version: '1.0.0',
       config: {

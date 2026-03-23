@@ -5,6 +5,7 @@ import { logger } from '../utils/logger'
 import { AppConfig } from '@common/app-config'
 import { globalState } from '../modules/state/global-state'
 import { MonitorController } from '../modules/ipc/monitor-controller'
+import { getFilePath } from '../utils/path-helper'
 
 interface SplashState {
   percent: number
@@ -40,7 +41,7 @@ export class SplashWindow {
       minimizable: true,
       skipTaskbar: true,
       webPreferences: {
-        preload: path.join(AppConfig.DIR_NAME, '../preload/index.cjs'),
+        preload: path.join(getFilePath(), '../preload/index.cjs'),
         webSecurity: false,
         sandbox: false,
         devTools: !AppConfig.IS_PRO,
@@ -58,7 +59,7 @@ export class SplashWindow {
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       await this.splashWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/splash.html`)
     } else {
-      await this.splashWindow.loadFile(path.join(AppConfig.DIR_NAME, '../renderer/splash.html'))
+      await this.splashWindow.loadFile(path.join(getFilePath(), '../renderer/splash.html'))
     }
 
     logger.info('SplashWindow 初始化成功')

@@ -5,11 +5,7 @@ export function toFileUrl(filePath: string): string {
   if (!trimmedPath) return ''
 
   const normalizedPath = trimmedPath.replace(/\\/g, '/')
-  const absolutePath = WINDOWS_DRIVE_PATH_REGEX.test(normalizedPath)
-    ? `/${normalizedPath}`
-    : normalizedPath.startsWith('/')
-      ? normalizedPath
-      : `/${normalizedPath}`
+  const absolutePath = WINDOWS_DRIVE_PATH_REGEX.test(normalizedPath) ? `/${normalizedPath}` : normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`
 
   return encodeURI(`file://${absolutePath}`)
 }
@@ -20,4 +16,3 @@ export function resolveResourceAssetUrl(resourcesPath: string, fileName: string)
   if (!basePath || !assetName) return ''
   return toFileUrl(`${basePath}/${assetName}`)
 }
-

@@ -10,6 +10,7 @@ import { appStore } from '../store/app-store'
 import { credentialStore } from '../store/credential-store'
 import { AppConfig } from '@common/app-config'
 import { MonitorController } from '../ipc/monitor-controller'
+import { getFilePath } from '../../utils/path-helper'
 
 const { machineIdSync } = pkg
 
@@ -91,11 +92,7 @@ class GlobalState {
     if (app.isPackaged) {
       resourcesPath = path.join(process.resourcesPath)
     } else {
-      const candidatePaths = [
-        path.join(app.getAppPath(), 'resources'),
-        path.join(app.getAppPath(), '../resources'),
-        path.join(AppConfig.DIR_NAME, '../../resources')
-      ]
+      const candidatePaths = [path.join(app.getAppPath(), 'resources'), path.join(app.getAppPath(), '../resources'), path.join(getFilePath(), '../../resources')]
       const hitPath = candidatePaths.find((item) => fs.existsSync(item))
       resourcesPath = hitPath || candidatePaths[0]
     }

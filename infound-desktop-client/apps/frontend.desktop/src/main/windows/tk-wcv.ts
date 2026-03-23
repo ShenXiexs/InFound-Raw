@@ -2,6 +2,7 @@ import { BaseWindow, session, WebContentsView } from 'electron'
 import { logger } from '../utils/logger'
 import { AppConfig } from '@common/app-config'
 import path from 'path'
+import { getFilePath } from '../utils/path-helper'
 
 export class TkWcv {
   private baseWindow: BaseWindow | null = null
@@ -29,7 +30,7 @@ export class TkWcv {
     this.tkWCV = new WebContentsView({
       webPreferences: {
         partition: persistKey,
-        preload: path.join(AppConfig.DIR_NAME, '../preload/index.js'),
+        preload: path.join(getFilePath(), '../preload/index.js'),
         session: sess,
         devTools: !AppConfig.IS_PRO,
         contextIsolation: true, // 强制开启，防止网页 JS 访问主进程模块

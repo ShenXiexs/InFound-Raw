@@ -2,7 +2,7 @@ import type {
   SellerCreatorDetailData,
   SellerCreatorDetailPayload,
   SellerCreatorDetailPayloadInput
-} from '@common/types/rpa-creator-detail'
+} from '@sim-common/types/rpa-creator-detail'
 import type { BrowserAction } from '../task-dsl/browser-actions'
 
 export const SELLER_CREATOR_DETAIL_READY_TEXT = 'Creator details'
@@ -12,7 +12,7 @@ const createDefaultSellerCreatorDetailPayload = (): SellerCreatorDetailPayload =
 })
 
 export const createDemoSellerCreatorDetailPayload = (): SellerCreatorDetailPayloadInput => ({
-  creatorId: '<creator_id_demo>'
+  creatorId: '7495400123324336701'
 })
 
 export const mergeSellerCreatorDetailPayload = (

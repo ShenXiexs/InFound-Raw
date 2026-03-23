@@ -24,7 +24,9 @@ export default defineConfig({
     resolve: {
       alias: {
         '@main': resolve(__dirname, 'src/main'),
-        '@common': resolve(__dirname, 'src/common')
+        '@common': resolve(__dirname, 'src/common'),
+        '@sim-common': resolve(__dirname, '../frontend.rpa.simulation/src/common'),
+        '@sim-rpa': resolve(__dirname, '../frontend.rpa.simulation/src/main/modules/rpa')
       }
     }
   },

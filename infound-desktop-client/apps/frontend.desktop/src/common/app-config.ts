@@ -1,6 +1,3 @@
-import { fileURLToPath } from 'node:url'
-import { dirname } from 'node:path'
-
 const ENV = import.meta.env
 
 export class AppConfig {
@@ -15,5 +12,4 @@ export class AppConfig {
   public static readonly OFFICIAL_WEBSITE_BASE_URL: string = ENV.VITE_OFFICIAL_WEBSITE_BASE_URL
   public static readonly EMBED_BASE_URL: string = ENV.VITE_EMBED_BASE_URL
   public static readonly USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
-  public static readonly DIR_NAME: string = typeof process !== 'undefined' && process.versions?.node ? dirname(fileURLToPath(import.meta.url)) : ''
 }
