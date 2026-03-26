@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from shared_application_services import BaseDTO
 
 
 def _to_camel(value: str) -> str:
@@ -10,15 +12,7 @@ def _to_camel(value: str) -> str:
     return parts[0] + "".join(part.capitalize() for part in parts[1:])
 
 
-class CreatorIngestionOptions(BaseModel):
-    """Metadata describing the creator crawl task."""
-
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorIngestionOptions(BaseDTO):
     task_id: Optional[str] = None
     account_name: Optional[str] = None
     region: Optional[str] = None
@@ -26,15 +20,7 @@ class CreatorIngestionOptions(BaseModel):
     search_strategy: Optional[Dict[str, Any]] = None
 
 
-class CreatorRow(BaseModel):
-    """Normalized creator row produced by the crawler."""
-
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorRow(BaseDTO):
     platform: Optional[str] = None
     platform_creator_id: Optional[str] = None
     platform_creator_username: Optional[str] = None
@@ -58,7 +44,6 @@ class CreatorRow(BaseModel):
     sales_revenue_per_buyer: Optional[Any] = None
     gmv_per_sales_channel: Optional[str] = None
     gmv_by_product_category: Optional[str] = None
-    est_post_rate: Optional[Any] = None
     avg_commission_rate: Optional[Any] = None
     collab_products: Optional[Any] = None
     partnered_brands: Optional[Any] = None
@@ -92,14 +77,7 @@ class CreatorRow(BaseModel):
     crawl_date: Optional[str] = None
 
 
-class CreatorIngestionRequest(BaseModel):
-    """Request body that collector posts to the inner API."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorIngestionRequest(BaseDTO):
     source: str = Field(..., description="Data source identifier")
     operator_id: Optional[str] = Field(
         default=None,
@@ -109,47 +87,23 @@ class CreatorIngestionRequest(BaseModel):
     rows: List[CreatorRow] = Field(..., min_length=1)
 
 
-class CreatorIngestionResult(BaseModel):
-    """Response payload returned to the collector."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorIngestionResult(BaseDTO):
     inserted: int = Field(..., description="Total creator rows ingested")
     creators: int = Field(..., description="Unique creators updated")
 
 
-class CreatorHistoryRequest(BaseModel):
-    """Query params for creator history lookups."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorHistoryRequest(BaseDTO):
     creator_id: Optional[str] = None
     creator_name: Optional[str] = None
     creator_username: Optional[str] = None
     limit: int = Field(default=20, ge=1, le=200)
 
 
-class CreatorHistoryItem(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorHistoryItem(BaseDTO):
     connect: bool
     reply: bool
     brand_name: Optional[str] = None
 
 
-class CreatorHistoryResult(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CreatorHistoryResult(BaseDTO):
     records: List[CreatorHistoryItem]

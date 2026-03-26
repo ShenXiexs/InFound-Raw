@@ -53,6 +53,7 @@ export const mergeSellerChatbotPayload = (input?: SellerChatbotPayloadInput): Se
     : defaults.recipients
 
   return {
+    ...input,
     creatorId: String(input?.creatorId ?? defaults.creatorId).trim(),
     message: String(input?.message ?? defaults.message).trim(),
     recipients

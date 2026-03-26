@@ -10,6 +10,7 @@ from .outreach_filter_base import (
     OutreachFilterScript,
     build_default_filter_modules,
     build_default_search_binding,
+    build_sort_binding,
 )
 
 if TYPE_CHECKING:
@@ -37,5 +38,15 @@ VN_OUTREACH_FILTER_SCRIPT = OutreachFilterScript(
     filter_title_selector=FILTER_TITLE_SELECTOR,
     filter_modules=build_default_filter_modules(),
     search_binding=build_default_search_binding(),
+    sort_binding=build_sort_binding(
+        option_map={
+            1: "Relevancy",
+            2: "GMV",
+            3: "Units sold",
+            4: "Follower",
+            5: "Avg. video views",
+            6: "Engagement rate",
+        }
+    ),
     prepare_page_hook=prepare_vn_outreach_page,
 )

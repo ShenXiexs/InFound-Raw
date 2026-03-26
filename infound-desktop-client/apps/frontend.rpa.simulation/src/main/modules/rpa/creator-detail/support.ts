@@ -20,6 +20,7 @@ export const mergeSellerCreatorDetailPayload = (
 ): SellerCreatorDetailPayload => {
   const defaults = createDefaultSellerCreatorDetailPayload()
   return {
+    ...input,
     creatorId: String(input?.creatorId ?? defaults.creatorId).trim()
   }
 }

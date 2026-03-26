@@ -1,0 +1,92 @@
+{
+  "accounts": [
+    {
+      "name": "VN_LOCAL_SHOP",
+      "region": "VN",
+      "shop_type": "local",
+      "login_email": "infound.ai@gmail.com",
+      "login_password": "@Gokoco2025",
+      "entry_url": "https://seller-vn.tiktok.com/homepage?is_new_connect=0&shop_region=VN",
+      "home_url": "https://seller-vn.tiktok.com/homepage?is_new_connect=0&shop_region=VN",
+      "enabled": true,
+      "notes": "Vietnam local shop"
+    },
+    {
+      "name": "VN_CROSS_BORDER_SHOP",
+      "region": "VN",
+      "shop_type": "cross_border",
+      "login_email": "seller.vn@infound.ai",
+      "login_password": "YBFCH)r9X)kX",
+      "entry_url": "https://seller.tiktokshopglobalselling.com/account/login?",
+      "home_url": "",
+      "enabled": true,
+      "notes": "Vietnam cross-border shop via global selling login"
+    },
+    {
+      "name": "ID_LOCAL_SHOP",
+      "region": "ID",
+      "shop_type": "local",
+      "login_email": "zhourh98@gmail.com",
+      "login_password": "Zzz12345678.",
+      "entry_url": "https://seller-id.tokopedia.com/account/login?redirect_url=https%3A%2F%2Fseller-id.tokopedia.com%2Fhomepage",
+      "home_url": "https://seller-id.tokopedia.com/homepage",
+      "enabled": true,
+      "notes": "Indonesia local shop"
+    },
+    {
+      "name": "BR_LOCAL_SHOP",
+      "region": "BR",
+      "shop_type": "local",
+      "login_email": "infound.tksmx001@gmail.com",
+      "login_password": "9854.Zrh",
+      "entry_url": "https://seller-br.tiktok.com/account/login?lng=en&shop_region=VN&register_referrer=https%3A%2F%2Fseller-br.tiktok.com%2F&redirect_url=https%3A%2F%2Fseller-vn.tiktok.com%2Fhomepage%3Flng%3Den%26shop_region%3DVN",
+      "home_url": "https://seller-br.tiktok.com/",
+      "enabled": true,
+      "notes": "Brazil local shop"
+    },
+    {
+      "name": "FR_LOCAL_SHOP",
+      "region": "FR",
+      "shop_type": "local",
+      "login_email": "",
+      "login_password": "",
+      "entry_url": "https://seller-fr-accounts.tiktok.com/account/login?redirect_url=https%3A%2F%2Faffiliate.tiktok.com%2Fconnection%2Fcreator%3Fshop_region%3DFR&lng=en",
+      "home_url": "",
+      "enabled": true,
+      "notes": "France local shop via manual login, account credentials pending"
+    },
+    {
+      "name": "MX_LOCAL_SHOP",
+      "region": "MX",
+      "shop_type": "local",
+      "login_email": "noteparis24@gmail.com",
+      "login_password": "9854.Zrh",
+      "entry_url": "seller-mx.tiktok.com/homepage?is_new_connect=0&shop_region=MX",
+      "home_url": "seller-mx.tiktok.com/homepage?is_new_connect=0&shop_region=MX",
+      "enabled": true,
+      "notes": "Mexico local shop"
+    },
+    {
+      "name": "EU_LOCAL_SHOP",
+      "region": "EU",
+      "shop_type": "local",
+      "login_email": "seller.eu.lc@infound.ai",
+      "login_password": "YBFCH)r9X)kX",
+      "entry_url": "",
+      "home_url": "",
+      "enabled": true,
+      "notes": "Europe local shop URL pending"
+    },
+    {
+      "name": "EU_CROSS_BORDER_SHOP",
+      "region": "EU",
+      "shop_type": "cross_border",
+      "login_email": "seller.eu@infound.ai",
+      "login_password": "YBFCH)r9X)kX",
+      "entry_url": "",
+      "home_url": "",
+      "enabled": true,
+      "notes": "Europe cross-border shop URL pending"
+    }
+  ]
+}

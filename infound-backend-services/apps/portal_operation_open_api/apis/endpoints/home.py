@@ -1,14 +1,13 @@
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
-from common.core.database import DatabaseManager
-from common.core.logger import get_logger
-from common.core.response import success_response, APIResponse
-from common.services.rabbitmq_producer import RabbitMQProducer
+from apps.portal_operation_open_api.core.deps import get_outreach_task_service
+from apps.portal_operation_open_api.core.rabbitmq_producer import RabbitMQProducer
 from apps.portal_operation_open_api.services.outreach_task_service import (
     OutreachTaskService,
 )
+from core_base import get_logger, APIResponse, success_response
 
 router = APIRouter(tags=["首页"])
 logger = get_logger()
@@ -21,14 +20,14 @@ UUID_PATTERN = r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0
     response_model_by_alias=True,
 )
 async def index(
-    task_id: str | None = Query(
-        None,
-        description="任务ID（可选）",
-        pattern=UUID_PATTERN,
-    ),
+        task_id: str | None = Query(
+            None,
+            description="任务ID（可选）",
+            pattern=UUID_PATTERN,
+        ),
+        service: OutreachTaskService = Depends(get_outreach_task_service),
 ) -> APIResponse[Any]:
-    async with DatabaseManager.get_session() as session:
-        tasks = await OutreachTaskService.stop_tasks(session, task_id)
+    tasks = await service.stop_tasks(task_id)
 
     if tasks:
         for task in tasks:

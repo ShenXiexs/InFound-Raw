@@ -1,10 +1,88 @@
-# service-a 专属 Token 配置（用于请求拦截校验）
-AUTH:
-  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"  # 自定义 Header 名（区分其他服务）
-  VALID_TOKENS: [ "844a22c4c6d47231bb4fc89c3e8a64ca5b09ec5de8f6d4bf65dacd7d" ]  # 合法 Token 列表
+app_name: "infound-portal-inner-open-api"
+env: "dev"
+debug: true
 
-# Chatbot schedule publisher（由 inner API 轮询 samples 表的 chatbot 字段并投递 MQ）
-CHATBOT_SCHEDULE_PUBLISHER_ENABLED: true
-CHATBOT_SCHEDULE_POLL_INTERVAL_SECONDS: 15
-CHATBOT_SCHEDULE_BATCH_SIZE: 20
-CHATBOT_SCHEDULE_SUPPORTED_REGION: "MX"
+# ============================================================
+# 日志配置
+# ============================================================
+log:
+  level: "INFO"
+  dir: "logs"
+  file_max_size: 10
+  file_backup_count: 30
+
+# ============================================================
+# MySQL 数据库配置
+# ============================================================
+mysql:
+  host: "db-zaxoqvvl.stg.infound.ai"
+  port: 8801
+  user: "infound-stg"
+  password: "&3$BSW)mGxE(Zk"
+  db: "infound.stg"
+  charset: "utf8mb4"
+
+# ============================================================
+# Redis 缓存配置
+# ============================================================
+redis:
+  host: "redis-q9zy4cjd.stg.infound.ai"
+  port: 8802
+  password: "XJh$(KLRM3*!m5"
+  db: 0
+  prefix: "if.dev"
+
+# ============================================================
+# RabbitMQ 消息队列配置（支持多队列）
+# ============================================================
+rabbitmq:
+  # 基础连接配置
+  host: "mq-zlx123j9.stg.infound.ai"
+  port: 8803
+  username: "infound.stg"
+  password: "xy6Ucz5IZ@Z%P)"
+  vhost: "/infound.stg"
+  prefetch_count: 10
+  reconnect_delay: 5
+  max_reconnect_attempts: 3
+
+  # 主交换机配置
+  exchange_name: "infound.topic"
+  exchange_type: "topic"
+  routing_key_prefix: "infound"
+
+  # 多队列配置
+  queues:
+    chatbot:
+      exchange: "infound.topic"
+      routing_key_pattern: "infound.chatbot.*"
+      queue_name: "chatbot.tasks.queue"
+      durable: true
+      auto_delete: false
+
+    crawler:
+      exchange: "infound.topic"
+      routing_key_pattern: "infound.crawler.*"
+      queue_name: "crawler.tasks.queue"
+      durable: true
+      auto_delete: false
+
+    outreach:
+      exchange: "infound.topic"
+      routing_key_pattern: "infound.outreach.*"
+      queue_name: "outreach.tasks.queue"
+      durable: true
+      auto_delete: false
+      queue_prefix: "chatbot.outreach.queue"
+      control_queue: "chatbot.outreach.control.queue"
+      control_routing_key_prefix: "chatbot.outreach.control"
+
+
+# ============================================================
+# 认证配置
+# ============================================================
+auth:
+  required_header: "X-INFound-Inner-Service-Token"
+  secret_key: "844a22c4c6d47231bb4fc89c3e8a64ca5b09ec5de8f6d4bf65dacd7d"
+  expire_days: 14
+  max_token: 5

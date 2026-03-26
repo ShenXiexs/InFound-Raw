@@ -52,6 +52,7 @@ export const mergeSampleManagementPayload = (input?: SampleManagementPayloadInpu
   })
 
   return {
+    ...input,
     tabs
   }
 }

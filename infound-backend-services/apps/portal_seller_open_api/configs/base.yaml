@@ -1,0 +1,58 @@
+app_name: "infound-portal-seller-open-api"
+env: "dev"
+debug: true
+
+log:
+  level: "INFO"
+  dir: "logs"
+  file_max_size: 10
+  file_backup_count: 30
+
+mysql:
+  host: "db-zaxoqvvl.stg.infound.ai"
+  port: 8801
+  user: "infound-stg"
+  password: "&3$BSW)mGxE(Zk"
+  db: "infound.stg"
+  charset: "utf8mb4"
+
+redis:
+  host: "redis-q9zy4cjd.stg.infound.ai"
+  port: 8802
+  password: "XJh$(KLRM3*!m5"
+  db: 0
+  prefix: "if.dev:seller"
+
+rabbitmq:
+  host: "mq-zlx123j9.stg.infound.ai"
+  port: 8803
+  username: "infound.stg"
+  password: "xy6Ucz5IZ@Z%P)"
+  vhost: "/infound.stg"
+  prefetch_count: 10
+  reconnect_delay: 5
+  max_reconnect_attempts: 3
+  exchange_name: "infound.topic"
+  exchange_type: "topic"
+  routing_key_prefix: "seller.rpa"
+  queues:
+    seller_rpa_inbox:
+      exchange: "infound.topic"
+      routing_key_pattern: "seller.rpa.user"
+      queue_name: "seller.rpa.user.inbox"
+      durable: true
+      auto_delete: false
+      queue_prefix: "seller.rpa.user.inbox"
+
+auth:
+  required_header: "INFoundSellerAuth"
+  secret_key: "3500f737887bd22f5bba0f0f0d55f516cb643ba328b388034aeddfc094f1b4d5"
+  expire_days: 14
+  max_tokens: 5
+
+seller_rpa_scheduler:
+  enabled: true
+  delayed_poll_interval_seconds: 5
+  delayed_batch_size: 50
+  dispatch_marker_ttl_seconds: 21600
+  recovery_batch_size: 500

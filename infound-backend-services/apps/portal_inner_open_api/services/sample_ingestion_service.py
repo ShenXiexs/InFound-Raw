@@ -9,25 +9,22 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.config import get_settings
-from common.core.logger import get_logger
-from common.models.infound import (
-    SampleContentCrawlLogs,
-    SampleContents,
-    SampleCrawlLogs,
-    Samples,
+from apps.portal_inner_open_api.core.config import Settings
+from apps.portal_inner_open_api.models.sample import (
+    SampleIngestionRequest,
+    SampleIngestionResult,
 )
 from apps.portal_inner_open_api.services.chatbot_schedule_repository import (
     SampleSnapshot,
     chatbot_schedule_repository,
 )
-from apps.portal_inner_open_api.models.sample import (
-    SampleIngestionRequest,
-    SampleIngestionResult,
+from shared_domain.models.infound import (
+    SampleCrawlLogs,
+    SampleContentCrawlLogs,
+    Samples,
+    SampleContents,
 )
-
-settings = get_settings()
-logger = get_logger()
+from core_base import get_logger
 
 
 def _generate_uuid() -> str:
@@ -37,7 +34,10 @@ def _generate_uuid() -> str:
 class SampleIngestionService:
     """Persist normalized rows from the crawler into MySQL."""
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings, db_session: AsyncSession) -> None:
+        self.logger = get_logger()
+        self.settings = settings
+        self.db_session = db_session
         self.default_operator_id = (
             str(
                 getattr(
@@ -52,9 +52,7 @@ class SampleIngestionService:
             getattr(settings, "SAMPLE_DEFAULT_REGION", "MX") or "MX"
         ).upper()
 
-    async def ingest(
-        self, request: SampleIngestionRequest, session: AsyncSession
-    ) -> SampleIngestionResult:
+    async def ingest(self, request: SampleIngestionRequest) -> SampleIngestionResult:
         rows = [row.model_dump() for row in request.rows]
         if not rows:
             raise ValueError("rows cannot be empty")
@@ -69,7 +67,7 @@ class SampleIngestionService:
         for row in rows:
             product_id = row.get("platform_product_id")
             if not product_id:
-                logger.warning("跳过缺少 platform_product_id 的行: %s", row)
+                self.logger.warning("跳过缺少 platform_product_id 的行: %s", row)
                 continue
             products[product_id] = row
             if row.get("type"):
@@ -81,8 +79,12 @@ class SampleIngestionService:
         sample_snapshots: list[tuple[SampleSnapshot | None, SampleSnapshot]] = []
         for product_id, row in products.items():
             summary_entries = content_summary.get(product_id, [])
-            payload = self._build_sample_payload(row, operator_id, utc_now, summary_entries)
-            existing, previous_snapshot = await self._upsert_sample(session, payload)
+            payload = self._build_sample_payload(
+                row, operator_id, utc_now, summary_entries
+            )
+            existing, previous_snapshot = await self._upsert_sample(
+                self.db_session, payload
+            )
             current_snapshot = SampleSnapshot(
                 sample_id=existing.id,
                 region=payload.get("region"),
@@ -105,37 +107,39 @@ class SampleIngestionService:
                 crawl_date,
                 summary_entries,
             )
-            session.add(SampleCrawlLogs(**crawl_payload))
+            self.db_session.add(SampleCrawlLogs(**crawl_payload))
 
         for row in contents:
-            content_payload = self._build_sample_content_payload(row, operator_id, utc_now)
-            await self._upsert_sample_content(session, content_payload)
+            content_payload = self._build_sample_content_payload(
+                row, operator_id, utc_now
+            )
+            await self._upsert_sample_content(self.db_session, content_payload)
             content_log_payload = self._build_sample_content_log_payload(
                 row,
                 operator_id,
                 utc_now,
                 crawl_date,
             )
-            session.add(SampleContentCrawlLogs(**content_log_payload))
+            self.db_session.add(SampleContentCrawlLogs(**content_log_payload))
 
         # Ensure newly inserted samples exist before updating schedule fields.
-        await session.flush()
+        await self.db_session.flush()
 
         # Trigger chatbot schedules based on latest sample snapshot(s).
         for previous, current in sample_snapshots:
             try:
                 await chatbot_schedule_repository.apply_sample_snapshot(
-                    session, previous=previous, current=current
+                    self.db_session, previous=previous, current=current
                 )
             except Exception:
-                logger.warning(
+                self.logger.warning(
                     "Failed to update chatbot schedule (ignored)",
                     sample_id=current.sample_id,
                     scenario_hint="sample_ingest",
                     exc_info=True,
                 )
 
-        logger.info(
+        self.logger.info(
             "样品数据入库完成",
             source=request.source,
             rows=len(rows),
@@ -160,7 +164,9 @@ class SampleIngestionService:
             "region": self._safe_region(row.get("region")),
             "stock": self._coerce_int(row.get("stock")),
             "product_sku": self._safe_str(row.get("product_sku")),
-            "available_sample_count": self._coerce_int(row.get("available_sample_count")),
+            "available_sample_count": self._coerce_int(
+                row.get("available_sample_count")
+            ),
             "is_uncooperative": self._coerce_bool(row.get("is_uncooperative")),
             "is_unapprovable": self._coerce_bool(row.get("is_unapprovable")),
             "status": self._safe_str(row.get("status")),
@@ -197,7 +203,9 @@ class SampleIngestionService:
             "region": self._safe_region(row.get("region")),
             "stock": self._coerce_int(row.get("stock")),
             "product_sku": self._safe_str(row.get("product_sku")),
-            "available_sample_count": self._coerce_int(row.get("available_sample_count")),
+            "available_sample_count": self._coerce_int(
+                row.get("available_sample_count")
+            ),
             "is_uncooperative": self._coerce_bool(row.get("is_uncooperative")),
             "is_unapprovable": self._coerce_bool(row.get("is_unapprovable")),
             "status": self._safe_str(row.get("status")),
@@ -248,9 +256,13 @@ class SampleIngestionService:
             "promotion_time": self._safe_str(row.get("promotion_time")),
             "promotion_view_count": self._coerce_int(row.get("promotion_view_count")),
             "promotion_like_count": self._coerce_int(row.get("promotion_like_count")),
-            "promotion_comment_count": self._coerce_int(row.get("promotion_comment_count")),
+            "promotion_comment_count": self._coerce_int(
+                row.get("promotion_comment_count")
+            ),
             "promotion_order_count": self._coerce_int(row.get("promotion_order_count")),
-            "promotion_order_total_amount": self._coerce_decimal(row.get("promotion_order_total_amount")),
+            "promotion_order_total_amount": self._coerce_decimal(
+                row.get("promotion_order_total_amount")
+            ),
             "creator_id": operator_id,
             "creation_time": utc_now,
             "last_modifier_id": operator_id,
@@ -273,9 +285,12 @@ class SampleIngestionService:
     ) -> tuple[Samples, SampleSnapshot | None]:
         stmt = select(Samples).where(
             Samples.platform_product_id == payload["platform_product_id"],
-            Samples.platform_creator_display_name.is_(None)
-            if payload.get("platform_creator_display_name") is None
-            else Samples.platform_creator_display_name == payload.get("platform_creator_display_name"),
+            (
+                Samples.platform_creator_display_name.is_(None)
+                if payload.get("platform_creator_display_name") is None
+                else Samples.platform_creator_display_name
+                == payload.get("platform_creator_display_name")
+            ),
         )
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
@@ -313,19 +328,25 @@ class SampleIngestionService:
         stmt = (
             select(SampleContents)
             .where(
-            SampleContents.platform_product_id == payload["platform_product_id"],
-            _eq_or_is_null(SampleContents.promotion_name, payload.get("promotion_name")),
-            _eq_or_is_null(SampleContents.promotion_time, payload.get("promotion_time")),
-            _eq_or_is_null(SampleContents.type, payload.get("type")),
+                SampleContents.platform_product_id == payload["platform_product_id"],
+                _eq_or_is_null(
+                    SampleContents.promotion_name, payload.get("promotion_name")
+                ),
+                _eq_or_is_null(
+                    SampleContents.promotion_time, payload.get("promotion_time")
+                ),
+                _eq_or_is_null(SampleContents.type, payload.get("type")),
             )
-            .order_by(SampleContents.last_modification_time.desc(), SampleContents.id.desc())
+            .order_by(
+                SampleContents.last_modification_time.desc(), SampleContents.id.desc()
+            )
             .limit(2)
         )
         result = await session.execute(stmt)
         matches = list(result.scalars().all())
         existing = matches[0] if matches else None
         if len(matches) > 1:
-            logger.warning(
+            self.logger.warning(
                 "sample_contents 检测到重复记录，将只更新最新一条",
                 platform_product_id=payload.get("platform_product_id"),
                 promotion_name=payload.get("promotion_name"),
@@ -359,7 +380,9 @@ class SampleIngestionService:
             bucket = summary.setdefault(product_id, [])
             bucket_seen = seen.setdefault(product_id, set())
             for entry in entries:
-                serialized = json.dumps(entry, sort_keys=True, default=str, ensure_ascii=False)
+                serialized = json.dumps(
+                    entry, sort_keys=True, default=str, ensure_ascii=False
+                )
                 if serialized in bucket_seen:
                     continue
                 bucket_seen.add(serialized)
@@ -369,7 +392,9 @@ class SampleIngestionService:
                 items.append(self._empty_summary_entry())
         return summary
 
-    def _build_summary_entries_for_row(self, row: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _build_summary_entries_for_row(
+        self, row: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         entries: List[Dict[str, Any]] = []
         promotion_fields = [
             row.get("type"),
@@ -405,7 +430,9 @@ class SampleIngestionService:
             entries.extend(self._logistics_summary_entries(logistics_snapshot))
         return entries
 
-    def _logistics_summary_entries(self, snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _logistics_summary_entries(
+        self, snapshot: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         entries: List[Dict[str, Any]] = []
         timeline = snapshot.get("timeline") or []
         basic_pairs = snapshot.get("basic_info") or []
@@ -518,7 +545,9 @@ class SampleIngestionService:
         value = value.strip()
         return len(value) == 36 and value.count("-") == 4
 
-    def _extract_platform_creator_display_name(self, row: Dict[str, Any]) -> Optional[str]:
+    def _extract_platform_creator_display_name(
+        self, row: Dict[str, Any]
+    ) -> Optional[str]:
         return self._safe_str(
             row.get("platform_creator_display_name") or row.get("creator_name")
         )
@@ -554,6 +583,3 @@ class SampleIngestionService:
     def _safe_region(self, region: Optional[str]) -> str:
         text = (region or self.default_region or "MX").strip()
         return text.upper() or self.default_region
-
-
-sample_ingestion_service = SampleIngestionService()

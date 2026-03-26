@@ -5,12 +5,13 @@ from typing import List, Optional
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.models.infound import CreatorCrawlLogs
 from apps.portal_inner_open_api.models.creator import (
     CreatorHistoryRequest,
     CreatorHistoryResult,
     CreatorHistoryItem,
 )
+from shared_domain.models.infound import CreatorCrawlLogs
+from core_base import get_logger
 
 
 def _to_bool(value: Optional[object]) -> bool:
@@ -25,25 +26,32 @@ def _to_bool(value: Optional[object]) -> bool:
 class CreatorHistoryService:
     """Query creator outreach history from crawl logs."""
 
-    async def fetch(
-        self, request: CreatorHistoryRequest, session: AsyncSession
-    ) -> CreatorHistoryResult:
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.logger = get_logger()
+        self.db_session = db_session
+
+    async def fetch(self, request: CreatorHistoryRequest) -> CreatorHistoryResult:
         normalized_name = (request.creator_name or "").strip().lower()
         normalized_username = (request.creator_username or "").strip().lower()
 
         conditions = []
         if request.creator_id:
-            conditions.append(CreatorCrawlLogs.platform_creator_id == request.creator_id)
+            conditions.append(
+                CreatorCrawlLogs.platform_creator_id == request.creator_id
+            )
         if normalized_name:
             conditions.append(
-                func.lower(CreatorCrawlLogs.platform_creator_display_name) == normalized_name
+                func.lower(CreatorCrawlLogs.platform_creator_display_name)
+                == normalized_name
             )
             conditions.append(
-                func.lower(CreatorCrawlLogs.platform_creator_username) == normalized_name
+                func.lower(CreatorCrawlLogs.platform_creator_username)
+                == normalized_name
             )
         if normalized_username:
             conditions.append(
-                func.lower(CreatorCrawlLogs.platform_creator_username) == normalized_username
+                func.lower(CreatorCrawlLogs.platform_creator_username)
+                == normalized_username
             )
 
         if not conditions:
@@ -59,7 +67,7 @@ class CreatorHistoryService:
             .order_by(CreatorCrawlLogs.creation_time.desc())
             .limit(request.limit)
         )
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         rows = result.mappings().all()
 
         records: List[CreatorHistoryItem] = []
@@ -73,6 +81,3 @@ class CreatorHistoryService:
             )
 
         return CreatorHistoryResult(records=records)
-
-
-creator_history_service = CreatorHistoryService()

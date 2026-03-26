@@ -1,0 +1,223 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import List, Optional, Any
+
+from pydantic import Field, AliasChoices, model_validator
+
+from shared_application_services import (
+    BaseDTO,
+    CleanStr,
+    PeriodList,
+    FlexibleInt,
+    PercentStr,
+    FlexibleDatetime,
+)
+from shared_application_services.dtos.base import FlexibleDecimal
+from shared_domain.models.infound import Campaigns, Products
+
+
+class CampaignIngestionOptions(BaseDTO):
+    campaign_id: Optional[str] = None
+    campaign_ids: Optional[List[str]] = None
+    account_name: Optional[str] = None
+    region: Optional[str] = None
+    scan_all_pages: Optional[bool] = None
+    max_pages: Optional[int] = None
+    export_excel: Optional[bool] = None
+
+
+class CampaignRow(BaseDTO):
+    platform_campaign_id: CleanStr = Field(
+        ..., validation_alias=AliasChoices("platform_campaign_id", "campaign_id")
+    )
+    platform_shop_id: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_shop_id", "shop_code")
+    )
+    platform_campaign_name: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_campaign_name", "campaign_name")
+    )
+    region: Optional[CleanStr] = None
+    platform: Optional[CleanStr] = Field("tiktok", validation_alias="platform")
+    status: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("status", "campaign_status")
+    )
+    registration_period: Optional[PeriodList] = Field(
+        None,
+        validation_alias=AliasChoices(
+            "registration_period", "campaign_registration_period"
+        ),
+    )
+    campaign_period: Optional[PeriodList] = Field(
+        None, validation_alias="campaign_period"
+    )
+    pending_product_count: Optional[FlexibleInt] = Field(
+        None,
+        validation_alias=AliasChoices(
+            "pending_product_count", "campaign_pending_products"
+        ),
+    )
+    approved_product_count: Optional[FlexibleInt] = Field(
+        None,
+        validation_alias=AliasChoices(
+            "approved_product_count", "campaign_approved_products"
+        ),
+    )
+    date_registered: Optional[FlexibleDatetime] = Field(
+        None, validation_alias="date_registered"
+    )
+    commission_rate: Optional[PercentStr] = Field(
+        None, validation_alias="commission_rate"
+    )
+    platform_shop_name: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_shop_name", "shop_name")
+    )
+    platform_shop_phone: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_shop_phone", "shop_phone")
+    )
+
+    def to_db_entity(
+        self, operator_id: str, default_region: str, utc_now: datetime
+    ) -> Campaigns:
+        """DTO -> SQLAlchemy Entity 的一键转换"""
+        data = self.model_dump()
+        data.update(
+            {
+                "id": str(
+                    uuid.uuid1(node=0x2AA7A70856D4)
+                ).upper(),  # 假设此函数在 context 可见
+                "region": (self.region or default_region).upper(),
+                "creator_id": operator_id,
+                "creation_time": utc_now,
+                "last_modifier_id": operator_id,
+                "last_modification_time": utc_now,
+            }
+        )
+        return Campaigns(**data)
+
+
+class ProductRow(BaseDTO):
+    platform_product_id: CleanStr = Field(
+        ..., validation_alias=AliasChoices("platform_product_id", "product_id")
+    )
+    platform_campaign_id: CleanStr = Field(
+        ..., validation_alias=AliasChoices("platform_campaign_id", "campaign_id")
+    )
+    platform_shop_id: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_shop_id", "shop_code")
+    )
+    region: Optional[str] = None
+    platform: Optional[CleanStr] = Field("tiktok", validation_alias="platform")
+    platform_shop_name: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_shop_name", "shop_name")
+    )
+    platform_shop_phone: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("platform_shop_phone", "shop_phone")
+    )
+    thumbnail: Optional[CleanStr] = Field(
+        None, validation_alias=AliasChoices("thumbnail", "image_link")
+    )
+    product_name: Optional[CleanStr] = Field(None, validation_alias="product_name")
+    product_rating: Optional[FlexibleInt] = Field(
+        None, validation_alias="product_rating"
+    )
+    reviews_count: Optional[FlexibleInt] = Field(None, validation_alias="reviews_count")
+    product_sku: Optional[CleanStr] = Field(None, validation_alias="product_sku")
+    stock: Optional[FlexibleInt] = Field(None, validation_alias="stock")
+    available_sample_count: Optional[FlexibleInt] = Field(
+        None,
+        validation_alias=AliasChoices("available_sample_count", "available_sample"),
+    )
+    item_sold: Optional[FlexibleInt] = Field(
+        None,
+        validation_alias=AliasChoices("item_sold", "items_sold"),
+    )
+    sale_price_min: Optional[FlexibleDecimal] = None
+    sale_price_max: Optional[FlexibleDecimal] = None
+
+    def to_db_entity(
+        self, operator_id: str, default_region: str, utc_now: datetime
+    ) -> Products:
+        """DTO -> SQLAlchemy Entity 的一键转换"""
+        data = self.model_dump()
+        data.update(
+            {
+                "id": str(
+                    uuid.uuid1(node=0x2AA7A70856D4)
+                ).upper(),  # 假设此函数在 context 可见
+                "region": (self.region or default_region).upper(),
+                "creator_id": operator_id,
+                "creation_time": utc_now,
+                "last_modifier_id": operator_id,
+                "last_modification_time": utc_now,
+            }
+        )
+        return Products(**data)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_price_range(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        # 1. 提取并初步清洗原始值 (利用之前的工具函数)
+        min_val = data.get("min_price")
+        max_val = data.get("max_price")
+
+        # 2. 逻辑 A: 缺一补一
+        if min_val and not max_val:
+            min_val = max_val = min_val
+        elif max_val and not min_val:
+            min_val = max_val = max_val
+
+        # 3. 逻辑 B: 针对爬虫脏数据的特殊拼接 (例如 min="19", max="0.99" -> "190.99" 的修正)
+        elif (
+            min_val
+            and max_val
+            and "." not in min_val
+            and "." in max_val
+            and max_val.startswith("0")
+        ):
+            joined = f"{min_val}{max_val}"
+            min_val = max_val = joined
+
+        # 4. 写回 data 字典，后续 Pydantic 会自动将其转为 FlexibleDecimal 类型
+        data["sale_price_min"] = min_val
+        data["sale_price_max"] = max_val
+
+        return data
+
+
+class CampaignIngestionRequest(BaseDTO):
+    source: str = Field(
+        ..., description="数据来源标识，例如 portal_tiktok_campaign_crawler"
+    )
+    operator_id: Optional[str] = Field(
+        default=None,
+        description="操作人/账号 ID，若未提供则使用服务端默认值",
+    )
+    options: Optional[CampaignIngestionOptions] = None
+    rows: List[CampaignRow] = Field(..., min_length=1)
+
+
+class ProductIngestionRequest(BaseDTO):
+    source: str = Field(
+        ..., description="数据来源标识，例如 portal_tiktok_campaign_crawler"
+    )
+    operator_id: Optional[str] = Field(
+        default=None,
+        description="操作人/账号 ID，若未提供则使用服务端默认值",
+    )
+    options: Optional[CampaignIngestionOptions] = None
+    rows: List[ProductRow] = Field(..., min_length=1)
+
+
+class CampaignIngestionResult(BaseDTO):
+    inserted: int = Field(..., description="本次提交的总行数")
+    campaigns: int = Field(..., description="涉及的唯一活动数量")
+
+
+class ProductIngestionResult(BaseDTO):
+    inserted: int = Field(..., description="本次提交的总行数")
+    products: int = Field(..., description="涉及的唯一商品数量")

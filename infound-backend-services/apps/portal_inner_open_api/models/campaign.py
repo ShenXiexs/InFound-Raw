@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from shared_application_services import BaseDTO
 
 
 def _to_camel(value: str) -> str:
@@ -10,13 +12,7 @@ def _to_camel(value: str) -> str:
     return parts[0] + "".join(part.capitalize() for part in parts[1:])
 
 
-class CampaignIngestionOptions(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CampaignIngestionOptions(BaseDTO):
     campaign_id: Optional[str] = None
     campaign_ids: Optional[List[str]] = None
     account_name: Optional[str] = None
@@ -26,13 +22,7 @@ class CampaignIngestionOptions(BaseModel):
     export_excel: Optional[bool] = None
 
 
-class CampaignRow(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CampaignRow(BaseDTO):
     platform_campaign_id: str = Field(..., min_length=1)
     platform_shop_id: Optional[str] = None
     platform_campaign_name: Optional[str] = None
@@ -49,13 +39,7 @@ class CampaignRow(BaseModel):
     platform_shop_phone: Optional[str] = None
 
 
-class ProductRow(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class ProductRow(BaseDTO):
     platform_product_id: str = Field(..., min_length=1)
     platform_campaign_id: str = Field(..., min_length=1)
     platform_shop_id: Optional[str] = None
@@ -75,13 +59,10 @@ class ProductRow(BaseModel):
     sale_price_max: Optional[Any] = None
 
 
-class CampaignIngestionRequest(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
+class CampaignIngestionRequest(BaseDTO):
+    source: str = Field(
+        ..., description="数据来源标识，例如 portal_tiktok_campaign_crawler"
     )
-
-    source: str = Field(..., description="数据来源标识，例如 portal_tiktok_campaign_crawler")
     operator_id: Optional[str] = Field(
         default=None,
         description="操作人/账号 ID，若未提供则使用服务端默认值",
@@ -90,13 +71,10 @@ class CampaignIngestionRequest(BaseModel):
     rows: List[CampaignRow] = Field(..., min_length=1)
 
 
-class ProductIngestionRequest(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
+class ProductIngestionRequest(BaseDTO):
+    source: str = Field(
+        ..., description="数据来源标识，例如 portal_tiktok_campaign_crawler"
     )
-
-    source: str = Field(..., description="数据来源标识，例如 portal_tiktok_campaign_crawler")
     operator_id: Optional[str] = Field(
         default=None,
         description="操作人/账号 ID，若未提供则使用服务端默认值",
@@ -105,21 +83,11 @@ class ProductIngestionRequest(BaseModel):
     rows: List[ProductRow] = Field(..., min_length=1)
 
 
-class CampaignIngestionResult(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class CampaignIngestionResult(BaseDTO):
     inserted: int = Field(..., description="本次提交的总行数")
     campaigns: int = Field(..., description="涉及的唯一活动数量")
 
 
-class ProductIngestionResult(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class ProductIngestionResult(BaseDTO):
     inserted: int = Field(..., description="本次提交的总行数")
     products: int = Field(..., description="涉及的唯一商品数量")

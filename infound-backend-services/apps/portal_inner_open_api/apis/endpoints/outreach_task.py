@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.database import get_db_session
-from common.core.response import APIResponse, success_response
+from apps.portal_inner_open_api.core.deps import (
+    get_outreach_task_service,
+)
 from apps.portal_inner_open_api.models.outreach_task import (
     OutreachTaskIngestionRequest,
     OutreachTaskIngestionResult,
@@ -10,8 +10,9 @@ from apps.portal_inner_open_api.models.outreach_task import (
     OutreachTaskProgressResult,
 )
 from apps.portal_inner_open_api.services.outreach_task_service import (
-    outreach_task_service,
+    OutreachTaskService,
 )
+from core_base import APIResponse, success_response
 
 router = APIRouter(prefix="/outreach_tasks", tags=["OutreachTasks"])
 
@@ -23,10 +24,10 @@ router = APIRouter(prefix="/outreach_tasks", tags=["OutreachTasks"])
 )
 async def ingest_outreach_task(
     payload: OutreachTaskIngestionRequest,
-    session: AsyncSession = Depends(get_db_session),
+    service: OutreachTaskService = Depends(get_outreach_task_service),
 ) -> APIResponse[OutreachTaskIngestionResult]:
     try:
-        result = await outreach_task_service.ingest(payload, session)
+        result = await service.ingest(payload)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -42,14 +43,13 @@ async def ingest_outreach_task(
 )
 async def increment_outreach_progress(
     payload: OutreachTaskProgressRequest,
-    session: AsyncSession = Depends(get_db_session),
+    service: OutreachTaskService = Depends(get_outreach_task_service),
 ) -> APIResponse[OutreachTaskProgressResult]:
     try:
-        new_count = await outreach_task_service.increment_progress(
+        new_count = await service.increment_progress(
             task_id=payload.task_id,
             delta=payload.delta,
             operator_id=payload.operator_id,
-            session=session,
         )
     except ValueError as exc:
         raise HTTPException(

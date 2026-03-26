@@ -86,6 +86,14 @@ export class SellerRpaApiClient {
     await this.post('/api/v1/rpa/outreach/results', payload)
   }
 
+  public async reportCreatorDetailResults(payload: Record<string, unknown>): Promise<void> {
+    await this.post('/api/v1/rpa/creator-details/results', payload)
+  }
+
+  public async reportSampleMonitorResults(payload: Record<string, unknown>): Promise<void> {
+    await this.post('/api/v1/rpa/sample-monitor/results', payload)
+  }
+
   private async post(path: string, payload: Record<string, unknown>): Promise<void> {
     const url = `${this.config.baseUrl}${path}`
     const response = await fetch(url, {

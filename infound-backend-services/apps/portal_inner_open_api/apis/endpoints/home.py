@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from common.core.response import success_response, APIResponse
+from core_base import APIResponse, success_response
 
 router = APIRouter(tags=["首页"])
 

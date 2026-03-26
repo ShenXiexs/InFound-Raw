@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.database import get_db_session
-from common.core.response import APIResponse, success_response
+from apps.portal_inner_open_api.core.deps import (
+    get_campaign_ingestion_service,
+)
 from apps.portal_inner_open_api.models.campaign import (
     CampaignIngestionRequest,
     CampaignIngestionResult,
     ProductIngestionRequest,
     ProductIngestionResult,
 )
-from apps.portal_inner_open_api.services.campaign_ingestion_service import (
-    campaign_ingestion_service,
-)
+from apps.portal_inner_open_api.services import CampaignIngestionService
+from core_base import APIResponse, success_response
 
 router = APIRouter(prefix="", tags=["Campaigns"])
 
@@ -23,10 +22,10 @@ router = APIRouter(prefix="", tags=["Campaigns"])
 )
 async def ingest_campaigns(
     payload: CampaignIngestionRequest,
-    session: AsyncSession = Depends(get_db_session),
+    service: CampaignIngestionService = Depends(get_campaign_ingestion_service),
 ) -> APIResponse[CampaignIngestionResult]:
     try:
-        result = await campaign_ingestion_service.ingest_campaigns(payload, session)
+        result = await service.ingest_campaigns(payload)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -42,10 +41,10 @@ async def ingest_campaigns(
 )
 async def ingest_products(
     payload: ProductIngestionRequest,
-    session: AsyncSession = Depends(get_db_session),
+    service: CampaignIngestionService = Depends(get_campaign_ingestion_service),
 ) -> APIResponse[ProductIngestionResult]:
     try:
-        result = await campaign_ingestion_service.ingest_products(payload, session)
+        result = await service.ingest_products(payload)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

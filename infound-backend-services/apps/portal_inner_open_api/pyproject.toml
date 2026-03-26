@@ -1,0 +1,25 @@
+[project]
+name = "portal-inner-open-api"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "core-base",
+    "core-mq",
+    "core-redis",
+    "core-web",
+    "pyjwt>=2.11.0",
+    "shared-application-services",
+    "shared-domain",
+    "shared-infrastructure",
+    "uvicorn[standard]>=0.41.0",
+]
+
+[tool.uv.sources]
+shared-infrastructure = { workspace = true }
+core-web = { workspace = true }
+core-redis = { workspace = true }
+core-mq = { workspace = true }
+shared-application-services = { workspace = true }
+shared-domain = { workspace = true }
+core-base = { workspace = true }

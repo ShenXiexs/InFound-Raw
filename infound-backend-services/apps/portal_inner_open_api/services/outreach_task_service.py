@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.logger import get_logger
-from common.models.infound import OutreachTasks
 from apps.portal_inner_open_api.models.outreach_task import (
     OutreachTaskIngestionRequest,
     OutreachTaskIngestionResult,
 )
+from shared_domain.models.infound import OutreachTasks
+from core_base import get_logger
 
 logger = get_logger()
 
@@ -62,7 +62,7 @@ def _parse_human_number(value: Any) -> Optional[float]:
     cleaned = (
         raw.replace(",", "")
         .replace(" ", "")
-        .replace("\u00A0", "")
+        .replace("\u00a0", "")
         .replace("$", "")
         .replace("\u20ac", "")
         .replace("\u00a3", "")
@@ -208,11 +208,13 @@ def _ensure_message_json(value: Any) -> Optional[str]:
 class OutreachTaskService:
     """Persist outreach task payload into MySQL."""
 
-    def __init__(self) -> None:
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.logger = get_logger()
+        self.db_session = db_session
         self.default_operator_id = "00000000-0000-0000-0000-000000000000"
 
     async def ingest(
-        self, request: OutreachTaskIngestionRequest, session: AsyncSession
+        self, request: OutreachTaskIngestionRequest
     ) -> OutreachTaskIngestionResult:
         row = request.task.model_dump()
         operator_id = request.operator_id or self.default_operator_id
@@ -222,7 +224,7 @@ class OutreachTaskService:
         payload = self._build_payload(row, audit_id, utc_now)
         task_id = payload["id"]
 
-        await self._upsert_task(session, payload)
+        await self._upsert_task(self.db_session, payload)
 
         logger.info(
             "Outreach task synced",
@@ -275,7 +277,9 @@ class OutreachTaskService:
             "gmv_range": _ensure_range_json(row_data.get("gmv")),
             "sales_range": _ensure_range_json(row_data.get("sales")),
             "min_fans": _to_int(row_data.get("min_fans")),
-            "min_avg_views": _to_int(row_data.get("avg_views") or row_data.get("min_avg_views")),
+            "min_avg_views": _to_int(
+                row_data.get("avg_views") or row_data.get("min_avg_views")
+            ),
             "min_engagement_rate": _to_int(row_data.get("min_engagement_rate")),
             "first_message": _ensure_message_json(row_data.get("email_first_body")),
             "second_message": _ensure_message_json(row_data.get("email_later_body")),
@@ -302,7 +306,6 @@ class OutreachTaskService:
         task_id: str,
         delta: int,
         operator_id: Optional[str],
-        session: AsyncSession,
     ) -> int:
         task_id_clean = _clean_text(task_id)
         if not task_id_clean:
@@ -311,7 +314,7 @@ class OutreachTaskService:
             raise ValueError("delta must be positive")
 
         audit_id = _normalize_uuid_text(operator_id or self.default_operator_id)
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
 
         stmt = (
             update(OutreachTasks)
@@ -324,14 +327,14 @@ class OutreachTaskService:
                 last_modification_time=utc_now,
             )
         )
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         if not result.rowcount:
             raise ValueError("Outreach task not found")
 
         stmt = select(OutreachTasks.new_creators_real_count).where(
             OutreachTasks.id == task_id_clean
         )
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         count = result.scalar_one_or_none()
         return int(count or 0)
 
@@ -349,6 +352,3 @@ class OutreachTaskService:
             return
 
         session.add(OutreachTasks(**payload))
-
-
-outreach_task_service = OutreachTaskService()

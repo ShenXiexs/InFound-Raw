@@ -21,6 +21,8 @@ export interface SellerCreatorDetailContextInput {
 export interface SellerCreatorDetailPayload extends SellerRpaTaskContextInput {
   creatorId: string
   context?: SellerCreatorDetailContextInput
+  script?: Record<string, unknown> | string
+  scriptPath?: string
 }
 
 export interface SellerCreatorDetailPayloadInput extends Partial<SellerCreatorDetailPayload> {}

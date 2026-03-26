@@ -20,8 +20,10 @@ POPUP_THRESHOLD_INPUT_SELECTOR = 'input[data-tid="m4b_input"][data-e2e="7f6a7b3f
 POPUP_CHECKBOX_LABEL_SELECTOR = 'label[data-tid="m4b_checkbox"]'
 POPUP_SCROLL_CONTAINER_SELECTOR = '.arco-select-popup-inner'
 DEFAULT_OUTREACH_PAGE_READY_TEXT = 'Find creators'
-OUTREACH_DSL_REFERENCE = 'ref/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts'
+OUTREACH_DSL_REFERENCE = 'infound-desktop-client-master/apps/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts'
 SEARCH_INPUT_SELECTOR = 'input[data-tid="m4b_input_search"]'
+SORT_BY_TRIGGER_SELECTOR = 'div[role="combobox"][aria-haspopup="listbox"], div.arco-select-view'
+SORT_BY_OPTION_SELECTOR = 'li.arco-select-option'
 
 PreparePageHook = Callable[[Any, Any, int], Awaitable[None]]
 
@@ -35,6 +37,7 @@ class OutreachFilterScript:
     filter_title_selector: str
     filter_modules: List[Dict[str, Any]]
     search_binding: Dict[str, str]
+    sort_binding: Optional[Dict[str, Any]] = None
     prepare_page_hook: Optional[PreparePageHook] = None
 
 
@@ -46,6 +49,38 @@ def build_default_search_binding(
         "action_type": "fillSelector + clickByText + pressKey",
         "selector": SEARCH_INPUT_SELECTOR,
         "dismiss_text": page_ready_text,
+    }
+
+
+def build_sort_binding(
+    *,
+    option_map: Dict[int | str, str],
+    trigger_selector: str = SORT_BY_TRIGGER_SELECTOR,
+    option_selector: str = SORT_BY_OPTION_SELECTOR,
+    wait_selector: str = SORT_BY_OPTION_SELECTOR,
+    scroll_container_selector: str = POPUP_SCROLL_CONTAINER_SELECTOR,
+) -> Dict[str, Any]:
+    normalized_option_map: Dict[str, str] = {}
+    trigger_texts: List[str] = []
+    for key, value in option_map.items():
+        numeric_key = str(key).strip()
+        label = str(value or "").strip()
+        if not numeric_key or not label:
+            continue
+        normalized_option_map[numeric_key] = label
+        if label not in trigger_texts:
+            trigger_texts.append(label)
+
+    return {
+        "field_key": "filterSortBy",
+        "field_title": "Sort by",
+        "action_type": "selectDropdownSingle",
+        "trigger_selector": trigger_selector,
+        "trigger_texts": trigger_texts,
+        "wait_selector": wait_selector,
+        "option_selector": option_selector,
+        "scroll_container_selector": scroll_container_selector,
+        "option_map": normalized_option_map,
     }
 
 

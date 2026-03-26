@@ -1,18 +1,9 @@
-from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any
 
-
-def _to_camel(value: str) -> str:
-    parts = value.split("_")
-    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+from shared_application_services import BaseDTO
 
 
-class SampleDetailResponse(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class SampleDetailResponse(BaseDTO):
     id: str
     status: str
     content_summary: Optional[Any] = None

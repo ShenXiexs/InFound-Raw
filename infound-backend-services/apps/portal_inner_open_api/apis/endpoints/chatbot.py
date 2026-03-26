@@ -2,14 +2,14 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException, status
 
-from common.core.response import APIResponse, success_response
-from common.services.rabbitmq_producer import RabbitMQProducer
+from apps.portal_inner_open_api.core.rabbitmq_producer import RabbitMQProducer
 from apps.portal_inner_open_api.models.chatbot import (
     ChatbotDispatchResult,
     ChatbotMessageTask,
     OutreachChatbotTask,
     OutreachChatbotControlRequest,
 )
+from core_base import APIResponse, success_response
 
 router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
     response_model_by_alias=True,
 )
 async def publish_chatbot_messages(
-    payload: List[ChatbotMessageTask],
+        payload: List[ChatbotMessageTask],
 ) -> APIResponse[ChatbotDispatchResult]:
     if not payload:
         raise HTTPException(
@@ -47,7 +47,7 @@ async def publish_chatbot_messages(
     response_model_by_alias=True,
 )
 async def publish_outreach_chatbot_messages(
-    payload: List[OutreachChatbotTask],
+        payload: List[OutreachChatbotTask],
 ) -> APIResponse[ChatbotDispatchResult]:
     if not payload:
         raise HTTPException(
@@ -73,7 +73,7 @@ async def publish_outreach_chatbot_messages(
     response_model_by_alias=True,
 )
 async def publish_outreach_chatbot_control(
-    payload: OutreachChatbotControlRequest,
+        payload: OutreachChatbotControlRequest,
 ) -> APIResponse[ChatbotDispatchResult]:
     action = payload.action
     task_id = payload.task_id

@@ -1,0 +1,12 @@
+env: "pro"
+debug: false
+
+mysql:
+  host: "172.17.0.1"
+  user: "infound-pro"
+  password: "J6B^tu)E~$HJBb"
+  db: "infound.pro"
+
+redis:
+  host: "172.17.0.1"
+  prefix: "if.pro:creator"

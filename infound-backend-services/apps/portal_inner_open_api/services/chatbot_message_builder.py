@@ -6,8 +6,8 @@ from typing import Any, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.config import get_settings
-from common.models.infound import Products
+from apps.portal_inner_open_api.core.config import Settings
+from shared_domain.models.infound import Products
 
 
 @dataclass(frozen=True)
@@ -21,8 +21,8 @@ class ChatbotMessageBuilder:
     SCENARIO_CONTENT_PENDING = "content_pending"
     SCENARIO_NO_CONTENT_POSTED = "no_content_posted"
 
-    def __init__(self) -> None:
-        settings = get_settings()
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
         self.link_template = str(
             getattr(
                 settings,
@@ -111,7 +111,9 @@ class ChatbotMessageBuilder:
             messages.append({"type": "link", "content": link})
         return messages
 
-    async def _no_content_posted(self, session: AsyncSession, sample: Any) -> List[dict]:
+    async def _no_content_posted(
+        self, session: AsyncSession, sample: Any
+    ) -> List[dict]:
         block = await self._product_block(session, sample)
         first = (
             "Hola, ¿cómo estás? 😊\n\n"
@@ -121,6 +123,3 @@ class ChatbotMessageBuilder:
             "¡Gracias por tu apoyo!"
         )
         return [{"type": "text", "content": first}]
-
-
-chatbot_message_builder = ChatbotMessageBuilder()

@@ -9,18 +9,15 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.config import get_settings
-from common.core.logger import get_logger
-from common.models.infound import Campaigns, Products
+from apps.portal_inner_open_api.core.config import Settings
 from apps.portal_inner_open_api.models.campaign import (
     CampaignIngestionRequest,
     CampaignIngestionResult,
     ProductIngestionRequest,
     ProductIngestionResult,
 )
-
-settings = get_settings()
-logger = get_logger()
+from shared_domain.models.infound import Campaigns, Products
+from core_base import get_logger
 
 PREFERRED_UUID_NODE = 0x2AA7A70856D4
 
@@ -142,7 +139,13 @@ def _normalize_price_range(
         return min_text, min_text
     if max_text and not min_text:
         return max_text, max_text
-    if min_text and max_text and "." not in min_text and "." in max_text and max_text.startswith("0"):
+    if (
+        min_text
+        and max_text
+        and "." not in min_text
+        and "." in max_text
+        and max_text.startswith("0")
+    ):
         joined = f"{min_text}{max_text}"
         return joined, joined
     return min_text, max_text
@@ -151,7 +154,10 @@ def _normalize_price_range(
 class CampaignIngestionService:
     """Persist campaign/product rows from the crawler into MySQL."""
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings, db_session: AsyncSession) -> None:
+        self.logger = get_logger()
+        self.settings = settings
+        self.db_session = db_session
         self.default_operator_id = str(
             getattr(settings, "CAMPAIGN_DEFAULT_OPERATOR_ID", None)
             or getattr(settings, "SAMPLE_DEFAULT_OPERATOR_ID", None)
@@ -162,7 +168,7 @@ class CampaignIngestionService:
         ).upper()
 
     async def ingest_campaigns(
-        self, request: CampaignIngestionRequest, session: AsyncSession
+        self, request: CampaignIngestionRequest
     ) -> CampaignIngestionResult:
         rows = [row.model_dump() for row in request.rows]
         if not rows:
@@ -175,23 +181,25 @@ class CampaignIngestionService:
         for row in rows:
             payload = self._build_campaign_payload(row, operator_id, utc_now)
             if not payload:
-                logger.warning("跳过缺少 platform_campaign_id 的活动行: %s", row)
+                self.logger.warning("跳过缺少 platform_campaign_id 的活动行: %s", row)
                 continue
             unique_campaigns.add(
                 f"{payload.get('platform_campaign_id')}|{payload.get('platform_shop_id') or ''}"
             )
-            await self._upsert_campaign(session, payload)
+            await self._upsert_campaign(self.db_session, payload)
 
-        logger.info(
+        self.logger.info(
             "Campaigns ingest completed",
             source=request.source,
             rows=len(rows),
             campaigns=len(unique_campaigns),
         )
-        return CampaignIngestionResult(inserted=len(rows), campaigns=len(unique_campaigns))
+        return CampaignIngestionResult(
+            inserted=len(rows), campaigns=len(unique_campaigns)
+        )
 
     async def ingest_products(
-        self, request: ProductIngestionRequest, session: AsyncSession
+        self, request: ProductIngestionRequest
     ) -> ProductIngestionResult:
         rows = [row.model_dump() for row in request.rows]
         if not rows:
@@ -204,14 +212,14 @@ class CampaignIngestionService:
         for row in rows:
             payload = self._build_product_payload(row, operator_id, utc_now)
             if not payload:
-                logger.warning("跳过缺少 platform_product_id 的商品行: %s", row)
+                self.logger.warning("跳过缺少 platform_product_id 的商品行: %s", row)
                 continue
             unique_products.add(
                 f"{payload.get('platform_campaign_id')}|{payload.get('platform_product_id')}"
             )
-            await self._upsert_product(session, payload)
+            await self._upsert_product(self.db_session, payload)
 
-        logger.info(
+        self.logger.info(
             "Products ingest completed",
             source=request.source,
             rows=len(rows),
@@ -247,9 +255,7 @@ class CampaignIngestionService:
             "registration_period": _to_period_list(
                 _pick_first(row, "registration_period", "campaign_registration_period")
             ),
-            "campaign_period": _to_period_list(
-                _pick_first(row, "campaign_period")
-            ),
+            "campaign_period": _to_period_list(_pick_first(row, "campaign_period")),
             "pending_product_count": _to_int(
                 _pick_first(row, "pending_product_count", "campaign_pending_products")
             ),
@@ -366,6 +372,3 @@ class CampaignIngestionService:
         data = {"id": _generate_uuid(), **payload}
         session.add(Products(**data))
         return True
-
-
-campaign_ingestion_service = CampaignIngestionService()

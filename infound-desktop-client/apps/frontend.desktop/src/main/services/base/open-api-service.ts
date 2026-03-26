@@ -23,10 +23,10 @@ const transform: InterceptorHooks = {
 
     config.headers[HTTP_HEADERS.APP_TYPE] = 'desktop'
 
-    /*const currentUser = globalState.currentState.currentUser
+    const currentUser = globalState.currentState.currentUser
     if (currentUser?.tokenName && currentUser?.tokenValue) {
       config.headers[currentUser.tokenName] = currentUser.tokenValue
-    }*/
+    }
 
     if (!AppConfig.IS_PRO) {
       logger.info('[Request]', {

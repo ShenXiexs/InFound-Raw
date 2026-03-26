@@ -1,11 +1,15 @@
-from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, asc, desc, case, literal_column
-from uuid import uuid4
 import json
+from datetime import datetime, timezone
+from typing import Sequence
+from uuid import uuid4
 
-from common.models.infound import OutreachTasks
-from common.core.exceptions import ResourceNotFoundError
+from sqlalchemy import select, func, asc, desc, case, literal_column
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.expression import text
+
+from core_base import get_logger
+from core_web import ResourceNotFoundError
+from shared_domain.models.infound import OutreachTasks
 
 
 def _parse_datetime(dt_str: str) -> datetime:
@@ -53,6 +57,10 @@ def _format_datetime(value):
 class OutreachTaskService:
     """运营管理-建联任务查询（portal_operation_open_api 专属）"""
 
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.logger = get_logger()
+        self.db_session = db_session
+
     @staticmethod
     def _parse_message_json(message: str) -> dict:
         """安全解析消息 JSON，处理空值和无效 JSON"""
@@ -81,23 +89,22 @@ class OutreachTaskService:
     # =========================
     # 任务一：任务列表
     # =========================
-    @staticmethod
     async def get_task_list(
-        session: AsyncSession,
-        page: int,
-        page_size: int,
-        status: str | None = None,
-        region: str | None = None,
-        task_name: str | None = None,
-        platform: str | None = None,
-        sort_by: str | None = None,
-        sort_order: str | None = None,
-        created_from: str | None = None,
-        created_to: str | None = None,
-        plan_start_from: str | None = None,
-        plan_start_to: str | None = None,
-        plan_end_from: str | None = None,
-        plan_end_to: str | None = None,
+            self,
+            page: int,
+            page_size: int,
+            status: str | None = None,
+            region: str | None = None,
+            task_name: str | None = None,
+            platform: str | None = None,
+            sort_by: str | None = None,
+            sort_order: str | None = None,
+            created_from: str | None = None,
+            created_to: str | None = None,
+            plan_start_from: str | None = None,
+            plan_start_to: str | None = None,
+            plan_end_from: str | None = None,
+            plan_end_to: str | None = None,
     ):
         offset = (page - 1) * page_size
 
@@ -138,7 +145,48 @@ class OutreachTaskService:
 
         # total
         count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = await session.scalar(count_stmt)
+        total = await self.db_session.scalar(count_stmt)
+
+        # 排序
+        sort_column = OutreachTasks.creation_time  # 默认按创建时间排序
+        if sort_by == "real_start_at":
+            sort_column = OutreachTasks.real_start_at
+        elif sort_by == "plan_stop_time":
+            sort_column = OutreachTasks.plan_stop_time
+        elif sort_by == "creation_time":
+            sort_column = OutreachTasks.creation_time
+        elif sort_by == "spend_time":
+            # 已运行时间需要特殊处理，使用数据库计算
+            # 计算逻辑：
+            # - 如果有 real_end_at，则 spend_time = real_end_at - real_start_at
+            # - 如果 status = 'running' 且有 real_start_at，则 spend_time = now - real_start_at
+            # - 否则 spend_time = 0
+            now_utc = datetime.now(timezone.utc)
+            sort_column = case(
+                (
+                    OutreachTasks.real_end_at.isnot(None),
+                    func.timestampdiff(
+                        text("SECOND"),
+                        OutreachTasks.real_start_at,
+                        OutreachTasks.real_end_at
+                    )
+                ),
+                (
+                    (OutreachTasks.status == "running") & OutreachTasks.real_start_at.isnot(None),
+                    func.timestampdiff(
+                        text("SECOND"),
+                        OutreachTasks.real_start_at,
+                        text(f"'{now_utc.strftime('%Y-%m-%d %H:%M:%S')}'")
+                    )
+                ),
+                else_=0
+            )
+
+        # 应用排序方向
+        if sort_order == "asc":
+            stmt = stmt.order_by(sort_column.asc())
+        else:
+            stmt = stmt.order_by(sort_column.desc())
 
         # list
         running_seconds = func.timestampdiff(
@@ -182,7 +230,7 @@ class OutreachTaskService:
             .limit(page_size)
         )
 
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         tasks = result.scalars().all()
 
         return {
@@ -210,13 +258,12 @@ class OutreachTaskService:
     # =========================
     # 任务二：任务详情
     # =========================
-    @staticmethod
     async def get_task_detail(
-        session: AsyncSession,
-        task_id: str,
+            self,
+            task_id: str,
     ):
         stmt = select(OutreachTasks).where(OutreachTasks.id == task_id)
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         t = result.scalar_one_or_none()
 
         if not t:
@@ -281,10 +328,9 @@ class OutreachTaskService:
     # =========================
     # 任务三：创建任务
     # =========================
-    @staticmethod
     async def create_task(
-        session: AsyncSession,
-        payload,
+            self,
+            payload,
     ):
         """
         创建建联任务
@@ -312,7 +358,7 @@ class OutreachTaskService:
             task_type="Connect",
             status="not_started",  # 初始状态
             search_keywords=(
-                payload.search_strategy.search_keywords or payload.brand.key_word
+                    payload.search_strategy.search_keywords or payload.brand.key_word
             ),
             product_categories=payload.search_strategy.product_category,
             fans_age_range=payload.search_strategy.fans_age_range,
@@ -349,26 +395,25 @@ class OutreachTaskService:
             plan_stop_time=_parse_datetime(payload.run_end_time),
         )
 
-        session.add(task)
-        await session.commit()
-        await session.refresh(task)
+        self.db_session.add(task)
+        await self.db_session.commit()
+        await self.db_session.refresh(task)
 
         return task
 
     # =========================
     # 任务四：更新任务
     # =========================
-    @staticmethod
     async def update_task(
-        session: AsyncSession,
-        task_id: str,
-        payload,
+            self,
+            task_id: str,
+            payload,
     ):
         """
         更新建联任务
         """
         stmt = select(OutreachTasks).where(OutreachTasks.id == task_id)
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         task = result.scalar_one_or_none()
 
         if not task:
@@ -393,7 +438,7 @@ class OutreachTaskService:
         if payload.product_list is not None:
             task.product_list = _normalize_product_list(payload.product_list)
         task.search_keywords = (
-            payload.search_strategy.search_keywords or payload.brand.key_word
+                payload.search_strategy.search_keywords or payload.brand.key_word
         )
         task.product_categories = payload.search_strategy.product_category
         task.fans_age_range = payload.search_strategy.fans_age_range
@@ -429,24 +474,23 @@ class OutreachTaskService:
         task.plan_execute_time = _parse_datetime(payload.run_at_time)
         task.plan_stop_time = _parse_datetime(payload.run_end_time)
 
-        await session.commit()
-        await session.refresh(task)
+        await self.db_session.commit()
+        await self.db_session.refresh(task)
 
         return task
 
     # =========================
     # 任务五：立即执行任务
     # =========================
-    @staticmethod
     async def run_task_now(
-        session: AsyncSession,
-        task_id: str,
+            self,
+            task_id: str,
     ):
         """
         立即执行任务（将计划执行时间设为当前时间）
         """
         stmt = select(OutreachTasks).where(OutreachTasks.id == task_id)
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         task = result.scalar_one_or_none()
 
         if not task:
@@ -465,22 +509,21 @@ class OutreachTaskService:
         task.last_modifier_id = "00000000-0000-0000-0000-000000000000"
         task.last_modification_time = now
 
-        await session.commit()
-        await session.refresh(task)
+        await self.db_session.commit()
+        await self.db_session.refresh(task)
 
         return task
 
     # =========================
     # 任务六：更新任务名称
     # =========================
-    @staticmethod
     async def update_task_name(
-        session: AsyncSession,
-        task_id: str,
-        task_name: str,
+            self,
+            task_id: str,
+            task_name: str,
     ) -> OutreachTasks:
         stmt = select(OutreachTasks).where(OutreachTasks.id == task_id)
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         task = result.scalar_one_or_none()
 
         if not task:
@@ -491,25 +534,24 @@ class OutreachTaskService:
         task.last_modifier_id = "00000000-0000-0000-0000-000000000000"
         task.last_modification_time = now
 
-        await session.commit()
-        await session.refresh(task)
+        await self.db_session.commit()
+        await self.db_session.refresh(task)
         return task
 
     # =========================
     # 任务七：停止任务（批量）
     # =========================
-    @staticmethod
     async def stop_tasks(
-        session: AsyncSession,
-        task_id: str | None = None,
-    ) -> list[OutreachTasks]:
+            self,
+            task_id: str | None = None,
+    ) -> list[OutreachTasks] | Sequence[OutreachTasks]:
         stmt = select(OutreachTasks)
         if task_id:
             stmt = stmt.where(OutreachTasks.id == task_id)
         else:
             stmt = stmt.where(OutreachTasks.status.in_(["not_started", "running"]))
 
-        result = await session.execute(stmt)
+        result = await self.db_session.execute(stmt)
         tasks = result.scalars().all()
         if not tasks:
             return []
@@ -524,7 +566,7 @@ class OutreachTaskService:
             task.last_modifier_id = "00000000-0000-0000-0000-000000000000"
             task.last_modification_time = now
 
-        await session.commit()
+        await self.db_session.commit()
         return tasks
 
     # =========================
@@ -532,9 +574,9 @@ class OutreachTaskService:
     # =========================
     @staticmethod
     def build_crawler_payload(
-        task: OutreachTasks,
-        *,
-        run_at_time_override: str | None = None,
+            task: OutreachTasks,
+            *,
+            run_at_time_override: str | None = None,
     ) -> dict:
         first_message = OutreachTaskService._parse_message_json(task.first_message)
         second_message = OutreachTaskService._parse_message_json(task.second_message)

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from shared_application_services import BaseDTO
 
 
 def _to_camel(value: str) -> str:
@@ -10,15 +12,7 @@ def _to_camel(value: str) -> str:
     return parts[0] + "".join(part.capitalize() for part in parts[1:])
 
 
-class OutreachTaskPayload(BaseModel):
-    """Normalized outreach task payload from the crawler."""
-
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class OutreachTaskPayload(BaseDTO):
     task_id: Optional[str] = None
     platform: Optional[str] = None
     task_name: Optional[str] = None
@@ -58,14 +52,7 @@ class OutreachTaskPayload(BaseModel):
     created_at: Optional[Any] = None
 
 
-class OutreachTaskIngestionRequest(BaseModel):
-    """Request body used to upsert an outreach task."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class OutreachTaskIngestionRequest(BaseDTO):
     source: Optional[str] = Field(default=None, description="Data source identifier")
     operator_id: Optional[str] = Field(
         default=None, description="Operator/account ID used for audit fields"
@@ -73,37 +60,16 @@ class OutreachTaskIngestionRequest(BaseModel):
     task: OutreachTaskPayload
 
 
-class OutreachTaskIngestionResult(BaseModel):
-    """Response payload returned to the collector."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class OutreachTaskIngestionResult(BaseDTO):
     task_id: str = Field(..., description="Outreach task ID")
 
 
-class OutreachTaskProgressRequest(BaseModel):
-    """Request body used to increment outreach task progress."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class OutreachTaskProgressRequest(BaseDTO):
     task_id: str = Field(..., min_length=1)
     delta: int = Field(default=1, ge=1)
     operator_id: Optional[str] = None
 
 
-class OutreachTaskProgressResult(BaseModel):
-    """Response payload returned after progress update."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class OutreachTaskProgressResult(BaseDTO):
     task_id: str
     new_creators_real_count: int

@@ -8,14 +8,13 @@ from typing import Any, Dict, Optional, Set
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.logger import get_logger
-from common.models.infound import Creators, CreatorCrawlLogs
+from apps.portal_inner_open_api.core.config import Settings
 from apps.portal_inner_open_api.models.creator import (
     CreatorIngestionRequest,
     CreatorIngestionResult,
 )
-
-logger = get_logger()
+from shared_domain.models.infound import CreatorCrawlLogs, Creators
+from core_base import get_logger
 
 PREFERRED_UUID_NODE = 0x2AA7A70856D4
 
@@ -78,7 +77,7 @@ def _parse_human_number(value: Any) -> Optional[float]:
     cleaned = (
         raw.replace(",", "")
         .replace(" ", "")
-        .replace("\u00A0", "")
+        .replace("\u00a0", "")
         .replace("$", "")
         .replace("\u20ac", "")
         .replace("\u00a3", "")
@@ -202,7 +201,6 @@ def _prepare_creator_payload(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "sales_revenue_per_buyer": _to_decimal(row.get("sales_revenue_per_buyer")),
         "gmv_per_sales_channel": _clean_text(row.get("gmv_per_sales_channel")),
         "gmv_by_product_category": _clean_text(row.get("gmv_by_product_category")),
-        "est_post_rate": _to_decimal(row.get("est_post_rate")),
         "avg_commission_rate": _to_decimal(row.get("avg_commission_rate")),
         "collab_products": _to_int(row.get("collab_products")),
         "partnered_brands": _to_int(row.get("partnered_brands")),
@@ -244,7 +242,9 @@ def _build_crawl_log_payload(
         "crawl_date": _parse_crawl_date(row.get("crawl_date"), crawl_date),
         "platform": base_payload.get("platform"),
         "platform_creator_id": base_payload.get("platform_creator_id"),
-        "platform_creator_display_name": base_payload.get("platform_creator_display_name"),
+        "platform_creator_display_name": base_payload.get(
+            "platform_creator_display_name"
+        ),
         "platform_creator_username": base_payload.get("platform_creator_username"),
         "task_id": task_id,
         "email": base_payload.get("email"),
@@ -264,7 +264,6 @@ def _build_crawl_log_payload(
         "sales_revenue_per_buyer": base_payload.get("sales_revenue_per_buyer"),
         "gmv_per_sales_channel": base_payload.get("gmv_per_sales_channel"),
         "gmv_by_product_category": base_payload.get("gmv_by_product_category"),
-        "est_post_rate": base_payload.get("est_post_rate"),
         "avg_commission_rate": base_payload.get("avg_commission_rate"),
         "collab_products": base_payload.get("collab_products"),
         "partnered_brands": base_payload.get("partnered_brands"),
@@ -303,12 +302,13 @@ def _build_crawl_log_payload(
 class CreatorIngestionService:
     """Persist creator snapshots into MySQL."""
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings, db_session: AsyncSession) -> None:
+        self.logger = get_logger()
+        self.settings = settings
+        self.db_session = db_session
         self.default_operator_id = "00000000-0000-0000-0000-000000000000"
 
-    async def ingest(
-        self, request: CreatorIngestionRequest, session: AsyncSession
-    ) -> CreatorIngestionResult:
+    async def ingest(self, request: CreatorIngestionRequest) -> CreatorIngestionResult:
         rows = [row.model_dump() for row in request.rows]
         if not rows:
             raise ValueError("rows cannot be empty")
@@ -327,7 +327,7 @@ class CreatorIngestionService:
         for row in rows:
             payload = _prepare_creator_payload(row)
             if not payload:
-                logger.warning("Skip creator row without platform_creator_id")
+                self.logger.warning("Skip creator row without platform_creator_id")
                 continue
 
             skip_upsert = _to_bool_flag(row.get("skip_creator_upsert"))
@@ -344,12 +344,12 @@ class CreatorIngestionService:
                         "last_modification_time": utc_now,
                     }
                 )
-                await self._upsert_creator(session, payload)
+                await self._upsert_creator(self.db_session, payload)
                 creator_ids.add(payload["platform_creator_id"])
                 base_payload = payload
             else:
                 base_payload = payload
-                logger.info(
+                self.logger.info(
                     "Skip creator upsert for sparse row",
                     platform_creator_id=payload.get("platform_creator_id"),
                 )
@@ -362,10 +362,10 @@ class CreatorIngestionService:
                 crawl_date,
                 task_id,
             )
-            session.add(CreatorCrawlLogs(**crawl_payload))
+            self.db_session.add(CreatorCrawlLogs(**crawl_payload))
             inserted += 1
 
-        logger.info(
+        self.logger.info(
             "Creator ingestion completed",
             source=request.source,
             rows=len(rows),
@@ -388,6 +388,3 @@ class CreatorIngestionService:
             return
 
         session.add(Creators(**payload))
-
-
-creator_ingestion_service = CreatorIngestionService()

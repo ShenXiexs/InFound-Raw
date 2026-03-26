@@ -9,6 +9,8 @@ export interface SellerChatbotPayload extends SellerRpaTaskContextInput {
   creatorId: string
   message: string
   recipients?: SellerChatbotRecipient[]
+  script?: Record<string, unknown> | string
+  scriptPath?: string
 }
 
 export interface SellerChatbotPayloadInput extends Partial<SellerChatbotPayload> {}

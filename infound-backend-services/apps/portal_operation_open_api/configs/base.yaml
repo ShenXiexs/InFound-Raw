@@ -1,0 +1,101 @@
+app_name: "infound-portal-operation-open-api"
+env: "dev"
+debug: true
+
+# ============================================================
+# 日志配置
+# ============================================================
+log:
+  level: "INFO"
+  dir: "logs"
+  file_max_size: 10
+  file_backup_count: 30
+
+# ============================================================
+# MySQL 数据库配置
+# ============================================================
+mysql:
+  host: "db-zaxoqvvl.stg.infound.ai"
+  port: 8801
+  user: "infound-stg"
+  password: "&3$BSW)mGxE(Zk"
+  db: "infound.stg"
+  charset: "utf8mb4"
+
+# ============================================================
+# Redis 缓存配置
+# ============================================================
+redis:
+  host: "redis-q9zy4cjd.stg.infound.ai"
+  port: 8802
+  password: "XJh$(KLRM3*!m5"
+  db: 0
+  prefix: "if.dev:operation"
+
+# ============================================================
+# RabbitMQ 消息队列配置（支持多队列）
+# ============================================================
+rabbitmq:
+  # 基础连接配置
+  host: "mq-zlx123j9.stg.infound.ai"
+  port: 8803
+  username: "infound.stg"
+  password: "xy6Ucz5IZ@Z%P)"
+  vhost: "/infound.stg"
+  prefetch_count: 10
+  reconnect_delay: 5
+  max_reconnect_attempts: 3
+
+  # 主交换机配置
+  exchange_name: "infound.topic"
+  exchange_type: "topic"
+  routing_key_prefix: "infound"
+
+  # 多队列配置
+  queues:
+    chatbot:
+      exchange: "infound.topic"
+      routing_key_pattern: "infound.chatbot.*"
+      queue_name: "chatbot.tasks.queue"
+      durable: true
+      auto_delete: false
+
+    crawler:
+      exchange: "infound.topic"
+      routing_key_pattern: "infound.crawler.*"
+      queue_name: "crawler.tasks.queue"
+      durable: true
+      auto_delete: false
+
+    outreach:
+      exchange: "infound.topic"
+      routing_key_pattern: "infound.outreach.*"
+      queue_name: "outreach.tasks.queue"
+      durable: true
+      auto_delete: false
+      queue_prefix: "chatbot.outreach.queue"
+      control_queue: "chatbot.outreach.control.queue"
+      control_routing_key_prefix: "chatbot.outreach.control"
+
+#    notification:
+#      exchange: "infound.topic"
+#      routing_key_pattern: "infound.notification.*"
+#      queue_name: "notifications.queue"
+#      durable: false
+#      auto_delete: true
+#
+#    data_sync:
+#      exchange: "infound.topic"
+#      routing_key_pattern: "infound.sync.*"
+#      queue_name: "data.sync.queue"
+#      durable: true
+#      auto_delete: false
+
+# ============================================================
+# 认证配置
+# ============================================================
+auth:
+  required_header: "INFoundOperationAuth"
+  secret_key: "3500f737887bd22f5bba0f0f0d55f516cb643ba328b388034aeddfc094f1b4d5"
+  expire_days: 14
+  max_token: 5

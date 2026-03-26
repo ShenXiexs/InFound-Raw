@@ -1,59 +1,75 @@
-from fastapi import HTTPException, Request
+import re
+
+from fastapi import Request, FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-from apps.portal_creator_open_api.services.security import decode_access_token, is_token_valid_in_redis, \
-    get_current_user_info
-from common import app_constants
-from common.core.config import get_settings
-from common.core.logger import get_logger
-
-settings = get_settings()
-logger = get_logger()
+from apps.portal_creator_open_api.core.deps import get_token_manager, get_settings
+from core_base import get_logger
 
 
 class AuthFilterMiddleware(BaseHTTPMiddleware):
     """
-    Authentication middleware:
-    1. Extract AccessToken from headers.
-    2. Validate the token and ensure it exists in Redis.
-    3. Store user info in request.state for downstream handlers.
+    身份验证中间件：
+    利用 TokenManager 类单例进行统一鉴权
     """
 
+    def __init__(self, app: FastAPI):
+        super().__init__(app)
+        self.logger = get_logger("AuthFilterMiddleware")
+
+    # 建议将排除路径正则化或提取到配置中
+    EXCLUDE_PATH_PATTERNS = [
+        r"^/account/login$",
+        r"^/$",
+        r"^/docs.*",
+        r"^/redoc.*",
+        r"^/openapi.json$",
+    ]
+
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        # Paths that skip authentication (login/docs/etc.)
-        exclude_paths = ["/account/login", "/", "/docs", "/redoc", "/openapi.json"]
-        if request.url.path in exclude_paths:
+        path = request.url.path
+
+        # 1. 排除不需要验证的路径
+        if any(re.match(pattern, path) for pattern in self.EXCLUDE_PATH_PATTERNS):
             return await call_next(request)
 
-        # 1) Read AccessToken from header
-        token = request.headers.get(app_constants.CREATOR_ACCESS_TOKEN_HEADER)
+        settings = get_settings(request)
+        token_manager = get_token_manager(request)
+
+        # 2. 从 Header 获取 Token
+        token = request.headers.get(settings.auth.required_header)
         if not token:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "No AccessToken"}
-            )
+            return self._unauthorized("AccessToken missing")
 
-        # 2) Validate token and parse user info
-        payload = decode_access_token(token)
+        # 3. 解析 Token (调用 TokenManager 类方法)
+        payload = token_manager.decode_access_token(token)
         if not payload:
-            raise HTTPException(status_code=401, detail="Invalid AccessToken")
-        username: str = payload.get("sub")
-        token_jti: str = payload.get("jti")
-        if not username or not token_jti:
-            raise HTTPException(status_code=401, detail="Invalid AccessToken")
+            return self._unauthorized("Invalid or expired token")
 
-        # 3) Ensure the token still exists in Redis (not logged out/expired)
-        if not is_token_valid_in_redis(username, token_jti):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid AccessToken (logged out or exceeded the limit)"}
+        username = payload.get("sub")
+        jti = payload.get("jti")
+
+        if not username or not jti:
+            return self._unauthorized("Malformed token payload")
+
+        # 4. 核心优化：一次性从 Redis 获取用户信息并验证
+        # 如果 Redis 中没有这个 JTI，说明已登出或被踢下线
+        user_info = token_manager.get_current_user_info(username, jti)
+        if not user_info:
+            self.logger.warning(
+                f"Unauthorized access attempt: user={username}, jti={jti}"
             )
+            return self._unauthorized("Session expired or logged out")
 
-        # 4) Build user object and store it on request.state
-        user = get_current_user_info(username, token_jti)
-        request.state.current_user_info = user  # accessible for the entire request
+        # 5. 存入 request.state 供后续逻辑使用
+        request.state.current_user_info = user_info
 
-        # Continue request
-        response = await call_next(request)
-        return response
+        # 6. 继续后续请求
+        return await call_next(request)
+
+    def _unauthorized(self, message: str) -> JSONResponse:
+        """统一的未授权响应格式"""
+        return JSONResponse(
+            status_code=401, content={"detail": message, "code": "UNAUTHORIZED"}
+        )

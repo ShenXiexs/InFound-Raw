@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Any
+
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.core.logger import get_logger
-from common.models.infound import Samples, SampleCrawlLogs
 from apps.portal_inner_open_api.services.chatbot_schedule_repository import (
     _normalize_status,
     _is_empty_content_summary,
 )
+from shared_domain.models.infound import Samples, SampleCrawlLogs
+from core_base import get_logger
 
 logger = get_logger()
 
@@ -46,21 +47,18 @@ class ChatbotStatusDetector:
                 }
             }
         """
-        stmt = (
-            select(
-                Samples.id,
-                Samples.platform_product_id,
-                Samples.platform_creator_username,
-                Samples.platform_creator_id,
-                Samples.status,
-                Samples.region,
-                Samples.content_summary,
-                Samples.ad_code,
-            )
-            .where(
-                Samples.platform_product_id.isnot(None),
-                Samples.platform_creator_username.isnot(None),
-            )
+        stmt = select(
+            Samples.id,
+            Samples.platform_product_id,
+            Samples.platform_creator_username,
+            Samples.platform_creator_id,
+            Samples.status,
+            Samples.region,
+            Samples.content_summary,
+            Samples.ad_code,
+        ).where(
+            Samples.platform_product_id.isnot(None),
+            Samples.platform_creator_username.isnot(None),
         )
 
         result = await session.execute(stmt)
@@ -116,14 +114,14 @@ class ChatbotStatusDetector:
         ).where(
             Samples.platform_creator_username.isnot(None),
         )
-        
+
         samples_result = await session.execute(samples_stmt)
         samples_rows = samples_result.all()
-        
+
         if not samples_rows:
             logger.info("没有找到有效的样品记录")
             return {}
-        
+
         # 构建 sample_id 到 (platform_product_id, platform_creator_username) 的映射
         # 用于后续关联 SampleCrawlLogs（因为 SampleCrawlLogs 没有 sample_id，只有 platform_product_id）
         sample_to_product_username = {}
@@ -131,14 +129,14 @@ class ChatbotStatusDetector:
             sample_id = row.id
             username = row.platform_creator_username
             product_id = row.platform_product_id
-            
+
             if sample_id and username and product_id:
                 sample_to_product_username[sample_id] = (product_id, username)
-        
+
         if not sample_to_product_username:
             logger.info("没有找到有效的样品记录（缺少 platform_product_id）")
             return {}
-        
+
         # 使用窗口函数找出每个 (platform_product_id, platform_creator_username) 组合的最新爬取记录
         # 按时间最近的排序（crawl_date DESC, creation_time DESC）
         subquery = (
@@ -288,8 +286,7 @@ class ChatbotStatusDetector:
 
                 # 从有内容变为无内容，或首次检测到无内容
                 if (prev_has_content and not curr_has_content) or (
-                    last_info.get("content_summary") is None
-                    and not curr_has_content
+                    last_info.get("content_summary") is None and not curr_has_content
                 ):
                     changes.append(
                         {
@@ -314,4 +311,3 @@ class ChatbotStatusDetector:
 
 # 单例实例
 chatbot_status_detector = ChatbotStatusDetector()
-

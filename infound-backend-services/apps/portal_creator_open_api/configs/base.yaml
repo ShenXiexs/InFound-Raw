@@ -1,0 +1,42 @@
+app_name: "infound-portal-creator-open-api"
+env: "dev"
+debug: true
+
+# ============================================================
+# 日志配置
+# ============================================================
+log:
+  level: "INFO"
+  dir: "logs"
+  file_max_size: 10
+  file_backup_count: 30
+
+# ============================================================
+# MySQL 数据库配置
+# ============================================================
+mysql:
+  host: "db-zaxoqvvl.stg.infound.ai"
+  port: 8801
+  user: "infound-stg"
+  password: "&3$BSW)mGxE(Zk"
+  db: "infound.stg"
+  charset: "utf8mb4"
+
+# ============================================================
+# Redis 缓存配置
+# ============================================================
+redis:
+  host: "redis-q9zy4cjd.stg.infound.ai"
+  port: 8802
+  password: "XJh$(KLRM3*!m5"
+  db: 0
+  prefix: "if.dev:creator"
+
+# ============================================================
+# 认证配置
+# ============================================================
+auth:
+  required_header: "INFoundCreatorAuth"
+  secret_key: "94dfc07baaef3854516a0f0f0d0d22f5bb887b1b28380fcb6734d055f353d43b"
+  expire_days: 14
+  max_token: 5

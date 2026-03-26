@@ -26,10 +26,15 @@ export interface TaskInfo {
   task_data: unknown
   created_at: string
   updated_at: string
+  task_source?: 'claim' | 'inbox'
 }
 
-export async function claimTaskAsync(taskType: TaskType): Promise<BaseApiResponse<TaskInfo>> {
-  const url = API_ENDPOINTS.task.claim + `?task_type=${taskType}`
+export async function claimTaskAsync(taskType: TaskType, taskId?: string): Promise<BaseApiResponse<TaskInfo>> {
+  const queryTaskId = String(taskId || '').trim()
+  const url =
+    API_ENDPOINTS.task.claim +
+    `?task_type=${taskType}` +
+    (queryTaskId ? `&task_id=${encodeURIComponent(queryTaskId)}` : '')
   return await openapiRequest.get<BaseApiResponse<TaskInfo>>(url)
 }
 

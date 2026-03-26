@@ -3,7 +3,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from shared_application_services import BaseDTO
 
 
 def _to_camel(value: str) -> str:
@@ -11,15 +13,7 @@ def _to_camel(value: str) -> str:
     return parts[0] + "".join(part.capitalize() for part in parts[1:])
 
 
-class SampleIngestionOptions(BaseModel):
-    """Metadata describing the crawl task options."""
-
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class SampleIngestionOptions(BaseDTO):
     campaign_id: Optional[str] = None
     campaign_ids: Optional[List[str]] = None
     account_name: Optional[str] = None
@@ -33,15 +27,7 @@ class SampleIngestionOptions(BaseModel):
     manual_login: Optional[bool] = None
 
 
-class SampleRow(BaseModel):
-    """Normalized row produced by the crawler."""
-
-    model_config = ConfigDict(
-        extra="allow",
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class SampleRow(BaseDTO):
     platform_product_id: str = Field(..., min_length=1)
     region: Optional[str] = None
     product_name: Optional[str] = None
@@ -78,15 +64,10 @@ class SampleRow(BaseModel):
     extracted_time: Optional[str] = None
 
 
-class SampleIngestionRequest(BaseModel):
-    """Request body that collector posts to the inner API."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
+class SampleIngestionRequest(BaseDTO):
+    source: str = Field(
+        ..., description="数据来源标识，例如 portal_tiktok_sample_crawler"
     )
-
-    source: str = Field(..., description="数据来源标识，例如 portal_tiktok_sample_crawler")
     operator_id: Optional[str] = Field(
         default=None,
         description="操作人/账号 ID，若未提供则使用服务端默认值",
@@ -95,13 +76,6 @@ class SampleIngestionRequest(BaseModel):
     rows: List[SampleRow] = Field(..., min_length=1)
 
 
-class SampleIngestionResult(BaseModel):
-    """Response payload returned to the collector."""
-
-    model_config = ConfigDict(
-        alias_generator=_to_camel,
-        populate_by_name=True,
-    )
-
+class SampleIngestionResult(BaseDTO):
     inserted: int = Field(..., description="本次提交的总行数（含内容行）")
     products: int = Field(..., description="涉及的唯一商品数量")

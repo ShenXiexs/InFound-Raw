@@ -1,5 +1,5 @@
 import { AbstractWorkerManager } from './abstract-worker-manager'
-import { TaskType } from '../../services/task-service'
+import { TaskInfo, TaskType } from '../../services/task-service'
 import { ChatWorkerManager } from './workers/chat-worker'
 import { CreatorDetailWorkerManager } from './workers/creator-detail-worker'
 import { OutReachWorkerManager } from './workers/out-reach-worker'
@@ -40,6 +40,15 @@ export class TaskWorkersManager {
   public async wakeUp(taskType?: TaskType | string): Promise<void> {
     const targetWorkers = this.resolveTargetWorkers(taskType)
     await Promise.allSettled(targetWorkers.map((worker) => worker.wakeUp()))
+  }
+
+  public async enqueueTask(task: TaskInfo): Promise<void> {
+    const worker = this.workers[task.task_type]
+    if (!worker) {
+      logger.warn(`未找到对应 worker，忽略收件箱任务: type=${task.task_type} id=${task.id}`)
+      return
+    }
+    await worker.enqueueTask(task)
   }
 
   public async stop(): Promise<void> {

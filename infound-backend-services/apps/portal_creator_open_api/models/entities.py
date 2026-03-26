@@ -17,5 +17,5 @@ class CurrentUserInfo(BaseModel):
     platform_creator_id: str
     platform_creator_username: str
     platform_creator_display_name: str
-    email: str
-    whatsapp: str
+    email: str | None
+    whatsapp: str | None

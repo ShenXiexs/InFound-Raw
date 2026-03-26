@@ -32,7 +32,7 @@ https://affiliate.tiktok.com/connection/creator?shop_region=<REGION>
    - filter titles
    - visible options
    - input/checkbox metadata
-   - DSL binding hints aligned with `ref/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts`
+   - DSL binding hints aligned with `infound-desktop-client-master/apps/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts`
 
 The JSON snapshot is written to:
 

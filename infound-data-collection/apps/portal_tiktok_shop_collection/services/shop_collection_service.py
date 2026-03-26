@@ -287,6 +287,11 @@ class ShopCollectionService:
             )
 
             modules: List[Dict[str, Any]] = []
+            sort_binding_snapshot: Dict[str, Any] | None = None
+            if outreach_script.sort_binding:
+                sort_binding_snapshot = await self._capture_sort_binding_snapshot(
+                    outreach_script.sort_binding
+                )
             for module_spec in outreach_script.filter_modules:
                 module_snapshot = await self._capture_module_snapshot(module_spec)
                 modules.append(module_snapshot)
@@ -308,6 +313,7 @@ class ShopCollectionService:
                     "script_region": outreach_script.region_code,
                 },
                 "modules": modules,
+                "sort_binding": sort_binding_snapshot,
                 "search_binding": dict(outreach_script.search_binding),
             }
 
@@ -513,6 +519,40 @@ class ShopCollectionService:
             "observed_filter_titles": observed_titles,
             "filters": filters,
         }
+
+    async def _capture_sort_binding_snapshot(
+        self,
+        sort_binding_spec: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self.logger.info(
+            "Capturing outreach sort binding",
+            field_key=sort_binding_spec.get("field_key"),
+            field_title=sort_binding_spec.get("field_title"),
+        )
+        trigger_metadata = await self._click_text_element(
+            selector=sort_binding_spec["trigger_selector"],
+            texts=sort_binding_spec.get("trigger_texts", ["Relevancy"]),
+            exact=False,
+            wait_ms=300,
+            prefer_last=True,
+        )
+        snapshot = await self._extract_popup_snapshot(sort_binding_spec)
+        await self._dismiss_filter_overlay({"close_mode": "dismiss"})
+        result = {
+            "field_key": sort_binding_spec.get("field_key", "filterSortBy"),
+            "field_title": sort_binding_spec.get("field_title", "Sort by"),
+            "status": "ok",
+            "trigger": trigger_metadata,
+            "dsl_binding": self._build_sort_dsl_binding(sort_binding_spec),
+            "snapshot": snapshot,
+        }
+        self.logger.info(
+            "Outreach sort binding captured",
+            field_key=result["field_key"],
+            field_title=result["field_title"],
+            **self._build_filter_log_fields(snapshot),
+        )
+        return result
 
     async def _capture_filter_snapshot(
         self,
@@ -1022,6 +1062,24 @@ class ShopCollectionService:
         ):
             if filter_spec.get(key):
                 binding[key] = filter_spec[key]
+        return binding
+
+    def _build_sort_dsl_binding(self, sort_binding_spec: Dict[str, Any]) -> Dict[str, Any]:
+        binding = {
+            "field_key": sort_binding_spec.get("field_key", "filterSortBy"),
+            "field_title": sort_binding_spec.get("field_title", "Sort by"),
+            "action_type": sort_binding_spec.get("action_type", "selectDropdownSingle"),
+            "trigger_selector": sort_binding_spec.get("trigger_selector", ""),
+            "trigger_texts": sort_binding_spec.get("trigger_texts", []),
+        }
+        for key in (
+            "wait_selector",
+            "option_selector",
+            "scroll_container_selector",
+            "option_map",
+        ):
+            if sort_binding_spec.get(key):
+                binding[key] = sort_binding_spec[key]
         return binding
 
     def _build_filter_log_fields(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:

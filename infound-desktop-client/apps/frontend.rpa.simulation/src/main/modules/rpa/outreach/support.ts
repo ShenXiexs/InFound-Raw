@@ -84,6 +84,8 @@ const FOLLOWER_COUNT_MAX_INPUT_SELECTOR = `${FOLLOWER_COUNT_RANGE_SELECTOR} inpu
 const POPUP_THRESHOLD_INPUT_SELECTOR = 'input[data-tid="m4b_input"][data-e2e="7f6a7b3f-260b-00c0"]'
 const POPUP_CHECKBOX_LABEL_SELECTOR = 'label[data-tid="m4b_checkbox"]'
 const POPUP_SCROLL_CONTAINER_SELECTOR = '.arco-select-popup-inner'
+const SORT_BY_TRIGGER_SELECTOR = 'div[role="combobox"][aria-haspopup="listbox"], div.arco-select-view'
+const SORT_BY_OPTION_SELECTOR = 'li.arco-select-option'
 const OUTREACH_FILTER_DISMISS_TEXT = 'Find creators'
 const OUTREACH_FILTER_DISMISS_SELECTOR = 'button span, h1, h2, h3, p, span, div'
 const OUTREACH_STEP_RETRY_COUNT = 3
@@ -103,6 +105,15 @@ export const CREATOR_MARKETPLACE_RAW_DIRECTORY_PATH_KEY = 'creator_marketplace_r
 
 const MODULE_BUTTON_FALLBACK_TEXTS: Record<string, string[]> = {
   Followers: ['Follower']
+}
+
+const MX_SORT_BY_OPTION_MAP: Record<string, string> = {
+  '1': 'Relevancy',
+  '2': 'Revenue',
+  '3': 'Units sold',
+  '4': 'Followers',
+  '5': 'Avg. video views',
+  '6': 'Engagement rate'
 }
 
 const createDefaultOutreachFilterConfig = (): OutreachFilterConfig => ({
@@ -137,6 +148,10 @@ const createDefaultOutreachFilterConfig = (): OutreachFilterConfig => ({
 })
 
 export const createDemoOutreachFilterConfig = (): OutreachFilterConfigInput => ({
+  duplicateCheckType: 2,
+  duplicateCheckCode: 'PRODUCT-DEMO-001',
+  messageSendStrategy: 1,
+  filterSortBy: 2,
   creatorFilters: {
     productCategorySelections: ['Home Supplies', 'Beauty & Personal Care', 'Phones & Electronics'],
     avgCommissionRate: 'Less than 20%',
@@ -164,7 +179,11 @@ export const createDemoOutreachFilterConfig = (): OutreachFilterConfigInput => (
     estPostRate: 'Good',
     brandCollaborationSelections: ["L'OREAL PROFESSIONNEL", 'Maybelline New York', 'NYX Professional Makeup']
   },
-  searchKeyword: 'lipstick'
+  searchKeyword: 'lipstick',
+  message: 'hola',
+  firstMessage: 'hola',
+  secondMessage: 'follow up',
+  expectCount: 20
 })
 
 export const mergeOutreachFilterConfig = (input?: OutreachFilterConfigInput): OutreachFilterConfig => {
@@ -261,6 +280,135 @@ const normalizeMultiSelectOptions = <T extends string>(
   }
 
   return normalized
+}
+
+const resolveSortByOptionMap = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  const optionMap: Record<string, string> = {}
+  for (const [key, rawLabel] of Object.entries(value as Record<string, unknown>)) {
+    const numericKey = String(key || '').trim()
+    const label = String(rawLabel ?? '').trim()
+    if (!numericKey || !label) {
+      continue
+    }
+    optionMap[numericKey] = label
+  }
+  return optionMap
+}
+
+const resolveSortByOptionText = (
+  selection: unknown,
+  optionMap: Record<string, string>
+): string | undefined => {
+  if (selection === null || selection === undefined || selection === '') {
+    return undefined
+  }
+
+  const token = String(selection).trim()
+  if (!token) {
+    return undefined
+  }
+
+  if (/^\d+$/.test(token)) {
+    return optionMap[token]
+  }
+
+  const loweredToken = token.toLowerCase()
+  for (const label of Object.values(optionMap)) {
+    if (label.toLowerCase() === loweredToken) {
+      return label
+    }
+  }
+
+  return undefined
+}
+
+const buildSortByAction = (
+  optionText: string,
+  optionMap: Record<string, string>,
+  dismissText: string,
+  binding?: ScriptRecord | null
+): BrowserAction => {
+  const effectiveBinding = binding ?? null
+  const parsedTriggerTexts = readScriptTextList(
+    effectiveBinding,
+    'triggerTexts',
+    'trigger_texts'
+  ).filter(Boolean)
+  const triggerTexts = parsedTriggerTexts.length ? parsedTriggerTexts : Object.values(optionMap)
+  const triggerText = triggerTexts[0] || 'Relevancy'
+  const triggerFallbackTexts = triggerTexts.slice(1)
+  const triggerSelector =
+    readScriptText(effectiveBinding, 'triggerSelector', 'trigger_selector') ||
+    SORT_BY_TRIGGER_SELECTOR
+  const optionSelector =
+    readScriptText(effectiveBinding, 'optionSelector', 'option_selector') ||
+    SORT_BY_OPTION_SELECTOR
+  const waitSelector =
+    readScriptText(effectiveBinding, 'waitSelector', 'wait_selector') || optionSelector
+  const scrollContainerSelector =
+    readScriptText(effectiveBinding, 'scrollContainerSelector', 'scroll_container_selector') ||
+    POPUP_SCROLL_CONTAINER_SELECTOR
+
+  return {
+    id: `设置建联排序:${optionText}`,
+    actionType: 'selectDropdownSingle',
+    payload: {
+      triggerText,
+      triggerFallbackTexts,
+      triggerSelector,
+      triggerExact: false,
+      optionText,
+      optionSelector,
+      waitSelector,
+      waitState: 'visible',
+      exact: true,
+      caseSensitive: false,
+      scrollContainerSelector,
+      scrollStepPx: 320,
+      maxScrollAttempts: 20,
+      timeoutMs: 10000,
+      intervalMs: 250,
+      triggerPostClickWaitMs: 250,
+      optionPostClickWaitMs: 160,
+      closeAfterSelect: true,
+      ...buildOutreachDismissPayload(dismissText)
+    },
+    options: { retryCount: OUTREACH_STEP_RETRY_COUNT },
+    onError: OUTREACH_STEP_ERROR_POLICY
+  }
+}
+
+const buildSortByStepFromScript = (
+  filterSortBy: unknown,
+  script: ScriptRecord,
+  dismissText: string
+): BrowserAction[] => {
+  const sortBinding = asRecord(readScriptValue(script, 'sortBinding', 'sort_binding'))
+  if (!sortBinding) {
+    return []
+  }
+
+  const binding = asRecord(readScriptValue(sortBinding, 'dslBinding', 'dsl_binding'))
+  const optionMap =
+    resolveSortByOptionMap(readScriptValue(binding, 'optionMap', 'option_map')) ||
+    resolveSortByOptionMap({})
+  const optionText = resolveSortByOptionText(filterSortBy, optionMap)
+  if (!optionText) {
+    return []
+  }
+
+  return [buildSortByAction(optionText, optionMap, dismissText, binding)]
+}
+
+const buildSortBySteps = (filterSortBy: unknown): BrowserAction[] => {
+  const optionText = resolveSortByOptionText(filterSortBy, MX_SORT_BY_OPTION_MAP)
+  if (!optionText) {
+    return []
+  }
+  return [buildSortByAction(optionText, MX_SORT_BY_OPTION_MAP, OUTREACH_FILTER_DISMISS_TEXT)]
 }
 
 const normalizeFreeformSelections = (selections: string[]): string[] => {
@@ -425,6 +573,7 @@ const buildSearchKeywordStepsFromScript = (
 }
 
 const buildScriptDrivenFilterSteps = (
+  input: OutreachFilterConfigInput | undefined,
   filters: OutreachFilterConfig,
   script: ScriptRecord
 ): BrowserAction[] | null => {
@@ -942,6 +1091,7 @@ const buildScriptDrivenFilterSteps = (
   const searchBinding = asRecord(readScriptValue(script, 'searchBinding', 'search_binding'))
   return [
     ...allSteps,
+    ...buildSortByStepFromScript(input?.filterSortBy, script, dismissText),
     ...buildSearchKeywordStepsFromScript(filters.searchKeyword, searchBinding, dismissText),
     ...buildCreatorCollectionSteps()
   ]
@@ -955,13 +1105,13 @@ export const resolveOutreachPageReadyText = (script?: ScriptRecord | null): stri
   OUTREACH_FILTER_DISMISS_TEXT
 
 export const buildOutreachFilterStepsFromScript = (
-  filters: OutreachFilterConfig,
+  input: OutreachFilterConfigInput | undefined,
   script?: ScriptRecord | null
 ): BrowserAction[] | null => {
   if (!script) {
     return null
   }
-  return buildScriptDrivenFilterSteps(filters, script)
+  return buildScriptDrivenFilterSteps(input, mergeOutreachFilterConfig(input), script)
 }
 
 const buildCreatorFilterSteps = (config: CreatorFilterConfig): BrowserAction[] => {
@@ -1530,10 +1680,11 @@ const buildCreatorCollectionSteps = (): BrowserAction[] => [
   }
 ]
 
-export const buildOutreachFilterSteps = (filters: OutreachFilterConfig): BrowserAction[] => [
+export const buildOutreachFilterSteps = (filters: OutreachFilterConfig, filterSortBy?: unknown): BrowserAction[] => [
   ...buildCreatorFilterSteps(filters.creatorFilters),
   ...buildFollowerFilterSteps(filters.followerFilters),
   ...buildPerformanceFilterSteps(filters.performanceFilters),
+  ...buildSortBySteps(filterSortBy),
   ...buildSearchKeywordSteps(filters.searchKeyword),
   ...buildCreatorCollectionSteps()
 ]
