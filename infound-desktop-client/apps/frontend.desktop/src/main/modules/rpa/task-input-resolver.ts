@@ -1,14 +1,14 @@
 import { AppConfig } from '@common/app-config'
-import type { SellerChatbotPayloadInput } from '@sim-common/types/rpa-chatbot'
-import type { SellerCreatorDetailPayloadInput } from '@sim-common/types/rpa-creator-detail'
-import type { OutreachFilterConfigInput } from '@sim-common/types/rpa-outreach'
-import type { SampleManagementPayloadInput } from '@sim-common/types/rpa-sample-management'
-import type { SellerRpaReportConfigInput } from '@sim-common/types/seller-rpa-report'
 import type {
   LoginStateCookieInput,
-  PlaywrightSimulationPayloadInput
-} from '@sim-common/types/rpa-simulation'
-import type { TaskInfo } from '../../services/task-service'
+  OutreachFilterConfigInput,
+  PlaywrightSimulationPayloadInput,
+  SampleManagementPayloadInput,
+  SellerChatbotPayloadInput,
+  SellerCreatorDetailPayloadInput,
+  SellerRpaReportConfigInput
+} from '@desktop-rpa'
+import { TaskInfo, TaskType } from '../../services/task-service'
 import { globalState } from '../state/global-state'
 
 const DEFAULT_REGION = 'MX'
@@ -258,6 +258,28 @@ export const resolveChatTaskInput = (
       envelope.payloadNode,
       envelope.reportNode
     ) as SellerChatbotPayloadInput
+  }
+}
+
+export const resolveUrgeChatTaskInput = (
+  task: TaskInfo
+): {
+  session: PlaywrightSimulationPayloadInput
+  payload: SellerChatbotPayloadInput
+} => {
+  const envelope = resolveTaskEnvelope(task)
+  const payload = buildTaskContext(
+    task,
+    envelope.taskNode,
+    envelope.payloadNode,
+    envelope.reportNode
+  ) as SellerChatbotPayloadInput
+  payload.businessMode = 'urge'
+  payload.taskType = payload.taskType || TaskType.UrgeChat
+
+  return {
+    session: buildSimulationSession(envelope.sessionNode, envelope.taskNode, envelope.payloadNode),
+    payload
   }
 }
 

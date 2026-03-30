@@ -1,79 +1,97 @@
+productName: 寻达
 appId: if.xunda.desktop
-productName: XunDa
 copyright: Copyright © 2026 寻达（XunDa）
 directories:
   output: dist/${version}
-  buildResources: build-dist
 files:
-  - 'out/**/*'  # 确保包含构建输出目录
+  - 'out/**/*'
   - 'package.json'
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!dist/*'
-  - '!logs/*'
-  - '!src/renderer/src/assets/bak/*'
-  - '!node_modules/@electron-toolkit/eslint*'                         # 排除 ESLint 配置相关
-  - '!node_modules/{eslint,prettier,typescript}/**'                   # 核心开发工具链
-  - '!node_modules/@vitejs/**'                                        # Vite 构建工具
-  - '!node_modules/unplugin*/**'                                      # 自动导入插件
-  - '!node_modules/vue-tsc/**'                                        # Vue 类型检查器
-  - '!node_modules/sass/**'                                           # CSS 预处理器
-  - '!node_modules/**/{*.md,*.ts,*.map,test,tests,__tests__}'
-  - '!node_modules/@swiftmychat/desktop-shared/**/src/**'             # 排除源码
-  - 'node_modules/@swiftmychat/desktop-shared/**'                     # 保留编译后的文件
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.base.json,tsconfig.node.json,tsconfig.web.json}'
-asarUnpack:
-  # - resources/**
-  - '**/chromium/**/*'
+  - "node_modules/**/*"
+  #  - 'node_modules/@infound/*/dist/**/*'
+  #  - 'node_modules/@infound/*/package.json'
+  #  - 'node_modules/electron-log/**/*'
+  #  - 'node_modules/electron-log/src/**/*'
+  #  - 'node_modules/electron-store/**/*'
+  #  - 'node_modules/electron-updater/**/*'
+  #  - 'node_modules/keytar/**/*'
+  #  - 'node_modules/node-machine-id/**/*'
+  #  - 'node_modules/playwright-core/**/*'
+  #  - 'node_modules/playwright-extra/**/*'
+  #  - 'node_modules/puppeteer-extra-plugin-stealth/**/*'
+  #  - 'node_modules/pino/**/*'
+  #  - "node_modules/pino-roll/**/*"
+  #  - 'node_modules/radash/**/*'
+  #  - 'node_modules/reflect-metadata/**/*'
+  #  - 'node_modules/@stomp/**/*'
+  #  - 'node_modules/vfonts/**/*'
+  #  - 'node_modules/ws/**/*'
+  - '!node_modules/**/{src,test,tests,__tests__}/**'     # 排除所有源码目录
+  - '!node_modules/**/*.{md,ts,tsx,map}'                 # 排除所有文档和源码文件
+  - '!node_modules/**/tsconfig*.json'                    # 排除 TS 配置
+  - '!node_modules/**/.gitignore'                        # 排除 Git 配置
+  - '!node_modules/playwright-core/.local-browsers/**/*'
+  - '!node_modules/@playwright/browser-chromium/**/*'
   - '!node_modules/@types/**'
+asarUnpack:
+  - "**/*.node"
 extraResources:
-  - from: ./resources/
+  - from: ./resources
     to: ./
-    filter:
-      - '!**/bak/**'
-  - from: 'node_modules/playwright-core/.local-browsers/chromium-*'
-    to: 'chromium'
-    filter: [ '**/*' ]
 electronLanguages:
   - zh-CN
   - zh-TW
   - en-US
 win:
-  icon: ./resources/icon.png
+  icon: ./resources/icons/win/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+  extraResources:
+    - from: ./build/chrome-headless-shell-win64.zip
+      to: ./browser/chrome-headless-shell.zip
 nsis:
-  allowToChangeInstallationDirectory: true
-  artifactName: ${productName}-${version}-${arch}.${ext}
-  createDesktopShortcut: always
-  createStartMenuShortcut: true
-  oneClick: false
-  runAfterFinish: true
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
+  allowToChangeInstallationDirectory: true  # 允许用户自定义安装路径
+  artifactName: xunda-${version}-${arch}.${ext}  # 安装包命名格式
+  createDesktopShortcut: always  # 始终创建桌面快捷方式
+  createStartMenuShortcut: true  # 创建开始菜单快捷方式
+  oneClick: false  # 非一键安装模式（显示安装向导）
+  runAfterFinish: true  # 安装完成后自动运行应用
+  shortcutName: 寻达  # 快捷方式名称
+  uninstallDisplayName: 寻达  # 卸载程序中显示的名称
 mac:
-  entitlementsInherit: build/entitlements.mac.plist
+  icon: "build/icon.icns"
+  artifactName: xunda-${version}-${arch}.${ext}
+  category: "public.app-category.utilities"
+  identity: null
   extendInfo:
+    - CFBundleExecutable: "XunDa"
     - NSCameraUsageDescription: Application requests access to the device's camera.
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
-dmg:
-  artifactName: ${productName}-${version}-${arch}.${ext}
-linux:
   target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: xunda.club
-  category: Utility
-appImage:
-  artifactName: ${productName}-${version}-${arch}.${ext}
+    - target: zip
+      arch:
+        - x64
+  #        - arm64
+  extraResources:
+    - from: ./build/chrome-headless-shell-mac-${arch}.zip
+      to: ./browser/chrome-headless-shell.zip
+dmg:
+  title: "安装 ${productName}"
+  iconSize: 100
+  contents:
+    - x: 140
+      y: 150
+    - x: 400
+      y: 150
+      type: "link"
+      path: "/Applications"
 npmArgs:
   - --omit=dev
-npmRebuild: false
+npmRebuild: true
 publish:
   provider: generic
   url: https://download.xunda.club/
@@ -81,3 +99,4 @@ electronDownload:
   mirror: https://mirrors.huaweicloud.com/electron/
 releaseInfo:
   releaseNotesFile: release-notes.md
+electronVersion: 40.8.4

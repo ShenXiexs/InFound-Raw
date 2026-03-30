@@ -13,12 +13,13 @@ import { TAB_MAX_COUNT, TAB_TYPES } from '@common/app-constants'
 import { MonitorController } from '../modules/ipc/monitor-controller'
 import { getFilePath } from '../utils/path-helper'
 import { Tab } from '@common/types/tab-type'
+import * as fs from 'fs'
 
 export class TabManager {
   private views: Map<string, WebContentsView> = new Map()
   private tabs: Tab[] = []
   private activeTabId: string | null = null
-  private readonly tabBarHeight = 40 // 必须与 CSS 中标签栏高度一致
+  private readonly tabBarHeight = 45 // 必须与 CSS 中标签栏高度一致
   private readonly addressBarHeight = 44
 
   constructor(private mainWindow: BrowserWindow) {
@@ -74,7 +75,7 @@ export class TabManager {
     const view = new WebContentsView({ webPreferences: baseWebPreferences })
 
     // view.setVisible(false)
-    view.webContents.setUserAgent(AppConfig.USER_AGENT)
+    view.webContents.setUserAgent(AppConfig.USER_AGENT) //todo: well done! I missed 【Phoenix】
 
     // 监听页面标题更新
     view.webContents.on('page-title-updated', (_, title) => {
@@ -124,6 +125,7 @@ export class TabManager {
         }
       }
     })
+
     //监听当前页的图标，若有变动，重绘【多时可能影响性能，前期影响小】
     view.webContents.on('page-favicon-updated', (_, favicons) => {
       const tab = this.tabs.find((t) => t.id === newId)
@@ -283,6 +285,7 @@ export class TabManager {
     }
   }
 
+  //todo:保留【Phoenix】
   public navigateTo(url: string): void {
     const view = this.getCurrentView()
     if (view) {
@@ -338,6 +341,29 @@ export class TabManager {
     })
   }
 
+  public updateTabTitle(id: string, title: string): void {
+    const tab = this.tabs.find((t) => t.id === id)
+    if (tab && tab.title !== title) {
+      tab.title = title
+      this.sendTabsToRenderer()
+    }
+  }
+
+  public exportCookiesToFile(filePath: string, cookies: Electron.Cookie[]) {
+    try {
+      const content = JSON.stringify(cookies, null, 2)
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(filePath, content)
+
+      console.info(`导出Cookie文件成功: ${filePath}`)
+      logger.debug(`导出Cookie文件成功: :${filePath}`)
+    } catch (err) {
+      console.info('导出Cookie文件失败', err)
+      logger.error('导出Cookie文件失败', err)
+    }
+  }
+
   // 监听窗口大小变化，更新当前激活视图的边界
   private setupListeners(): void {
     this.mainWindow.on('resize', () => {
@@ -356,8 +382,8 @@ export class TabManager {
     return {
       x: 0,
       y: this.tabBarHeight + this.addressBarHeight,
-      width,
-      height: height - this.tabBarHeight - this.addressBarHeight
+      width: width + 4,
+      height: height - this.tabBarHeight - this.addressBarHeight + 5
     }
   }
 

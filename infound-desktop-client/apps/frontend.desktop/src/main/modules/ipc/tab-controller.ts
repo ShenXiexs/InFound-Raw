@@ -6,7 +6,7 @@ import { TabManager } from '../../windows/tab-manager'
 import { TkTabItemManager } from '../../windows/tk-tab-item-manager'
 
 export class TabController {
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_ACTIVATE_ITEM, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_ACTIVATE_ITEM, IPCType.INVOKE)
   async activateTab(event: Electron.IpcMainInvokeEvent, id: string): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) {
@@ -21,11 +21,10 @@ export class TabController {
     }
   }
 
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_CLOSE_ITEM, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_CLOSE_ITEM, IPCType.INVOKE)
   async closeTab(event: Electron.IpcMainInvokeEvent, id: string): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
-    // 假设每个 TK 窗口关联了一个 TkTabItemManager 实例
     const tkManager = (win as any).tkTabItemManager as TkTabItemManager
     if (tkManager) {
       tkManager.closeTabItem(id)
@@ -34,7 +33,7 @@ export class TabController {
     }
   }
 
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_NAVIGATE_BACK, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_NAVIGATE_BACK, IPCType.INVOKE)
   async goBack(event: Electron.IpcMainInvokeEvent): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
@@ -44,7 +43,7 @@ export class TabController {
     }
   }
 
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_NAVIGATE_FORWARD, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_NAVIGATE_FORWARD, IPCType.INVOKE)
   async goForward(event: Electron.IpcMainInvokeEvent): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
@@ -54,7 +53,7 @@ export class TabController {
     }
   }
 
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_NAVIGATE_RELOAD, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_NAVIGATE_RELOAD, IPCType.INVOKE)
   async reload(event: Electron.IpcMainInvokeEvent): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
@@ -64,7 +63,7 @@ export class TabController {
     }
   }
 
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_SHOW_ITEMS_MENU, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_SHOW_ITEMS_MENU, IPCType.INVOKE)
   async showTabsMenu(event: Electron.IpcMainInvokeEvent, x: number, y: number): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) {
@@ -81,7 +80,7 @@ export class TabController {
     }
   }
 
-  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.TABS_REORDER_ITEMS, IPCType.INVOKE)
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_REORDER_ITEMS, IPCType.INVOKE)
   async reorderTabs(event: Electron.IpcMainInvokeEvent, orderedIds: string[]): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return

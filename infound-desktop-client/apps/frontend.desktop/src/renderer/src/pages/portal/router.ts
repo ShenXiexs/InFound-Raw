@@ -1,7 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '@renderer/pages/portal/views/Home.vue'
 import LoginView from '@renderer/pages/portal/views/Login.vue'
-import { AppState } from '@infound/desktop-shared'
+import { AppState } from '@infound/desktop-base'
 import { rendererStore } from '@renderer/store/renderer-store'
 
 const router = createRouter({

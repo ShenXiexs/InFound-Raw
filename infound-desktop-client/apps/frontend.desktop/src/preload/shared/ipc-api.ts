@@ -13,6 +13,8 @@ function getGatewayByChannel(channel: string): string {
     return IPCGateway.WS
   } else if (channel.startsWith('tk-')) {
     return IPCGateway.TK
+  } else if (channel.startsWith('tabs-')) {
+    return IPCGateway.TAB
   } else if (channel.startsWith('rpa-')) {
     return IPCGateway.RPA
   } else if (channel.startsWith('renderer-monitor-')) {

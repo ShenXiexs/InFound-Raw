@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from apps.portal_seller_open_api.core.deps import get_task_runtime_service
-from apps.portal_seller_open_api.models.entities import CurrentUserInfo
+from apps.portal_seller_open_api.core.deps import (
+    get_current_user_info,
+    get_task_runtime_service,
+)
 from apps.portal_seller_open_api.models.task_runtime import (
     SellerRpaTaskClaimResult,
     SellerRpaTaskHeartbeatResult,
@@ -13,39 +15,40 @@ from apps.portal_seller_open_api.services.task_runtime_service import (
     SellerRpaTaskRuntimeService,
 )
 from core_base import APIResponse, success_response
+from shared_seller_application_services.current_user_info import CurrentUserInfo
 
-router = APIRouter(prefix="/task", tags=["Seller RPA Task Runtime"])
+router = APIRouter(tags=["任务计划"])
 
 
 @router.get(
-    "/claim",
+    "/task/claim",
     response_model=APIResponse[SellerRpaTaskClaimResult | None],
-    response_model_by_alias=False,
+    response_model_by_alias=True,
+    description="客户端申领任务：支持类型 OUTREACH, CREATOR_DETAIL, SAMPLE_MONITOR, CHAT, URGE_CHAT",
 )
 async def claim_task(
-    request: Request,
     task_type: SellerRpaTaskType = Query(...),
     task_id: str | None = Query(None),
+    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
     service: SellerRpaTaskRuntimeService = Depends(get_task_runtime_service),
 ) -> APIResponse[SellerRpaTaskClaimResult | None]:
-    current_user: CurrentUserInfo = request.state.current_user_info
-    result = await service.claim(current_user, task_type, task_id)
+    result = await service.claim(current_user_info, task_type, task_id)
     return success_response(result)
 
 
 @router.post(
-    "/{task_id}/heartbeat",
+    "/task/{task_id}/heartbeat",
     response_model=APIResponse[SellerRpaTaskHeartbeatResult],
-    response_model_by_alias=False,
+    response_model_by_alias=True,
+    description="心跳汇报：更新任务的心跳时间，证明客户端仍在运行",
 )
 async def heartbeat_task(
     task_id: str,
-    request: Request,
+    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
     service: SellerRpaTaskRuntimeService = Depends(get_task_runtime_service),
 ) -> APIResponse[SellerRpaTaskHeartbeatResult]:
-    current_user: CurrentUserInfo = request.state.current_user_info
     try:
-        result = await service.heartbeat(current_user, task_id)
+        result = await service.heartbeat(current_user_info, task_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -55,19 +58,19 @@ async def heartbeat_task(
 
 
 @router.post(
-    "/{task_id}/report",
+    "/task/{task_id}/report",
     response_model=APIResponse[SellerRpaTaskReportResult],
-    response_model_by_alias=False,
+    response_model_by_alias=True,
+    description="结果上报：结束生命周期",
 )
 async def report_task(
     task_id: str,
     payload: SellerRpaTaskReportRequest,
-    request: Request,
+    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
     service: SellerRpaTaskRuntimeService = Depends(get_task_runtime_service),
 ) -> APIResponse[SellerRpaTaskReportResult]:
-    current_user: CurrentUserInfo = request.state.current_user_info
     try:
-        result = await service.report(current_user, task_id, payload)
+        result = await service.report(current_user_info, task_id, payload)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

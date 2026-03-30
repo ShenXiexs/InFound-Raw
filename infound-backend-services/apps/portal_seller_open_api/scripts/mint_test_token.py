@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 from apps.portal_seller_open_api.core.config import Settings
-from apps.portal_seller_open_api.core.token_manager import TokenManager
-from apps.portal_seller_open_api.models.entities import CurrentUserInfo
 from core_base import SettingsFactory
 from core_redis import RedisClientManager
+from shared_seller_application_services.current_user_info import CurrentUserInfo
+from shared_seller_application_services.token_manager import TokenManager
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,8 +17,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--user-id", required=True, help="Seller user_id")
     parser.add_argument("--username", required=True, help="Seller username")
-    parser.add_argument("--phone-number", default=None, help="Optional phone number")
-    parser.add_argument("--device-id", default=None, help="Optional device id")
+    parser.add_argument("--phone-number", default="", help="Optional phone number")
+    parser.add_argument("--device-id", default="manual-device", help="Optional device id")
+    parser.add_argument("--device-type", default="desktop", help="Optional device type")
     parser.add_argument(
         "--shell",
         action="store_true",
@@ -35,13 +37,15 @@ def main() -> None:
     RedisClientManager.initialize(settings.redis)
 
     try:
-        token_manager = TokenManager(settings)
+        token_manager = TokenManager(settings.auth, settings.redis)
         current_user = CurrentUserInfo(
             jti="manual-test",
+            iat=datetime.now(timezone.utc),
             user_id=args.user_id,
             username=args.username,
-            phone_number=args.phone_number,
+            phone_number=args.phone_number or "",
             device_id=args.device_id,
+            device_type=args.device_type,
         )
         token = token_manager.create_access_token(current_user)
 

@@ -5,6 +5,7 @@ import { dateZhCN, zhCN } from 'naive-ui'
 import TitleBarOfWindow from '@renderer/components/TitleBarOfWindow.vue'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { rendererStore } from '@renderer/store/renderer-store'
+import { commonThemeOverrides } from '@infound/desktop-base'
 
 const CHECK_TOKEN_INTERVAL_MS = 60 * 60 * 1000
 const TOKEN_INVALID_CODE = 1251
@@ -66,20 +67,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <n-config-provider
-    :date-locale="dateZhCN"
-    :locale="zhCN"
-    :theme="null"
-    :theme-overrides="{
-      common: {
-        fontWeightStrong: '600',
-        primaryColor: '#8142f6',
-        primaryColorHover: '#935cf7',
-        primaryColorPressed: '#6f31e4',
-        primaryColorSuppl: '#8142f6'
-      }
-    }"
-  >
+  <n-config-provider :date-locale="dateZhCN" :locale="zhCN" :theme="null" :theme-overrides="commonThemeOverrides">
     <n-global-style />
     <n-message-provider>
       <n-layout class="portal-layout">

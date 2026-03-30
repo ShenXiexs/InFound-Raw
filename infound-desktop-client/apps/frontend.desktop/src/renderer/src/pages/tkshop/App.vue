@@ -8,9 +8,10 @@ import { TkShopSetting } from '@common/types/tk-type'
 import { TAB_TYPES } from '@common/app-constants'
 import { resolveResourceAssetUrl } from '@renderer/utils/asset-url'
 import { Tab } from '@common/types/tab-type'
+import { commonThemeOverrides } from '@infound/desktop-base'
 
 const globalState: RendererState = rendererStore.currentState
-const icon = computed(() => resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'icon.png'))
+const icon = computed(() => resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'icons/common/icon.png'))
 const shopName = ref('寻达')
 
 const tabs = ref<Tab[]>([])
@@ -170,19 +171,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <n-config-provider :date-locale="dateZhCN" :locale="zhCN" :theme="null" :theme-overrides="{ common: { fontWeightStrong: '600' } }">
+  <n-config-provider :date-locale="dateZhCN" :locale="zhCN" :theme="null" :theme-overrides="commonThemeOverrides">
     <n-global-style />
     <n-message-provider>
-      <div class="app-container">
+      <n-layout class="app-container">
         <!-- 第一行：标题栏（应用图标 + 店铺名称 + 标签控件 + 窗口控制） -->
-        <div class="title-row">
-          <div class="title-left">
-            <!-- 应用图标 + 店铺名称 -->
-            <n-avatar :src="icon" size="small" style="background-color: transparent; margin-right: 6px" />
-            <n-ellipsis style="width: 100px; font-size: 14px">{{ shopName }}</n-ellipsis>
+        <n-layout-header class="header">
+          <div class="header-left">
+            <n-avatar :size="32" :src="icon" class="title-icon" style="background-color: transparent" />
+            <n-ellipsis style="width: 120px">
+              <span class="header-title">{{ shopName }}</span>
+            </n-ellipsis>
           </div>
-          <div class="title-center">
-            <div class="tab-controls">
+          <div class="header-center">
+            <div class="header-center-inner">
               <!-- 下拉菜单按钮 -->
               <n-button circle quaternary title="切换标签页" @click="showTabsMenu">
                 <template #icon>
@@ -219,7 +221,7 @@ onUnmounted(() => {
                 </div>
               </div>
               <!-- 右滚动按钮 -->
-              <n-button :disabled="scrollRightDisabled" circle quaternary size="small" title="向右滚动" @click="scrollRight">
+              <n-button :disabled="scrollRightDisabled" circle quaternary title="向右滚动" @click="scrollRight">
                 <template #icon>
                   <n-icon>
                     <i-hugeicons-arrow-right-01 />
@@ -228,13 +230,12 @@ onUnmounted(() => {
               </n-button>
             </div>
           </div>
-          <div class="title-right">
+          <div class="header-right">
             <button-group-of-title-bar />
           </div>
-        </div>
-
+        </n-layout-header>
         <!-- 第二行：导航栏（后退/前进/刷新 + 地址栏 + 业务按钮） -->
-        <div class="nav-row">
+        <n-layout-header class="nav-row">
           <div class="nav-left">
             <n-button :disabled="!canGoBack" circle quaternary title="后退" @click="goBack">
               <template #icon>
@@ -281,55 +282,23 @@ onUnmounted(() => {
               </div>
             </n-button>
           </div>
-        </div>
-
+        </n-layout-header>
         <!-- 第三行：内容区 -->
-        <div class="content-area"></div>
-      </div>
+        <n-layout-content class="content-area">
+          <n-flex align="center" justify="center" style="width: 100%; height: calc(100vh - 99px)">
+            <n-result status="418" title="页面加载中..."></n-result>
+          </n-flex>
+        </n-layout-content>
+      </n-layout>
     </n-message-provider>
   </n-config-provider>
 </template>
 
 <style lang="scss" scoped>
+@use '@renderer/assets/styles/title-bar.scss' as *;
+
 .app-container {
   height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* 第一行 */
-.title-row {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  background: #f0f0f0;
-  border-bottom: 1px solid #ccc;
-  flex-shrink: 0;
-
-  .title-left {
-    -webkit-app-region: drag; // 允许拖拽窗口
-    display: flex;
-    align-items: center;
-    min-width: 120px;
-  }
-  .title-center {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    min-width: 0;
-    .tab-controls {
-      display: flex;
-      align-items: center;
-      width: 100%;
-    }
-  }
-  .title-right {
-    display: flex;
-    align-items: center;
-  }
 }
 
 /* 标签列表区域 */
@@ -352,7 +321,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  height: 30px;
+  height: 38px;
   background: #e0e0e0;
   border: 1px solid #ccc;
   border-bottom: none;
@@ -366,8 +335,9 @@ onUnmounted(() => {
     background: #d0d0d0;
   }
   &.active {
-    background: #fff;
+    background: #f9f9f9;
     font-weight: bold;
+    height: 42px;
   }
   .favicon {
     width: 16px;
@@ -405,7 +375,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  background: #e8e8e8;
+  background: #f9f9f9;
   border-bottom: 1px solid #aaa;
   flex-shrink: 0;
 

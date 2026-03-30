@@ -1,5 +1,7 @@
-import { AppState, LoggerLevel, WebSocketMessage } from '@infound/desktop-shared'
+import { AppState, WebSocketMessage } from '@infound/desktop-base'
+import { LoggerLevel } from '@infound/desktop-electron'
 import { TkShopSetting } from '@common/types/tk-type'
+import { Tab } from '@common/types/tab-type'
 
 export const IPC_CHANNELS = {
   APP_LOGGER: 'app-logger',
@@ -25,11 +27,6 @@ export const IPC_CHANNELS = {
   WEBSOCKET_SEND: 'websocket-send',
   WEBSOCKET_TEST: 'websocket-test',
 
-  RENDERER_MONITOR_APP_GLOBAL_STATE_SYNC: 'renderer-monitor-app-global-state-sync',
-  RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC: 'renderer-monitor-app-splash-window-state-sync',
-  RENDERER_MONITOR_TK_SHOP_ALL_TAB_ITEM_SETTINGS_SYNC: 'renderer-monitor-tk-shop-all-tab-item-settings-sync',
-  RENDERER_MONITOR_WEBSOCKET_RECEIVE: 'renderer-monitor-websocket-receive',
-
   TK_SHOP_OPEN_WINDOW: 'tk-shop-open-window',
   TK_SHOP_GET_TKSHOP_SETTING: 'tk-shop-get-tk-shop-setting',
   TK_SHOP_GET_ENTRIES: 'tk-shop-get-entries',
@@ -38,9 +35,24 @@ export const IPC_CHANNELS = {
   TK_SHOP_UPDATE: 'tk-shop-update',
   TK_SHOP_DELETE: 'tk-shop-delete',
 
-  RPA_TASK_START: 'rpa-task-start',
+  TABS_ACTIVATE_ITEM: 'tabs-activate-item',
+  TABS_CLOSE_ITEM: 'tabs-close-item',
+  TABS_NAVIGATE_BACK: 'tabs-navigate-back',
+  TABS_NAVIGATE_FORWARD: 'tabs-navigate-forward',
+  TABS_NAVIGATE_RELOAD: 'tabs-navigate-reload',
+  TABS_SHOW_ITEMS_MENU: 'tabs-show-items-menu',
+  TABS_REORDER_ITEMS: 'tabs-reorder-items',
+
   RPA_SELLER_LOGIN: 'rpa-seller-login',
-  RPA_SELLER_OUT_REACH: 'rpa-seller-out-reach'
+  RPA_SELLER_OUT_REACH: 'rpa-seller-out-reach',
+  RPA_TASK_START: 'rpa-task-start',
+
+  RENDERER_MONITOR_APP_GLOBAL_STATE_SYNC: 'renderer-monitor-app-global-state-sync',
+  RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC: 'renderer-monitor-app-splash-window-state-sync',
+  RENDERER_MONITOR_TK_SHOP_ALL_TAB_ITEM_SETTINGS_SYNC: 'renderer-monitor-tk-shop-all-tab-item-settings-sync',
+  RENDERER_MONITOR_WEBSOCKET_RECEIVE: 'renderer-monitor-websocket-receive',
+  RENDERER_MONITOR_TABS_UPDATED: 'renderer-monitor-tabs-updated',
+  RENDERER_MONITOR_TABS_NAVIGATION_STATE: 'renderer-monitor-tabs-navigation-state'
 } as const
 
 export type IPCChannelKey = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -106,10 +118,6 @@ export interface AppProtocol {
   [IPC_CHANNELS.WEBSOCKET_CONNECT]: { params: []; return: void }
   [IPC_CHANNELS.WEBSOCKET_DISCONNECT]: { params: []; return: void }
 
-  [IPC_CHANNELS.RENDERER_MONITOR_APP_GLOBAL_STATE_SYNC]: { params: [{ path: string; value: any }]; return: void }
-  [IPC_CHANNELS.RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC]: { params: [{ percent: number; status: string }]; return: void }
-  [IPC_CHANNELS.RENDERER_MONITOR_WEBSOCKET_RECEIVE]: { params: [WebSocketMessage]; return: void }
-
   [IPC_CHANNELS.TK_SHOP_OPEN_WINDOW]: { params: [TkShopOpenWindowPayload]; return: void }
   [IPC_CHANNELS.TK_SHOP_GET_TKSHOP_SETTING]: { params: [number]; return: { success: boolean; data: TkShopSetting } }
   [IPC_CHANNELS.TK_SHOP_GET_ENTRIES]: { params: []; return: { success: boolean; data?: ShopEntryInfoDTO[]; error?: string } }
@@ -127,20 +135,26 @@ export interface AppProtocol {
     return: { success: boolean; data?: Record<string, any>; error?: string }
   }
 
-  [IPC_CHANNELS.RPA_TASK_START]: { params: []; return: void }
   [IPC_CHANNELS.RPA_SELLER_LOGIN]: { params: []; return: void }
   [IPC_CHANNELS.RPA_SELLER_OUT_REACH]: { params: []; return: boolean }
+  [IPC_CHANNELS.RPA_TASK_START]: { params: []; return: void }
 
-  [IPC_CHANNELS.TABS_UPDATED]: { params: [tabs: any[], activeId: string]; return: void }
-  [IPC_CHANNELS.NAVIGATION_STATE]: { params: [canGoBack: boolean, canGoForward: boolean]; return: void }
+  [IPC_CHANNELS.TABS_ACTIVATE_ITEM]: { params: [id: string]; return: void }
+  [IPC_CHANNELS.TABS_CLOSE_ITEM]: { params: [id: string]; return: void }
+  [IPC_CHANNELS.TABS_NAVIGATE_BACK]: { params: []; return: void }
+  [IPC_CHANNELS.TABS_NAVIGATE_FORWARD]: { params: []; return: void }
+  [IPC_CHANNELS.TABS_NAVIGATE_RELOAD]: { params: []; return: void }
+  [IPC_CHANNELS.TABS_SHOW_ITEMS_MENU]: { params: [x: number, y: number]; return: void }
+  [IPC_CHANNELS.TABS_REORDER_ITEMS]: { params: [orderedIds: string[]]; return: void }
 
-  [IPC_CHANNELS.ACTIVATE_TAB]: { params: [id: string]; return: void }
-  [IPC_CHANNELS.CLOSE_TAB]: { params: [id: string]; return: void }
-  [IPC_CHANNELS.NAVIGATE_BACK]: { params: []; return: void }
-  [IPC_CHANNELS.NAVIGATE_FORWARD]: { params: []; return: void }
-  [IPC_CHANNELS.NAVIGATE_RELOAD]: { params: []; return: void }
-  [IPC_CHANNELS.SHOW_TABS_MENU]: { params: [x: number, y: number]; return: void }
-  [IPC_CHANNELS.REORDER_TABS]: { params: [orderedIds: string[]]; return: void }
+  [IPC_CHANNELS.RENDERER_MONITOR_APP_GLOBAL_STATE_SYNC]: { params: [{ path: string; value: any }]; return: void }
+  [IPC_CHANNELS.RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC]: { params: [{ percent: number; status: string }]; return: void }
+  [IPC_CHANNELS.RENDERER_MONITOR_WEBSOCKET_RECEIVE]: { params: [WebSocketMessage]; return: void }
+  [IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED]: { params: [{ activeId: string; tabs: Tab[] }]; return: void }
+  [IPC_CHANNELS.RENDERER_MONITOR_TABS_NAVIGATION_STATE]: {
+    params: [{ canGoBack: boolean; canGoForward: boolean }]
+    return: void
+  }
 }
 
 export interface IPCAPI {

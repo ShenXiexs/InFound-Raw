@@ -23,6 +23,7 @@ class SellerRpaTaskDispatchService:
         "CREATOR_DETAIL",
         "CHAT",
         "SAMPLE_MONITOR",
+        "URGE_CHAT",
     }
 
     def __init__(self, settings: Settings) -> None:

@@ -1,25 +1,29 @@
 import { IPC_CHANNELS } from '@common/types/ipc-type'
-import type { SellerChatbotPayloadInput } from '@common/types/rpa-chatbot'
-import type { SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
-import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
-import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
-import type { PlaywrightSimulationPayloadInput } from '@common/types/rpa-simulation'
-import { isPlaywrightSimulationPayloadInput } from '@common/types/rpa-simulation'
 import { logger } from '../../utils/logger'
 import { appWindowsAndViewsManager } from '../../windows/app-windows-and-views-manager'
-import {
-  createDemoSellerCreatorDetailPayload,
-  isSellerCreatorDetailPayloadInput
-} from '../rpa/creator-detail/support'
-import { createDemoSellerChatbotPayload, isSellerChatbotPayloadInput } from '../rpa/chatbot/support'
-import { createDemoOutreachFilterConfig, isOutreachFilterConfigInput } from '../rpa/outreach/support'
-import { isSampleManagementPayloadInput } from '../rpa/sample-management/support'
-import { PlaywrightSimulationService } from '../rpa/playwright-simulation/playwright-simulation-service'
 import { IPCHandle, IPCType } from './base/ipc-decorator'
+import type {
+  OutreachFilterConfigInput,
+  PlaywrightSimulationPayloadInput,
+  SampleManagementPayloadInput,
+  SellerChatbotPayloadInput,
+  SellerCreatorDetailPayloadInput
+} from '@desktop-rpa'
+import {
+  PlaywrightSimulationService,
+  createDemoOutreachFilterConfig,
+  createDemoSellerChatbotPayload,
+  createDemoSellerCreatorDetailPayload,
+  isOutreachFilterConfigInput,
+  isPlaywrightSimulationPayloadInput,
+  isSampleManagementPayloadInput,
+  isSellerChatbotPayloadInput,
+  isSellerCreatorDetailPayloadInput
+} from '@desktop-rpa'
 
 const SELLER_LOGIN_URL = 'https://seller-mx.tiktok.com/'
 
-export class RPAController {
+class RPAController {
   public getSimulationService(): PlaywrightSimulationService {
     return PlaywrightSimulationService.getInstance(logger)
   }
@@ -68,60 +72,39 @@ export class RPAController {
   }
 
   @IPCHandle(IPC_CHANNELS.RPA_EXECUTE_SIMULATION, IPCType.SEND)
-  async executeSimulation(
-    eventOrPayload?: unknown,
-    payloadMaybe?: PlaywrightSimulationPayloadInput
-  ): Promise<void> {
-    const payload = isPlaywrightSimulationPayloadInput(payloadMaybe)
-      ? payloadMaybe
-      : isPlaywrightSimulationPayloadInput(eventOrPayload)
-        ? eventOrPayload
-        : undefined
+  async executeSimulation(eventOrPayload?: unknown, payloadMaybe?: PlaywrightSimulationPayloadInput): Promise<void> {
+    const payload = isPlaywrightSimulationPayloadInput(payloadMaybe) ? payloadMaybe : isPlaywrightSimulationPayloadInput(eventOrPayload) ? eventOrPayload : undefined
 
     await this.startSimulationSession(payload)
   }
 
   @IPCHandle(IPC_CHANNELS.RPA_SELLER_OUT_REACH, IPCType.SEND)
   async sellerOutReach(eventOrPayload?: unknown, payloadMaybe?: OutreachFilterConfigInput): Promise<void> {
-    const payload = isOutreachFilterConfigInput(payloadMaybe)
-      ? payloadMaybe
-      : isOutreachFilterConfigInput(eventOrPayload)
-        ? eventOrPayload
-        : undefined
+    const payload = isOutreachFilterConfigInput(payloadMaybe) ? payloadMaybe : isOutreachFilterConfigInput(eventOrPayload) ? eventOrPayload : undefined
 
     await this.runSellerOutReach(payload)
   }
 
   @IPCHandle(IPC_CHANNELS.RPA_SELLER_CHATBOT, IPCType.SEND)
   async sellerChatbot(eventOrPayload?: unknown, payloadMaybe?: SellerChatbotPayloadInput): Promise<void> {
-    const payload = isSellerChatbotPayloadInput(payloadMaybe)
-      ? payloadMaybe
-      : isSellerChatbotPayloadInput(eventOrPayload)
-        ? eventOrPayload
-        : undefined
+    const payload = isSellerChatbotPayloadInput(payloadMaybe) ? payloadMaybe : isSellerChatbotPayloadInput(eventOrPayload) ? eventOrPayload : undefined
 
     await this.runSellerChatbot(payload)
   }
 
   @IPCHandle(IPC_CHANNELS.RPA_SELLER_CREATOR_DETAIL, IPCType.SEND)
   async sellerCreatorDetail(eventOrPayload?: unknown, payloadMaybe?: SellerCreatorDetailPayloadInput): Promise<void> {
-    const payload = isSellerCreatorDetailPayloadInput(payloadMaybe)
-      ? payloadMaybe
-      : isSellerCreatorDetailPayloadInput(eventOrPayload)
-        ? eventOrPayload
-        : undefined
+    const payload = isSellerCreatorDetailPayloadInput(payloadMaybe) ? payloadMaybe : isSellerCreatorDetailPayloadInput(eventOrPayload) ? eventOrPayload : undefined
 
     await this.runSellerCreatorDetail(payload)
   }
 
   @IPCHandle(IPC_CHANNELS.RPA_SAMPLE_MANAGEMENT, IPCType.SEND)
   async sampleManagement(eventOrPayload?: unknown, payloadMaybe?: SampleManagementPayloadInput): Promise<void> {
-    const payload = isSampleManagementPayloadInput(payloadMaybe)
-      ? payloadMaybe
-      : isSampleManagementPayloadInput(eventOrPayload)
-        ? eventOrPayload
-        : undefined
+    const payload = isSampleManagementPayloadInput(payloadMaybe) ? payloadMaybe : isSampleManagementPayloadInput(eventOrPayload) ? eventOrPayload : undefined
 
     await this.runSampleManagement(payload)
   }
 }
+
+export default RPAController

@@ -1,13 +1,13 @@
 import { BaseApiResponse } from '../utils/net-request'
 import openapiRequest from './base/open-api-service'
-import { template } from 'radash'
 import { API_ENDPOINTS } from './endpoints'
 
 export enum TaskType {
   Outreach = 'OUTREACH',
   CreatorDetail = 'CREATOR_DETAIL',
-  SampleMonitor = 'SAMPLE_MONITOR', // camelCase 字段传入 body
-  Chat = 'CHAT'
+  SampleMonitor = 'SAMPLE_MONITOR',
+  Chat = 'CHAT',
+  UrgeChat = 'URGE_CHAT'
 }
 
 export enum TaskStatus {
@@ -18,7 +18,6 @@ export enum TaskStatus {
   Cancelled = 'CANCELLED'
 }
 
-// TODO: 后续细化调整
 export interface TaskInfo {
   id: string
   task_type: TaskType
@@ -28,6 +27,9 @@ export interface TaskInfo {
   updated_at: string
   task_source?: 'claim' | 'inbox'
 }
+
+const buildTaskEndpoint = (endpoint: string, taskId: string): string =>
+  endpoint.replace('{taskId}', encodeURIComponent(String(taskId || '').trim()))
 
 export async function claimTaskAsync(taskType: TaskType, taskId?: string): Promise<BaseApiResponse<TaskInfo>> {
   const queryTaskId = String(taskId || '').trim()
@@ -39,12 +41,12 @@ export async function claimTaskAsync(taskType: TaskType, taskId?: string): Promi
 }
 
 export async function heartbeatAsync(taskId: string): Promise<BaseApiResponse<Record<string, any>>> {
-  const url = template(API_ENDPOINTS.task.heartbeat, { taskId: taskId })
+  const url = buildTaskEndpoint(API_ENDPOINTS.task.heartbeat, taskId)
   return await openapiRequest.post<BaseApiResponse>(url)
 }
 
 export async function reportAsync(taskId: string, taskStatus: TaskStatus, error?: string): Promise<BaseApiResponse<Record<string, any>>> {
-  const url = template(API_ENDPOINTS.task.report, { taskId: taskId })
+  const url = buildTaskEndpoint(API_ENDPOINTS.task.report, taskId)
   const payload = {
     task_status: taskStatus,
     error

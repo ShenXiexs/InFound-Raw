@@ -4,19 +4,22 @@ import { ChatWorkerManager } from './workers/chat-worker'
 import { CreatorDetailWorkerManager } from './workers/creator-detail-worker'
 import { OutReachWorkerManager } from './workers/out-reach-worker'
 import { SampleMonitorWorker } from './workers/sample-monitor-worker'
+import { UrgeChatWorkerManager } from './workers/urge-chat-worker'
 import { logger } from '../../utils/logger'
+import { AppConfig } from '@common/app-config'
 
 export class TaskWorkersManager {
   private readonly workers: Partial<Record<TaskType, AbstractWorkerManager>> = {}
   private initialized = false
   private pollingTimer: NodeJS.Timeout | null = null
-  private static readonly POLLING_INTERVAL_MS = 5000
+  private static readonly POLLING_INTERVAL_MS = AppConfig.TASK_MANAGER_POLLING_INTERVAL_MS
 
   constructor() {
     this.workers[TaskType.Chat] = new ChatWorkerManager()
     this.workers[TaskType.CreatorDetail] = new CreatorDetailWorkerManager()
     this.workers[TaskType.Outreach] = new OutReachWorkerManager()
     this.workers[TaskType.SampleMonitor] = new SampleMonitorWorker()
+    this.workers[TaskType.UrgeChat] = new UrgeChatWorkerManager()
   }
 
   public async init(): Promise<void> {
@@ -42,13 +45,25 @@ export class TaskWorkersManager {
     await Promise.allSettled(targetWorkers.map((worker) => worker.wakeUp()))
   }
 
-  public async enqueueTask(task: TaskInfo): Promise<void> {
+  public enqueueTask(task: TaskInfo): void {
     const worker = this.workers[task.task_type]
     if (!worker) {
       logger.warn(`未找到对应 worker，忽略收件箱任务: type=${task.task_type} id=${task.id}`)
       return
     }
-    await worker.enqueueTask(task)
+    worker.enqueueTask(task)
+  }
+
+  public async cancelTask(
+    taskId: string,
+    options?: {
+      rootTaskId?: string
+      cancelScope?: string
+    }
+  ): Promise<void> {
+    await Promise.allSettled(
+      this.getAllWorkers().map((worker) => worker.cancelTask(taskId, options))
+    )
   }
 
   public async stop(): Promise<void> {

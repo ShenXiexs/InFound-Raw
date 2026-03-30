@@ -1,7 +1,7 @@
 import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { logger } from '../../utils/logger'
-import { LoggerLevel } from '@infound/desktop-shared'
+import { LoggerLevel } from '@infound/desktop-electron'
 
 export class LoggerController {
   @IPCHandle(IPCGateway.APP, IPC_CHANNELS.APP_LOGGER, IPCType.SEND)

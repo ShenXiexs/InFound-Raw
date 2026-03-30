@@ -12,6 +12,7 @@ class SellerRpaTaskType(StrEnum):
     CREATOR_DETAIL = "CREATOR_DETAIL"
     CHAT = "CHAT"
     SAMPLE_MONITOR = "SAMPLE_MONITOR"
+    URGE_CHAT = "URGE_CHAT"
 
 
 class SellerRpaTaskStatus(StrEnum):

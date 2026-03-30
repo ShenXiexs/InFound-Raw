@@ -5,6 +5,7 @@ import { AppConfig } from '@common/app-config'
 import { appWindowsAndViewsManager } from './app-windows-and-views-manager'
 import { globalState } from '../modules/state/global-state'
 import { getFilePath } from '../utils/path-helper'
+import { ResourceFactory } from '../utils/resource-factory'
 
 export class MainWindow {
   public baseWindow: BrowserWindow | null = null
@@ -29,7 +30,7 @@ export class MainWindow {
       height: height,
       minHeight: 300,
       minWidth: 600,
-      icon: path.join(globalState.currentState.appSetting.resourcesPath, 'icon.png'),
+      icon: ResourceFactory.getTrayIcon(),
       x: x,
       y: y,
       show: false,
@@ -49,8 +50,21 @@ export class MainWindow {
     })
 
     this.baseWindow.on('close', (e) => {
-      e.preventDefault()
-      this.baseWindow?.hide()
+      if (process.platform === 'darwin') {
+        // Mac 专属：红叉不退出，除非是真的要 Quit
+        if (!globalState.currentState.isQuitting) {
+          e.preventDefault()
+          this.baseWindow?.hide()
+          app.dock?.hide()
+        }
+      } else {
+        // Windows/Linux 逻辑：
+        // 如果你想实现“最小化到托盘”，也可以在这里判断状态
+        if (!globalState.currentState.isQuitting) {
+          e.preventDefault()
+          this.baseWindow?.hide()
+        }
+      }
     })
 
     this.baseWindow.on('closed', () => {
@@ -87,6 +101,9 @@ export class MainWindow {
   public showWindow(): void {
     if (this.baseWindow) {
       this.baseWindow.show()
+      /*if (!AppConfig.IS_PRO) {
+        this.baseWindow.webContents.openDevTools({ mode: 'undocked' })
+      }*/
     }
   }
 

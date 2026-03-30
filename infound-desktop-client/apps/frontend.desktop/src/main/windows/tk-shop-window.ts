@@ -1,11 +1,11 @@
 import { app, BrowserWindow, screen, shell } from 'electron'
 import path from 'path'
-import { globalState } from '../modules/state/global-state'
 import { AppConfig } from '@common/app-config'
 import { is } from '@electron-toolkit/utils'
 import { TkShopSetting } from '@common/types/tk-type'
 import { TkTabItemManager } from './tk-tab-item-manager'
 import { getFilePath } from '../utils/path-helper'
+import { ResourceFactory } from '../utils/resource-factory'
 
 export class TkShopWindow {
   public baseWindow: BrowserWindow | null = null
@@ -27,7 +27,7 @@ export class TkShopWindow {
       height: height,
       minHeight: 300,
       minWidth: 600,
-      icon: path.join(globalState.currentState.appSetting.resourcesPath, 'icon.png'),
+      icon: ResourceFactory.getTrayIcon(),
       x: x,
       y: y,
       show: false,

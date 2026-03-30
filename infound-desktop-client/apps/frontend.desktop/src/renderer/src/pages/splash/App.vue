@@ -1,15 +1,15 @@
 <script lang="ts" setup>
 import { computed, reactive } from 'vue'
-import { AppState } from '@infound/desktop-shared'
+import { AppState, commonThemeOverrides } from '@infound/desktop-base'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { rendererStore } from '@renderer/store/renderer-store'
 import { resolveResourceAssetUrl } from '@renderer/utils/asset-url'
 
 const globalState: AppState = rendererStore.currentState
 const logo = computed(() => {
-  const url = resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'logo2.png')
+  const url = resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'icons/common/logo2.png')
   if (url) return url
-  return `${globalState.appSetting.resourcesPath}/logo2.png`
+  return `${globalState.appSetting.resourcesPath}/icons/common/logo2.png`
 })
 const version = globalState.appInfo.version
 
@@ -25,17 +25,7 @@ window.ipc.on(IPC_CHANNELS.RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC, (data:
 </script>
 
 <template>
-  <n-config-provider
-    :theme="null"
-    :theme-overrides="{
-      common: {
-        primaryColor: '#8142f6',
-        primaryColorHover: '#935cf7',
-        primaryColorPressed: '#6f31e4',
-        primaryColorSuppl: '#8142f6'
-      }
-    }"
-  >
+  <n-config-provider :theme="null" :theme-overrides="commonThemeOverrides">
     <n-global-style />
     <n-message-provider>
       <n-flex align="center" justify="center" style="height: 100vh; width: 100%; padding: 0" vertical>

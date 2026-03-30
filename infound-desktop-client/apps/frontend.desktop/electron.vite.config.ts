@@ -16,7 +16,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          format: 'es'
+          format: 'cjs'
         }
       },
       bytecode: true
@@ -25,8 +25,7 @@ export default defineConfig({
       alias: {
         '@main': resolve(__dirname, 'src/main'),
         '@common': resolve(__dirname, 'src/common'),
-        '@sim-common': resolve(__dirname, '../frontend.rpa.simulation/src/common'),
-        '@sim-rpa': resolve(__dirname, '../frontend.rpa.simulation/src/main/modules/rpa')
+        '@desktop-rpa': resolve(__dirname, '../../packages/frontend.desktop.rpa/src')
       }
     }
   },
@@ -36,11 +35,11 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/preload/index.ts')
         },
+        // external: [],
         output: {
           format: 'cjs'
         }
-      },
-      bytecode: true
+      }
     },
     resolve: {
       alias: {
@@ -63,7 +62,7 @@ export default defineConfig({
           splash: resolve(__dirname, 'src/renderer/splash.html'),
           index: resolve(__dirname, 'src/renderer/index.html'),
           tkshop: resolve(__dirname, 'src/renderer/tkshop.html'),
-          universal: resolve(__dirname, 'src/renderer/universal.html'),
+          universal: resolve(__dirname, 'src/renderer/universal.html')
           //updater: resolve(__dirname, 'src/renderer/updater.html'),
           //login: resolve(__dirname, 'src/renderer/login.html')
         }

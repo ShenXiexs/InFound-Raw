@@ -1,7 +1,7 @@
 import { app, Menu, Tray } from 'electron'
-import * as Path from 'path'
 import { appWindowsAndViewsManager } from '../windows/app-windows-and-views-manager'
 import { logger } from '../utils/logger'
+import { ResourceFactory } from '../utils/resource-factory'
 import { globalState } from '../modules/state/global-state'
 
 export class AppTray {
@@ -32,9 +32,7 @@ export class AppTray {
     }
 
     try {
-      const iconPath = Path.join(globalState.currentState.appSetting.resourcesPath, 'icon.png')
-
-      this.tray = new Tray(iconPath)
+      this.tray = new Tray(ResourceFactory.getTrayIcon())
       this.tray.setToolTip('寻达')
       this.tray.setContextMenu(this.createContextMenu())
 

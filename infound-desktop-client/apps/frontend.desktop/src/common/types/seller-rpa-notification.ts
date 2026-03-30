@@ -15,13 +15,18 @@ export interface SellerRpaTaskEnvelopePayload {
 export interface SellerRpaNotificationPayload {
   [key: string]: unknown
   eventType: SellerRpaNotificationEventType | string
+  title?: string
+  type?: string
   payloadVersion?: string
   messageId?: string
   userId?: string
   taskId?: string
   taskType?: TaskType | string
+  rootTaskId?: string
+  cancelScope?: string
   scheduledTime?: string
   activatedAt?: string
   expiresAt?: string
+  messages?: Array<Record<string, unknown>>
   payload?: SellerRpaTaskEnvelopePayload | Record<string, unknown>
 }

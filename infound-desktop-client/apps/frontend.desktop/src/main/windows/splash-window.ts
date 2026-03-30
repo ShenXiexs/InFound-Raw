@@ -3,9 +3,9 @@ import { BrowserWindow } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { logger } from '../utils/logger'
 import { AppConfig } from '@common/app-config'
-import { globalState } from '../modules/state/global-state'
 import { MonitorController } from '../modules/ipc/monitor-controller'
 import { getFilePath } from '../utils/path-helper'
+import { ResourceFactory } from '../utils/resource-factory'
 
 interface SplashState {
   percent: number
@@ -31,7 +31,7 @@ export class SplashWindow {
     this.splashWindow = new BrowserWindow({
       width: 600,
       height: 400,
-      icon: path.join(globalState.currentState.appSetting.resourcesPath, 'icon.png'),
+      icon: ResourceFactory.getTrayIcon(),
       frame: false, // 无边框窗口
       resizable: false,
       center: true,
@@ -56,12 +56,18 @@ export class SplashWindow {
     this.splashWindow.setMenuBarVisibility(false)
     this.splashWindow.setMenu(null)
 
+    logger.info(`is.dev=${is.dev}, URL=${process.env['ELECTRON_RENDERER_URL']}`)
+
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       await this.splashWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/splash.html`)
+      logger.info(`Loading splash A from: ${path.join(getFilePath(), '../renderer/splash.html')}`)
     } else {
       await this.splashWindow.loadFile(path.join(getFilePath(), '../renderer/splash.html'))
+      logger.info(`Loading splash B from: ${path.join(getFilePath(), '../renderer/splash.html')}`)
     }
 
+    logger.info('SplashWindow 正在初始化...')
+    logger.info(`getFilePath(): ${getFilePath()}`)
     logger.info('SplashWindow 初始化成功')
   }
 

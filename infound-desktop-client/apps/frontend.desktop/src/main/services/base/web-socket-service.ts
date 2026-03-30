@@ -1,4 +1,4 @@
-import { Client, Message } from '@stomp/stompjs' // 使用官方 STOMP 库
+import { Client, Message } from '@stomp/stompjs'
 import WebSocket from 'ws'
 import { logger } from '../../utils/logger'
 import { CookieMap, parseSetCookie } from '../../utils/set-cookie-parser'
@@ -7,25 +7,50 @@ import { appStore } from '../../modules/store/app-store'
 import { HTTP_HEADERS } from '@common/app-constants'
 import { globalState } from '../../modules/state/global-state'
 import { taskWorkersManager } from '../../modules/rpa/task-workers-manager'
-import { TaskInfo, TaskStatus, TaskType } from '../task-service'
+import { TaskType } from '../task-service'
 import { SellerRpaNotificationPayload } from '@common/types/seller-rpa-notification'
 
 type NotificationPayload = Record<string, unknown>
+
 const MESSAGE_CACHE_TTL_MS = 6 * 60 * 60 * 1000
+const KNOWN_RPA_EVENT_TYPES = new Set(['NEW_TASK_READY', 'CANCEL_TASK', 'RPA_TASK_READY'])
+
+const asRecord = (value: unknown): NotificationPayload | undefined =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as NotificationPayload) : undefined
 
 const parseNotificationPayload = (body: string): NotificationPayload | undefined => {
   const text = body.trim()
   if (!text) {
     return undefined
   }
+
   try {
     const parsed = JSON.parse(text) as unknown
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as NotificationPayload
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const root = parsed as NotificationPayload
+      const firstMessage = Array.isArray(root.messages)
+        ? asRecord(root.messages[0])
+        : undefined
+      if (!firstMessage) {
+        return root
+      }
+
+      const normalized: NotificationPayload = {
+        ...root,
+        ...firstMessage
+      }
+      if (!normalized.eventType && typeof firstMessage.title === 'string') {
+        normalized.eventType = firstMessage.title
+      }
+      if (!normalized.messageId && firstMessage.id) {
+        normalized.messageId = firstMessage.id
+      }
+      return normalized
     }
   } catch {
-    /* non-json notification */
+    // ignore non-json body
   }
+
   return undefined
 }
 
@@ -58,6 +83,16 @@ const resolveWsAuthHeader = (): { tokenName: string; tokenValue: string } | unde
   }
 }
 
+const toText = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value.trim()
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).trim()
+  }
+  return ''
+}
+
 const extractTaskType = (payload?: NotificationPayload): TaskType | undefined => {
   if (!payload) {
     return undefined
@@ -84,91 +119,98 @@ const extractTaskType = (payload?: NotificationPayload): TaskType | undefined =>
   return undefined
 }
 
-const normalizeEventType = (payload?: NotificationPayload): string => {
-  return String(
-    payload?.eventType ||
-      payload?.event_type ||
-      (payload?.data as NotificationPayload | undefined)?.eventType ||
-      ''
-  )
-    .trim()
-    .toUpperCase()
-}
-
-const asRecord = (value: unknown): NotificationPayload | undefined =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as NotificationPayload) : undefined
-
-const toText = (value: unknown): string => {
-  if (typeof value === 'string') {
-    return value.trim()
+const extractRootTaskId = (payload?: NotificationPayload): string => {
+  if (!payload) {
+    return ''
   }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value).trim()
+
+  const candidates = [
+    payload.rootTaskId,
+    (payload.payload as NotificationPayload | undefined)?.rootTaskId,
+    ((payload.payload as NotificationPayload | undefined)?.task as NotificationPayload | undefined)
+      ?.rootTaskId,
+    (
+      ((payload.payload as NotificationPayload | undefined)?.input as NotificationPayload | undefined)
+        ?.payload as NotificationPayload | undefined
+    )?.rootTaskId
+  ]
+
+  for (const candidate of candidates) {
+    const normalized = toText(candidate)
+    if (normalized) {
+      return normalized
+    }
   }
+
   return ''
 }
 
-const resolveTaskEnvelope = (payload?: NotificationPayload): NotificationPayload | undefined => {
-  const envelope = asRecord(payload?.payload)
-  if (!envelope) {
-    return undefined
+const extractCancelScope = (payload?: NotificationPayload): string => {
+  if (!payload) {
+    return ''
   }
-  if ('task' in envelope || 'input' in envelope || 'executor' in envelope) {
-    return envelope
+
+  const candidates = [
+    payload.cancelScope,
+    (payload.payload as NotificationPayload | undefined)?.cancelScope
+  ]
+
+  for (const candidate of candidates) {
+    const normalized = toText(candidate).toUpperCase()
+    if (normalized) {
+      return normalized
+    }
   }
-  return undefined
+
+  return ''
 }
 
-const buildTaskInfoFromNotification = (
-  payload?: SellerRpaNotificationPayload
-): TaskInfo | undefined => {
-  const taskType = extractTaskType(payload)
-  const envelope = resolveTaskEnvelope(payload as NotificationPayload | undefined)
-  if (!taskType || !envelope) {
-    return undefined
+const normalizeEventType = (payload?: NotificationPayload): string => {
+  const candidates = [
+    payload?.eventType,
+    payload?.event_type,
+    payload?.title,
+    payload?.type,
+    (payload?.data as NotificationPayload | undefined)?.eventType,
+    (payload?.data as NotificationPayload | undefined)?.event_type,
+    (payload?.data as NotificationPayload | undefined)?.title,
+    (payload?.data as NotificationPayload | undefined)?.type
+  ]
+
+  for (const candidate of candidates) {
+    const normalized = toText(candidate).toUpperCase()
+    if (KNOWN_RPA_EVENT_TYPES.has(normalized)) {
+      return normalized
+    }
   }
 
-  const taskNode = asRecord(envelope.task) || {}
-  const taskId = toText(payload?.taskId) || toText(taskNode.taskId)
-  if (!taskId) {
-    return undefined
-  }
-
-  const nowIso = new Date().toISOString()
-  const scheduledTime = toText(payload?.scheduledTime) || toText(taskNode.scheduledTime)
-  const createdAt = toText(taskNode.createdAt) || scheduledTime || nowIso
-  const updatedAt =
-    toText(taskNode.updatedAt) ||
-    toText(payload?.activatedAt) ||
-    scheduledTime ||
-    nowIso
-
-  return {
-    id: taskId,
-    task_type: taskType,
-    task_status: TaskStatus.Pending,
-    task_data: envelope,
-    created_at: createdAt,
-    updated_at: updatedAt,
-    task_source: 'inbox'
-  }
+  return ''
 }
 
-const buildSellerNotificationDestination = (userId: string): string => {
-  const prefix = String(AppConfig.SELLER_RPA_WS_INBOX_DESTINATION_PREFIX || '').trim().replace(/\/+$/, '')
+const isSellerRpaNotificationPayload = (
+  payload?: NotificationPayload
+): payload is SellerRpaNotificationPayload =>
+  Boolean(
+    payload &&
+      (
+        normalizeEventType(payload) ||
+        extractTaskType(payload)
+      )
+  )
+
+const buildUserNotificationDestination = (userId: string): string => {
+  const prefix = String(AppConfig.USER_NOTIFICATION_WS_DESTINATION_PREFIX || '').trim().replace(/\/+$/, '')
   return `${prefix}.${userId}`
 }
 
-// 消息类型定义
 export class WebSocketService {
-  private client: Client | null = null
-  private connected = false
-  private serverUrl = AppConfig.WS_BASE_URL
+  private generalClient: Client | null = null
+  private sellerRpaClient: Client | null = null
+  private generalConnected = false
+  private sellerRpaConnected = false
   private readonly processedMessageIds = new Map<string, number>()
 
-  // 建立连接（使用原生 WebSocket + STOMP）
   public async connect(): Promise<boolean> {
-    // 断开现有连接
     await this.disconnect()
 
     const auth = resolveWsAuthHeader()
@@ -177,18 +219,56 @@ export class WebSocketService {
       return false
     }
 
-    /*// 创建原生 WebSocket 连接（支持自定义 headers）
-    const ws = new WebSocket(this.serverUrl, {
-      headers: {
-        [tokenName.value]: tokenValue.value
-      },
-      rejectUnauthorized: true
-    })*/
+    const userId = globalState.currentState.currentUser?.userId
+    const generalUrl = String(AppConfig.GENERAL_WS_BASE_URL || '').trim()
+    const sellerRpaUrl = String(AppConfig.SELLER_RPA_WS_BASE_URL || '').trim()
 
-    // 初始化 STOMP 客户端
-    this.client = new Client({
+    if (generalUrl) {
+      this.generalClient = this.createClient({
+        serverUrl: generalUrl,
+        channelName: 'general',
+        onConnect: (client) => {
+          this.generalConnected = true
+          logger.info(`✅ STOMP 连接成功: general ${generalUrl}`)
+          if (userId && !sellerRpaUrl) {
+            this.subscribeUserNotifications(client, userId, 'general')
+          }
+        }
+      })
+      this.generalClient.activate()
+    }
+
+    if (sellerRpaUrl) {
+      this.sellerRpaClient = this.createClient({
+        serverUrl: sellerRpaUrl,
+        channelName: 'seller-rpa',
+        onConnect: (client) => {
+          this.sellerRpaConnected = true
+          logger.info(`✅ STOMP 连接成功: seller-rpa ${sellerRpaUrl}`)
+          if (userId) {
+            this.subscribeUserNotifications(client, userId, 'seller-rpa')
+          }
+        }
+      })
+      this.sellerRpaClient.activate()
+    }
+
+    return Boolean(generalUrl || sellerRpaUrl)
+  }
+
+  private createClient(options: {
+    serverUrl: string
+    channelName: string
+    onConnect: (client: Client) => void
+  }): Client {
+    const auth = resolveWsAuthHeader()
+    if (!auth) {
+      throw new Error('请先登录')
+    }
+
+    const client = new Client({
       webSocketFactory: () => {
-        const ws = new WebSocket(this.serverUrl, {
+        const ws = new WebSocket(options.serverUrl, {
           headers: {
             [auth.tokenName]: auth.tokenValue,
             [HTTP_HEADERS.DEVICE_TYPE]: 'client'
@@ -197,86 +277,94 @@ export class WebSocketService {
         })
 
         ws.on('close', () => {
-          logger.warn('WebSocket 已关闭，准备重新连接')
+          logger.warn(`WebSocket 已关闭，准备重新连接: ${options.channelName}`)
           try {
             ws.terminate()
           } catch {
-            /* empty */
+            // ignore
           }
         })
 
         return ws
-      }, // 使用原生 WebSocket 实例
+      },
       heartbeatIncoming: 0,
       heartbeatOutgoing: 10000,
-      connectHeaders: {}, // 无需额外参数，认证已通过 WebSocket headers 传递
-      //debug: (str) => logger.info('STOMP debug:', str), // 开发环境调试
+      connectHeaders: {},
       onConnect: () => {
-        this.connected = true
-        logger.info('✅ STOMP 连接成功 - 已订阅 seller RPA 用户收件箱')
-
-        const userId = globalState.currentState.currentUser?.userId
-        if (userId) {
-          const destination = buildSellerNotificationDestination(userId)
-          this.client?.subscribe(
-            destination,
-            (message: Message) => {
-              logger.info(`📨 收到 seller RPA 通知: destination=${destination} body=${message.body}`)
-              void this.handleNotificationMessage(message)
-            },
-            {
-              ack: 'client-individual',
-              durable: 'true', // ✅ 队列持久化
-              'auto-delete': 'false', // ✅ 不自动删除
-              'prefetch-count': '1',
-              'x-declare': JSON.stringify({
-                durable: true,
-                autoDelete: false
-              })
-            }
-          )
-        }
-
+        options.onConnect(client)
         return true
       },
       onStompError: (frame) => {
-        logger.error('STOMP 错误:', frame.body)
+        logger.error(`STOMP 错误[${options.channelName}]:`, frame.body)
         return false
       },
       onWebSocketError: (error) => {
-        logger.error('WebSocket 错误:', JSON.stringify(error))
+        logger.error(`WebSocket 错误[${options.channelName}]:`, JSON.stringify(error))
         return false
       },
-      reconnectDelay: 3000 // 自动重连间隔（3秒）
+      reconnectDelay: 3000
     })
-
-    // 启动连接
-    this.client.activate()
-
-    return true
+    return client
   }
 
   public async disconnect(): Promise<void> {
-    if (this.client) {
-      logger.info('断开连接')
-      await this.client.deactivate() // 关闭 STOMP 连接
-      this.connected = false
-      this.client = null
+    if (this.generalClient) {
+      logger.info('断开 general websocket 连接')
+      await this.generalClient.deactivate()
+      this.generalConnected = false
+      this.generalClient = null
+    }
+    if (this.sellerRpaClient) {
+      logger.info('断开 seller-rpa websocket 连接')
+      await this.sellerRpaClient.deactivate()
+      this.sellerRpaConnected = false
+      this.sellerRpaClient = null
     }
   }
 
   public isConnected(): boolean {
-    return this.connected
+    return this.generalConnected || this.sellerRpaConnected
   }
 
-  private async handleNotificationMessage(message: Message): Promise<void> {
-    const payload = parseNotificationPayload(message.body) as SellerRpaNotificationPayload | undefined
-    const eventType = normalizeEventType(payload)
-    const taskType = extractTaskType(payload)
-    const messageId = toText(payload?.messageId)
+  private subscribeUserNotifications(client: Client, userId: string, channelName: string): void {
+    const destination = buildUserNotificationDestination(userId)
+    client.subscribe(
+      destination,
+      (message: Message) => {
+        logger.info(`📨 收到用户通知: channel=${channelName} destination=${destination} body=${message.body}`)
+        void this.handleUserNotificationMessage(message)
+      },
+      {
+        ack: 'client-individual',
+        'prefetch-count': '1'
+      }
+    )
+  }
+
+  private async handleUserNotificationMessage(message: Message): Promise<void> {
+    const payload = parseNotificationPayload(message.body)
+    if (!isSellerRpaNotificationPayload(payload)) {
+      logger.info('当前用户通知不是 RPA 任务事件，直接 ack')
+      message.ack()
+      return
+    }
+
+    await this.handleRpaNotificationMessage(
+      message,
+      payload as SellerRpaNotificationPayload
+    )
+  }
+
+  private async handleRpaNotificationMessage(
+    message: Message,
+    payload: SellerRpaNotificationPayload
+  ): Promise<void> {
+    const eventType = normalizeEventType(payload as NotificationPayload)
+    const taskType = extractTaskType(payload as NotificationPayload)
+    const messageId = toText(payload.messageId)
 
     if (messageId && this.isRecentlyProcessed(messageId)) {
-      logger.warn(`忽略重复 seller RPA 消息: ${messageId}`)
+      logger.warn(`忽略重复 RPA 任务通知: ${messageId}`)
       message.ack()
       return
     }
@@ -285,53 +373,59 @@ export class WebSocketService {
     if (expiresAt) {
       const expiresMs = Date.parse(expiresAt)
       if (Number.isFinite(expiresMs) && expiresMs <= Date.now()) {
-        logger.warn(`忽略已过期 seller RPA 消息: ${messageId || '(no-message-id)'}`)
+        logger.warn(`忽略已过期 RPA 任务通知: ${messageId || '(no-message-id)'}`)
         message.ack()
         return
       }
     }
 
     if (eventType === 'CANCEL_TASK') {
-      logger.warn(
-        `收到 CANCEL_TASK 事件，但当前 desktop 仅记录日志，尚未实现运行中任务取消: taskType=${taskType || '(unknown)'}`
-      )
-      message.ack()
-      return
-    }
-
-    try {
-      const directTask = buildTaskInfoFromNotification(payload)
-      if (directTask) {
-        logger.info(
-          `任务通知命中完整 payload，直接分发执行: eventType=${eventType || 'NEW_TASK_READY'} taskType=${directTask.task_type} taskId=${directTask.id}`
-        )
-        await taskWorkersManager.enqueueTask(directTask)
-      } else if ((eventType === 'NEW_TASK_READY' || eventType === 'RPA_TASK_READY') && taskType) {
-        logger.info(`任务通知命中 eventType=${eventType} taskType=${taskType}，唤醒对应 worker`)
-        await taskWorkersManager.wakeUp(taskType)
-      } else if (taskType) {
-        logger.info(`任务通知命中 taskType=${taskType}，唤醒对应 worker`)
-        await taskWorkersManager.wakeUp(taskType)
-      } else {
-        logger.info('任务通知未包含可识别 taskType，唤醒全部 worker')
-        await taskWorkersManager.wakeUp()
-      }
-
+      const taskId = toText(payload?.taskId)
+      const rootTaskId = extractRootTaskId(payload)
+      const cancelScope = extractCancelScope(payload)
       if (messageId) {
         this.processedMessageIds.set(messageId, Date.now())
       }
       this.compactProcessedMessageIds()
       message.ack()
-    } catch (error) {
-      logger.error(
-        `seller RPA 通知处理失败: ${(error as Error)?.message || error}`
+      logger.warn(
+        `收到 CANCEL_TASK 事件: taskType=${taskType || '(unknown)'} taskId=${taskId || '(empty)'} rootTaskId=${rootTaskId || '(empty)'} cancelScope=${cancelScope || 'TASK'}`
       )
-      if (typeof message.nack === 'function') {
-        message.nack()
-      } else {
-        message.ack()
+      try {
+        await taskWorkersManager.cancelTask(taskId, {
+          rootTaskId,
+          cancelScope
+        })
+      } catch (error) {
+        logger.error(`处理 CANCEL_TASK 失败: ${(error as Error)?.message || error}`)
       }
       return
+    }
+
+    try {
+      if (messageId) {
+        this.processedMessageIds.set(messageId, Date.now())
+      }
+      this.compactProcessedMessageIds()
+      message.ack()
+
+      if ((eventType === 'NEW_TASK_READY' || eventType === 'RPA_TASK_READY') && taskType) {
+        logger.info(
+          `收到新任务触发通知，立即尝试 claim: eventType=${eventType} taskType=${taskType} taskId=${toText(payload.taskId) || '(empty)'}`
+        )
+        await taskWorkersManager.wakeUp(taskType)
+      } else if (eventType === 'NEW_TASK_READY' || eventType === 'RPA_TASK_READY') {
+        logger.info(`收到新任务触发通知但未携带 taskType，唤醒全部 worker 竞争 claim`)
+        await taskWorkersManager.wakeUp()
+      } else if (taskType) {
+        logger.info(`任务通知命中 eventType=${eventType} taskType=${taskType}，唤醒对应 worker`)
+        await taskWorkersManager.wakeUp(taskType)
+      } else {
+        logger.info('任务通知未包含可识别 taskType，唤醒全部 worker')
+        await taskWorkersManager.wakeUp()
+      }
+    } catch (error) {
+      logger.error(`RPA 任务通知处理失败: ${(error as Error)?.message || error}`)
     }
   }
 

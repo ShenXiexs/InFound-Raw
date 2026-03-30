@@ -1,4 +1,4 @@
-import { CurrentUserInfo } from '@infound/desktop-shared'
+import { CurrentUserInfo } from '@infound/desktop-base'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { IPCGateway, IPCHandle, IPCType } from '../base/ipc-decorator'
 import { checkTokenAsync, getCurrentUserAsync, loginAsync } from '../../../services/user-service'
@@ -40,7 +40,6 @@ export class AuthController {
         tokenValue: cookieToken.tokenValue
       }
 
-      // 优先使用响应头 set-cookie 的 token，保留 body token 作为兼容兜底
       if (!token.tokenValue) {
         token.tokenName = loginResult.tokenName
         token.tokenValue = loginResult.tokenValue
@@ -68,7 +67,7 @@ export class AuthController {
         tokenName: token.tokenName,
         tokenValue: token.tokenValue,
         enableDebug: enableDebug
-      } as CurrentUserInfo //todo: added by Phoenix: Avoid compilation errors, but increasing the risk during runtime, all attributes should be assigned values.
+      } as CurrentUserInfo
 
       await globalState.saveState('currentUser', currentUser)
       await globalState.saveState('currentUser.tokenValue', currentUser.tokenValue)

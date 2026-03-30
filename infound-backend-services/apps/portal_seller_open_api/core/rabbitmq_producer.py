@@ -7,137 +7,128 @@ from uuid import uuid4
 
 import aio_pika
 from aio_pika import Message
+from aio_pika.abc import (
+    AbstractRobustChannel,
+    AbstractRobustConnection,
+    AbstractRobustExchange,
+)
 
+from apps.portal_seller_open_api.core.config import IFRabbitMQWebSTOMPSettings
 from core_base import get_logger
-from core_mq import RabbitMQConnection
-from core_mq.rabbitmq_setting import QueueConfig, RabbitMQSettings
 
 
 class RabbitMQProducer:
-    _logger = get_logger("SellerRabbitMQProducer")
-    _settings: Optional[RabbitMQSettings] = None
-    _connection: Optional[RabbitMQConnection] = None
+    _logger = get_logger("SellerUserNotificationProducer")
+    _settings: Optional[IFRabbitMQWebSTOMPSettings] = None
+    _connection: Optional[AbstractRobustConnection] = None
+    _channel: Optional[AbstractRobustChannel] = None
+    _exchange: Optional[AbstractRobustExchange] = None
     _initialized: bool = False
+    _declared_queues: set[str] = set()
 
-    INBOX_QUEUE_KEY = "seller_rpa_inbox"
+    USER_NOTIFICATION_QUEUE_PREFIX = "user.notification"
+    USER_NOTIFICATION_MAX_LENGTH = 1000
+    USER_NOTIFICATION_QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000
     DEFAULT_MESSAGE_TTL_MS = 6 * 60 * 60 * 1000
     EVENT_NEW_TASK_READY = "NEW_TASK_READY"
     EVENT_CANCEL_TASK = "CANCEL_TASK"
 
     @classmethod
-    async def initialize(cls, settings: RabbitMQSettings) -> None:
-        if cls._initialized and cls._connection and cls._connection.exchange:
+    async def initialize(cls, settings: IFRabbitMQWebSTOMPSettings) -> None:
+        if cls._initialized and cls._connection and cls._exchange:
             return
 
         if not settings.host or not settings.exchange_name:
             cls._logger.warning(
-                "RabbitMQ 配置不完整，跳过 seller producer 初始化",
+                "RabbitMQ Web STOMP 配置不完整，跳过 seller producer 初始化",
                 host=settings.host,
                 exchange=settings.exchange_name,
             )
             return
 
         cls._settings = settings
-        cls._connection = RabbitMQConnection(
-            url=settings.url,
-            exchange_name=settings.exchange_name,
-            exchange_type=aio_pika.ExchangeType.TOPIC,
-            prefetch_count=settings.prefetch_count or 10,
-            reconnect_delay=settings.reconnect_delay,
-            max_reconnect_attempts=settings.max_reconnect_attempts,
+        cls._connection = await aio_pika.connect_robust(
+            host=settings.host,
+            port=settings.port,
+            login=settings.username,
+            password=settings.password,
+            virtualhost=settings.vhost,
         )
-        await cls._connection.connect()
+        cls._channel = await cls._connection.channel()
+        cls._exchange = await cls._channel.declare_exchange(
+            settings.exchange_name,
+            aio_pika.ExchangeType.TOPIC,
+            durable=True,
+        )
         cls._initialized = True
         cls._logger.info(
-            "Seller RabbitMQ producer 初始化成功",
+            "Seller user.notification producer 初始化成功",
             exchange=settings.exchange_name,
         )
 
     @classmethod
     async def close(cls) -> None:
-        if cls._connection:
+        if cls._connection and not cls._connection.is_closed:
             await cls._connection.close()
         cls._connection = None
+        cls._channel = None
+        cls._exchange = None
         cls._settings = None
         cls._initialized = False
+        cls._declared_queues.clear()
 
     @classmethod
     def is_initialized(cls) -> bool:
-        return bool(cls._initialized and cls._connection and cls._connection.exchange)
+        return bool(cls._initialized and cls._connection and cls._exchange)
 
     @classmethod
-    async def _get_connection(cls) -> RabbitMQConnection:
-        if not cls._connection:
+    async def _get_exchange(cls) -> AbstractRobustExchange:
+        if not cls._exchange:
             raise RuntimeError("RabbitMQProducer is not initialized")
-        return cls._connection
+        return cls._exchange
 
     @classmethod
-    def _get_inbox_queue_setting(cls) -> QueueConfig:
-        if not cls._settings:
-            raise RuntimeError("RabbitMQProducer settings are not initialized")
-        queue_setting = cls._settings.queues.get(cls.INBOX_QUEUE_KEY)
-        if queue_setting is None:
-            raise RuntimeError(f"RabbitMQ queue config '{cls.INBOX_QUEUE_KEY}' is missing")
-        return queue_setting
+    async def _get_channel(cls) -> AbstractRobustChannel:
+        if not cls._channel:
+            raise RuntimeError("RabbitMQProducer channel is not initialized")
+        return cls._channel
 
     @classmethod
-    def build_user_inbox_binding(
-        cls,
-        user_id: str,
-        *,
-        event_suffix: str = "task.ready",
-    ) -> Tuple[str, str, str]:
+    def build_user_notification_binding(cls, user_id: str) -> Tuple[str, str, str]:
         normalized_user_id = str(user_id or "").strip()
         if not normalized_user_id:
-            raise ValueError("user_id is required for seller inbox queue")
+            raise ValueError("user_id is required for user notification queue")
 
-        queue_setting = cls._get_inbox_queue_setting()
-        queue_prefix = str(queue_setting.queue_prefix or queue_setting.queue_name or "").strip(".")
-        routing_prefix = str(queue_setting.routing_key_pattern or "").strip()
-        routing_prefix = routing_prefix.rstrip(".*").rstrip(".")
-        if not queue_prefix or not routing_prefix:
-            raise RuntimeError("Seller inbox queue prefix settings are required")
-
-        queue_name = f"{queue_prefix}.{normalized_user_id}"
-        binding_key = f"{routing_prefix}.{normalized_user_id}.*"
-        normalized_event_suffix = str(event_suffix or "task.ready").strip().strip(".")
-        publish_routing_key = f"{routing_prefix}.{normalized_user_id}.{normalized_event_suffix}"
-        return queue_name, binding_key, publish_routing_key
+        queue_name = f"{cls.USER_NOTIFICATION_QUEUE_PREFIX}.{normalized_user_id}"
+        routing_key = f"{cls.USER_NOTIFICATION_QUEUE_PREFIX}.{normalized_user_id}"
+        return queue_name, routing_key, routing_key
 
     @classmethod
-    async def ensure_user_inbox(
-        cls,
-        user_id: str,
-        *,
-        message_ttl_ms: Optional[int] = None,
-        event_suffix: str = "task.ready",
-    ) -> Tuple[str, str, str]:
-        conn = await cls._get_connection()
-        queue_setting = cls._get_inbox_queue_setting()
-        queue_name, binding_key, publish_routing_key = cls.build_user_inbox_binding(
-            user_id,
-            event_suffix=event_suffix,
+    async def ensure_user_notification_queue(cls, user_id: str) -> Tuple[str, str, str]:
+        channel = await cls._get_channel()
+        exchange = await cls._get_exchange()
+        queue_name, binding_key, publish_routing_key = cls.build_user_notification_binding(
+            user_id
         )
 
-        if queue_name not in conn.queues:
-            queue_arguments: dict[str, Any] = {}
-            ttl_ms = int(message_ttl_ms or cls.DEFAULT_MESSAGE_TTL_MS)
-            if ttl_ms > 0:
-                queue_arguments["x-message-ttl"] = ttl_ms
-
-            await conn.add_queue(
-                queue_name=queue_name,
-                routing_key=binding_key,
-                durable=queue_setting.durable,
-                auto_delete=queue_setting.auto_delete,
-                exclusive=queue_setting.exclusive,
-                arguments=queue_arguments or None,
+        if queue_name not in cls._declared_queues:
+            queue = await channel.declare_queue(
+                queue_name,
+                durable=True,
+                auto_delete=False,
+                arguments={
+                    "x-message-ttl": cls.USER_NOTIFICATION_QUEUE_TTL_MS,
+                    "x-max-length": cls.USER_NOTIFICATION_MAX_LENGTH,
+                },
             )
+            await queue.bind(exchange, routing_key=binding_key)
+            cls._declared_queues.add(queue_name)
             cls._logger.info(
-                "Seller 用户收件箱已创建",
+                "用户通知队列已声明并绑定",
                 queue_name=queue_name,
                 binding_key=binding_key,
-                message_ttl_ms=ttl_ms,
+                queue_ttl_ms=cls.USER_NOTIFICATION_QUEUE_TTL_MS,
+                max_length=cls.USER_NOTIFICATION_MAX_LENGTH,
             )
 
         return queue_name, binding_key, publish_routing_key
@@ -150,24 +141,23 @@ class RabbitMQProducer:
         task_id: str,
         task_type: str,
         scheduled_time: datetime,
-        payload: dict[str, Any],
+        payload: dict[str, Any] | None = None,
         message_ttl_ms: Optional[int] = None,
     ) -> dict[str, Any]:
         ttl_ms = int(message_ttl_ms or cls.DEFAULT_MESSAGE_TTL_MS)
-        queue_name, binding_key, publish_routing_key = await cls.ensure_user_inbox(
-            user_id=user_id,
-            message_ttl_ms=ttl_ms,
-            event_suffix="task.ready",
+        queue_name, binding_key, publish_routing_key = (
+            await cls.ensure_user_notification_queue(user_id=user_id)
         )
-        conn = await cls._get_connection()
-        if not conn.exchange:
-            raise RuntimeError("RabbitMQ exchange is not initialized")
+        exchange = await cls._get_exchange()
 
         message_id = str(uuid4()).upper()
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(milliseconds=max(ttl_ms, 0))
+        task_name = str((payload or {}).get("taskName") or "").strip()
         message_body = {
             "eventType": cls.EVENT_NEW_TASK_READY,
+            "title": cls.EVENT_NEW_TASK_READY,
+            "type": "notification",
             "payloadVersion": "2026-03-26",
             "messageId": message_id,
             "userId": user_id,
@@ -175,15 +165,18 @@ class RabbitMQProducer:
             "taskType": task_type,
             "scheduledTime": _to_utc_iso(scheduled_time),
             "expiresAt": _to_utc_iso(expires_at),
-            "payload": payload,
         }
+        if task_name:
+            message_body["content"] = f"任务《{task_name}》已立即执行"
+        if payload:
+            message_body["payload"] = payload
 
         message = Message(
             json.dumps(message_body, ensure_ascii=False, default=str).encode("utf-8"),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             content_type="application/json",
             message_id=message_id,
-            expiration=str(ttl_ms),
+            expiration=_build_message_expiration(ttl_ms),
             headers={
                 "event_type": cls.EVENT_NEW_TASK_READY,
                 "task_id": task_id,
@@ -194,9 +187,9 @@ class RabbitMQProducer:
                 "payload_version": "2026-03-26",
             },
         )
-        await conn.exchange.publish(message, routing_key=publish_routing_key)
+        await exchange.publish(message, routing_key=publish_routing_key)
         cls._logger.info(
-            "Seller RPA 任务消息已发送到用户收件箱",
+            "Seller RPA 任务消息已发送到用户通知队列",
             queue_name=queue_name,
             routing_key=publish_routing_key,
             task_id=task_id,
@@ -227,26 +220,20 @@ class RabbitMQProducer:
         if not normalized_event_type:
             raise ValueError("event_type is required")
 
-        event_suffix = {
-            cls.EVENT_NEW_TASK_READY: "task.ready",
-            cls.EVENT_CANCEL_TASK: "task.cancel",
-        }.get(normalized_event_type, normalized_event_type.lower().replace("_", "."))
-
         ttl_ms = int(message_ttl_ms or cls.DEFAULT_MESSAGE_TTL_MS)
-        queue_name, binding_key, publish_routing_key = await cls.ensure_user_inbox(
-            user_id=user_id,
-            message_ttl_ms=ttl_ms,
-            event_suffix=event_suffix,
+        queue_name, binding_key, publish_routing_key = (
+            await cls.ensure_user_notification_queue(user_id=user_id)
         )
-        conn = await cls._get_connection()
-        if not conn.exchange:
-            raise RuntimeError("RabbitMQ exchange is not initialized")
+        exchange = await cls._get_exchange()
 
         message_id = str(uuid4()).upper()
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(milliseconds=max(ttl_ms, 0))
+        task_name = str((payload or {}).get("taskName") or "").strip()
         message_body: dict[str, Any] = {
             "eventType": normalized_event_type,
+            "title": normalized_event_type,
+            "type": "notification",
             "messageId": message_id,
             "userId": str(user_id).strip(),
             "activatedAt": _to_utc_iso(now),
@@ -258,6 +245,13 @@ class RabbitMQProducer:
             message_body["taskType"] = str(task_type).strip().upper()
         if scheduled_time is not None:
             message_body["scheduledTime"] = _to_utc_iso(scheduled_time)
+        if task_name:
+            event_content = (
+                f"任务《{task_name}》已取消"
+                if normalized_event_type == cls.EVENT_CANCEL_TASK
+                else f"任务《{task_name}》事件已触发"
+            )
+            message_body["content"] = event_content
         if payload:
             message_body["payload"] = payload
 
@@ -266,6 +260,7 @@ class RabbitMQProducer:
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             content_type="application/json",
             message_id=message_id,
+            expiration=_build_message_expiration(ttl_ms),
             headers={
                 "event_type": normalized_event_type,
                 "task_id": str(task_id or "").strip(),
@@ -275,9 +270,9 @@ class RabbitMQProducer:
                 "binding_key": binding_key,
             },
         )
-        await conn.exchange.publish(message, routing_key=publish_routing_key)
+        await exchange.publish(message, routing_key=publish_routing_key)
         cls._logger.info(
-            "Seller RPA 事件消息已发送到用户收件箱",
+            "Seller RPA 事件消息已发送到用户通知队列",
             event_type=normalized_event_type,
             queue_name=queue_name,
             routing_key=publish_routing_key,
@@ -298,3 +293,10 @@ def _to_utc_iso(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _build_message_expiration(ttl_ms: int) -> timedelta | None:
+    normalized_ttl_ms = int(ttl_ms or 0)
+    if normalized_ttl_ms <= 0:
+        return None
+    return timedelta(milliseconds=normalized_ttl_ms)

@@ -1,8 +1,9 @@
 {
   "name": "xunda",
-  "version": "1.0.1",
+  "productName": "寻达",
+  "version": "0.0.37",
   "description": "TK达人营销增长引擎",
-  "main": "./out/main/index.js",
+  "main": "./out/main/index.cjs",
   "author": "xunda.club",
   "homepage": "https://www.xunda.club",
   "type": "module",
@@ -13,70 +14,30 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
-    "dev": "electron-vite dev --mode dev",
-    "dev:win": "chcp 65001 && electron-vite dev --mode dev",
-    "build": "npm run typecheck && electron-vite build",
-    "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
-    "build:stg:win": "npm run build:stg && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps && cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
-    "pack:dir": "electron-builder --dir",
-    "pack": "electron-builder",
-    "dist": "pnpm run build && electron-builder"
-  },
-  "build": {
-    "appId": "com.infound.desktop",
-    "productName": "Infound Desktop",
-    "artifactName": "${productName}-win32_x64-${version}-signed.${ext}",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**/*",
-      "node_modules/**/*",
-      "!**/*.map"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/chrome-headless-shell-win64.zip",
-        "to": "browser/chrome-headless-shell.zip"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "build/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true,
-      "license": "build/license.txt",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeader": "build/logo.bmp",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Infound Desktop"
-    }
+    "dev": "pnpm -r --filter=@infound/* build && electron-vite dev --mode dev",
+    "dev:mac": "pnpm -r --filter=@infound/* build && electron-vite dev --mode dev",
+    "dev:win": "chcp 65001 && pnpm -r --filter=@infound/* build && electron-vite dev --mode dev",
+    "prepare:playwright": "electron-builder install-app-deps && cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium"
   },
   "dependencies": {
-    "@infound/desktop-shared": "workspace:*",
+    "@infound/desktop-base": "workspace:*",
+    "@infound/desktop-electron": "workspace:*",
+    "@infound/desktop-rpa": "workspace:*",
     "@stomp/stompjs": "^7.3.0",
-    "electron-log": "^5.4.3",
-    "electron-store": "^11.0.2",
+    "electron-store": "8.2.0",
     "electron-updater": "^6.8.3",
     "keytar": "^7.9.0",
     "node-machine-id": "^1.1.12",
+    "pino": "^10.3.1",
+    "pino-roll": "^4.0.0",
     "playwright-core": "1.58.2",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "radash": "^12.1.1",
     "reflect-metadata": "^0.2.2",
-    "stompjs": "^2.3.3",
     "vfonts": "^0.0.3",
-    "ws": "^8.19.0"
+    "ws": "^8.19.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
@@ -88,11 +49,10 @@
     "@iconify-json/hugeicons": "^1.2.23",
     "@intlify/unplugin-vue-i18n": "^11.0.7",
     "@types/node": "^24.10.13",
-    "@types/stompjs": "^2.3.10",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-vue": "^6.0.4",
     "cross-env": "^10.1.0",
-    "electron": "^40.6.0",
+    "electron": "40.8.4",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "eslint": "^10.0.1",

@@ -9,7 +9,7 @@ import ButtonGroupOfTitleBar from '@renderer/components/ButtonGroupOfTitleBar.vu
 import { resolveResourceAssetUrl } from '@renderer/utils/asset-url'
 
 const globalState: RendererState = rendererStore.currentState
-const icon = computed(() => resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'icon.png'))
+const icon = computed(() => resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'icons/common/icon.png'))
 const router = useRouter()
 const message = useMessage()
 

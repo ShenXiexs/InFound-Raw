@@ -2,7 +2,10 @@ import { BaseWindow, session, WebContentsView } from 'electron'
 import { join } from 'path'
 import { logger } from '../utils/logger'
 import { AppConfig } from '@common/app-config'
-import type { BrowserPaginationResult, BrowserSelectorState } from '../modules/rpa/task-dsl/browser-actions'
+import type {
+  BrowserPaginationResult,
+  BrowserSelectorState
+} from '@desktop-rpa/seller-rpa/task-dsl/browser-actions'
 
 interface JsonResponseCaptureSession {
   captureKey: string

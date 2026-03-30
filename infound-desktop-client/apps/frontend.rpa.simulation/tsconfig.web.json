@@ -1,25 +1,14 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
-  "include": [
-    "src/renderer/*.d.ts",
-    "src/renderer/src/**/*",
-    "src/renderer/src/**/*.vue",
-    "src/preload/*.d.ts",
-    "src/common/**/*"
-  ],
+  "include": ["src/renderer/*.d.ts", "src/renderer/src/**/*", "src/renderer/src/**/*.vue", "src/preload/*.d.ts", "src/common/**/*"],
   "compilerOptions": {
     "composite": true,
     "baseUrl": ".",
     "paths": {
-      "@common/*": [
-        "src/common/*"
-      ],
-      "@renderer/*": [
-        "src/renderer/src/*"
-      ]
+      "@common/*": ["src/common/*"],
+      "@desktop-rpa/*": ["../../packages/frontend.desktop.rpa/src/*"],
+      "@renderer/*": ["src/renderer/src/*"]
     },
-    "types": [
-      "unplugin-icons/types/vue"
-    ]
+    "types": ["unplugin-icons/types/vue"]
   }
 }

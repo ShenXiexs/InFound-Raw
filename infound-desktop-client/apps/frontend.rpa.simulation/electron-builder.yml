@@ -11,12 +11,12 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
-  - "**/chromium/**/*"
+  - '**/chromium/**/*'
 build:
   extraResources:
-    - from: "node_modules/playwright-core/.local-browsers/chromium-*"
-      to: "chromium"
-      filter: [ "**/*" ]
+    - from: 'node_modules/playwright-core/.local-browsers/chromium-*'
+      to: 'chromium'
+      filter: ['**/*']
 win:
   executableName: frontend.rpa.simulation
 nsis:

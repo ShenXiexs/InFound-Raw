@@ -1,8 +1,9 @@
 import { createHash } from 'crypto'
 import { app } from 'electron'
 import pkg from 'node-machine-id'
+//import Store from 'electron-store'
 import Store from 'electron-store'
-import { AppStoreSchema, CurrentUserInfo } from '@infound/desktop-shared'
+import { AppStoreSchema, CurrentUserInfo } from '@infound/desktop-base'
 import { AppConfig } from '@common/app-config'
 import { logger } from '../../utils/logger'
 import { credentialStore } from './credential-store'
@@ -38,8 +39,8 @@ const defaultData: AppStoreSchema = {
 
 // 客户端数据持久化
 export class AppStore {
-  private store: Store<AppStoreSchema>
-  private schema = {
+  private store!: Store<AppStoreSchema>
+  private schema: Store.Schema<AppStoreSchema> = {
     appSetting: {
       type: 'object',
       properties: {
@@ -91,7 +92,7 @@ export class AppStore {
     }
   }
 
-  constructor() {
+  /*constructor() {
     const storeName = AppConfig.IS_PRO ? 'app' : 'app-' + import.meta.env.MODE
     logger.info('AppStore init', app.getPath('userData'), storeName)
 
@@ -103,14 +104,37 @@ export class AppStore {
       schema: this.schema,
       defaults: defaultData,
       encryptionKey: AppConfig.IS_PRO ? this.getDeviceEncryptionKey() : undefined
-      /*migrations: {
+      /!*migrations: {
         '1.0.1': (store) => {
           const appInfo = store.get('appInfo')
           if (appInfo) {
             store.set('appSetting', appInfo)
           }
         }
-      }*/
+      }*!/
+    })
+  }*/
+
+  // 【核心】提供一个异步的初始化方法
+  public async init(): Promise<void> {
+    const storeName = AppConfig.IS_PRO ? 'app' : 'app-' + import.meta.env.MODE
+
+    this.store = new Store<AppStoreSchema>({
+      cwd: app.getPath('userData'),
+      name: storeName,
+      fileExtension: 'json',
+      clearInvalidConfig: true,
+      schema: this.schema,
+      defaults: defaultData,
+      encryptionKey: AppConfig.IS_PRO ? this.getDeviceEncryptionKey() : undefined
+      /*migrations: {
+          '1.0.1': (store) => {
+            const appInfo = store.get('appInfo')
+            if (appInfo) {
+              store.set('appSetting', appInfo)
+            }
+          }
+        }*/
     })
   }
 

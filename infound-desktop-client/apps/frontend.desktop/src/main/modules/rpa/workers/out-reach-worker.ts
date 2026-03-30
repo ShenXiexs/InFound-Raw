@@ -13,4 +13,8 @@ export class OutReachWorkerManager extends AbstractWorkerManager {
     await desktopRpaExecutionService.startSession(session)
     await desktopRpaExecutionService.runOutreach(payload)
   }
+
+  protected async abortCurrentTask(): Promise<void> {
+    await desktopRpaExecutionService.abortOutreach()
+  }
 }

@@ -1,0 +1,28 @@
+[project]
+name = "portal-seller-web-socket"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "bcrypt>=5.0.0",
+    "core-base",
+    "core-redis",
+    "core-web",
+    "gunicorn>=25.1.0",
+    "shared-application-services",
+    "shared-domain",
+    "shared-infrastructure",
+    "uvicorn[standard]>=0.41.0",
+    "aio-pika>=9.6.1",
+    "pyjwt>=2.12.1",
+    "shared-seller-application-services",
+]
+
+[tool.uv.sources]
+core-base = { workspace = true }
+core-web = { workspace = true }
+core-redis = { workspace = true }
+shared-application-services = { workspace = true }
+shared-domain = { workspace = true }
+shared-infrastructure = { workspace = true }
+shared-seller-application-services = { workspace = true }

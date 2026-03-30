@@ -6,6 +6,7 @@ from typing import Any, Iterable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.portal_seller_open_api.core.config import Settings
 from apps.portal_seller_open_api.models.entities import CurrentUserInfo
 from apps.portal_seller_open_api.models.outreach_result import (
     OutreachResultIngestionRequest,
@@ -20,6 +21,9 @@ from apps.portal_seller_open_api.services.normalization import (
     normalize_int,
     normalize_outreach_status,
     normalize_utc_datetime,
+)
+from apps.portal_seller_open_api.services.task_orchestration_service import (
+    SellerRpaTaskOrchestrationService,
 )
 from shared_domain.models.infound import (
     SellerTkOutreachCreatorCounts,
@@ -55,8 +59,11 @@ EST_POST_RATE_MAPPING = {
 
 
 class OutreachResultIngestionService:
-    def __init__(self, db_session: AsyncSession) -> None:
+    def __init__(self, db_session: AsyncSession, settings: Settings) -> None:
         self.db_session = db_session
+        self.task_orchestration_service = SellerRpaTaskOrchestrationService(
+            db_session, settings
+        )
 
     async def ingest(
         self,
@@ -186,7 +193,19 @@ class OutreachResultIngestionService:
             settings_payload["new_count"] = new_count
             await self._upsert_settings(settings_payload)
 
+        derived_task_plans = await self.task_orchestration_service.prepare_outreach_follow_up_tasks(
+            current_user,
+            task_id=task_id,
+            shop_id=shop.id,
+            shop_region_code=clean_text(payload.shop_region_code) or shop.shop_region_code,
+            search_keyword=payload.search_keyword,
+            message=payload.message,
+            first_message=payload.first_message,
+            second_message=payload.second_message,
+            creators=payload.creators,
+        )
         await self.db_session.commit()
+        await self.task_orchestration_service.dispatch_task_plans(derived_task_plans)
 
         return OutreachResultIngestionResult(
             task_id=task_id,

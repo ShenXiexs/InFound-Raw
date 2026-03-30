@@ -4,22 +4,28 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
 dependencies = [
+    "aio-pika>=9.6.1",
+    "alibabacloud-dysmsapi20170525>=4.5.0",
+    "bcrypt>=5.0.0",
     "core-base",
     "core-mq",
     "core-redis",
     "core-web",
-    "pyjwt>=2.11.0",
+    "gunicorn>=25.1.0",
+    "pyjwt>=2.12.1",
     "shared-application-services",
     "shared-domain",
+    "shared-seller-application-services",
     "shared-infrastructure",
     "uvicorn[standard]>=0.41.0",
 ]
 
 [tool.uv.sources]
-shared-infrastructure = { workspace = true }
+core-base = { workspace = true }
+core-mq = { workspace = true }
 core-web = { workspace = true }
 core-redis = { workspace = true }
-core-mq = { workspace = true }
 shared-application-services = { workspace = true }
 shared-domain = { workspace = true }
-core-base = { workspace = true }
+shared-infrastructure = { workspace = true }
+shared-seller-application-services = { workspace = true }

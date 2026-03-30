@@ -1,4 +1,4 @@
-import { AppInfo, AppSetting, AppState, CurrentUserInfo } from '@infound/desktop-shared'
+import { AppInfo, AppSetting, AppState, CurrentUserInfo } from '@infound/desktop-base'
 import { defineStore } from 'pinia'
 import { debounce, set } from 'radash'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
@@ -94,7 +94,7 @@ export class RendererStore {
 
   private setupRendererToMainSync(): void {
     const debouncedSync = debounce({ delay: 500 }, (path: string, value: any) => {
-      window.ipc.send(IPC_CHANNELS.APP_GLOBAL_STATE_SET_ITEM, { path, value })
+      window.ipc.send(IPC_CHANNELS.APP_GLOBAL_STATE_SET_ITEM, path, value)
     })
 
     this.store.$subscribe((_mutation: any, state: { appSetting: any }) => {

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+**/__pycache__
+**/*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.git
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 测试和覆盖率
+.tox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+.hypothesis/
+
+# 文档
+*.md
+docs/
+
+# 备份和其他
+backup/
+logs/
+*.bak
+*.lock

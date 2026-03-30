@@ -3,12 +3,15 @@ import { BrowserWindow, WebContentsView } from 'electron'
 import { PageLoadStatus, TkShopSetting, TkShopTabItemSetting } from '@common/types/tk-type'
 import { logger } from '../utils/logger'
 import { globalState } from '../modules/state/global-state'
-import { AppState, CurrentUserInfo } from '@infound/desktop-shared'
+import { AppState, CurrentUserInfo } from '@infound/desktop-base'
 import { resetWCVSize } from '../utils/mcv-helper'
 import { TransitionWcv } from './transition-wcv'
 import { appStore } from '../modules/store/app-store'
 import { TabManager } from './tab-manager'
-import { TAB_TYPES } from '@common/app-constants'
+import { TAB_TYPES, TK_CONTENTS } from '@common/app-constants'
+import * as fs from 'fs'
+import * as path from 'path'
+import { app } from 'electron'
 
 export class TkTabItemManager {
   private readonly baseWindow: BrowserWindow
@@ -22,6 +25,9 @@ export class TkTabItemManager {
   private transitionWcv: TransitionWcv
   private readonly tabManager: TabManager
   private businessData: Map<string, { pageLoadStatus: PageLoadStatus; targetUrl: string }> = new Map() // todo:业务数据
+
+  //tk login related contents
+  private lastSavedKeyCookie: string | null = null
 
   constructor(baseWindow: BrowserWindow, shopSetting: TkShopSetting) {
     this.baseWindow = baseWindow
@@ -213,6 +219,7 @@ export class TkTabItemManager {
     // 监控导航
     // monitorNavigation(logger, view.webContents)
 
+    //todo:【提醒】 will-frame-navigate事件已在Electron的webContensView移除，内部保留，此实现暂时正常，注意更新
     ;(view.webContents as any).on('will-frame-navigate', (event: Electron.Event, url: string) => {
       if (!url.startsWith('http') && !url.startsWith('https')) {
         logger.debug(`拦截到子框架的协议跳转: ${url}`)
@@ -255,6 +262,27 @@ export class TkTabItemManager {
       }
     })
 
+    // 监听TK页面，保存登录态
+    view.webContents.on('did-navigate', async (_, url) => {
+      if (url.includes(TK_CONTENTS.BASE_URL) && !url.includes(TK_CONTENTS.LOGIN_PAGE_URL_FLAG)) {
+        await this.checkAndExportCookies(view)
+      }
+    })
+
+    //优化处理：TK商家中心单页面切页时，某些功能模块没有title（如订单相关模志），尝试加载后取title，如为空则显示默认标题
+    view.webContents.on('did-navigate-in-page', async (_, url, isMainFrame) => {
+      if (isMainFrame && url.includes(TK_CONTENTS.BASE_URL)) {
+        try {
+          const title = await view.webContents.executeJavaScript('document.title')
+          const finalTitle = title && title.trim() ? title : TK_CONTENTS.DEFAULT_TITLE
+          this.tabManager.updateTabTitle(id, finalTitle)
+        } catch (err) {
+          logger.warn('获取标题失败', err)
+          this.tabManager.updateTabTitle(id, TK_CONTENTS.DEFAULT_TITLE)
+        }
+      }
+    })
+
     // 初始化业务数据
     this.businessData.set(id, {
       pageLoadStatus: PageLoadStatus.Loading,
@@ -264,7 +292,7 @@ export class TkTabItemManager {
 
   private loadTabItemSettings(): Record<string, TkShopTabItemSetting> {
     let tabItemSettings: Record<string, TkShopTabItemSetting> | null = this.currentUser == null ? null : appStore.get(`tkShops.${this.currentUser!.userId}`)
-    logger.info(tabItemSettings)
+    //logger.info(JSON.stringify(tabItemSettings))
     // tabItemSettings = null // todo: will be removed
     // 如果设置为空或为空对象，则新建默认 tab 设置
     if (tabItemSettings == null || Object.keys(tabItemSettings).length === 0) {
@@ -291,5 +319,51 @@ export class TkTabItemManager {
     //   })
     // }
     return tabItemSettings
+  }
+
+  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
+  private getLoginStateCookieFilePath(platformShopId: string): string {
+    const userId = this.currentUser?.userId || '00000000-0000-0000-0000-000000000000'
+    const shopId = this.shopSetting?.id || '000000'
+    const loginStateFolder = path.join(app.getPath('userData'), TK_CONTENTS.KEY, userId, shopId)
+    return path.join(loginStateFolder, `${platformShopId}.json`)
+  }
+
+  // 注意：在跳转到登录页时，无法获得 SHOP_ID，因此无法删除对应的 Cookie 文件，因此登录态cookie是否能用，由RPA模块判断，保留或删除都可
+  // 用户重新登录时，新文件会覆盖或新增，旧文件保留不影响使用。
+  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
+  private async checkAndExportCookies(view: WebContentsView) {
+    const cookies = await view.webContents.session.cookies.get({})
+    const currentKeyCookie = cookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null
+    const shopIdCookie = cookies.find((c) => c.name === TK_CONTENTS.SHOP_ID_COOKIE_KEY)?.value
+
+    if (!shopIdCookie) {
+      console.log('未找到 SHOP_ID Cookie，跳过保存')
+      logger.debug('未找到 SHOP_ID Cookie，跳过保存')
+      return
+    }
+
+    const filePath = this.getLoginStateCookieFilePath(shopIdCookie)
+
+    if (this.lastSavedKeyCookie === null && fs.existsSync(filePath)) {
+      try {
+        const existingContent = fs.readFileSync(filePath, 'utf-8')
+        const existingCookies = JSON.parse(existingContent)
+        this.lastSavedKeyCookie = existingCookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null
+      } catch (err) {
+        console.log(`读取现有 Cookie文件 ${filePath} 失败`, err)
+        logger.warn(`读取现有 Cookie文件 ${filePath} 失败`, err)
+      }
+    }
+
+    if (this.lastSavedKeyCookie === currentKeyCookie) {
+      console.log('关键 Cookie 值未变化，跳过保存')
+      logger.debug('关键 Cookie 值未变化，跳过保存')
+      return
+    }
+
+    this.tabManager.exportCookiesToFile(filePath, cookies)
+
+    this.lastSavedKeyCookie = currentKeyCookie
   }
 }

@@ -18,9 +18,17 @@ export class AppConfig {
   public static readonly APP_PROTOCOL: string = ENV.VITE_APP_PROTOCOL
   public static readonly APP_HARDCODED_SALT: string = ENV.VITE_APP_HARDCODED_SALT
   public static readonly OPENAPI_BASE_URL: string = ENV.VITE_OPENAPI_BASE_URL
-  public static readonly WS_BASE_URL: string = readEnv('VITE_SELLER_RPA_WS_BASE_URL', 'VITE_WS_BASE_URL')
-  public static readonly SELLER_RPA_WS_INBOX_DESTINATION_PREFIX: string =
-    readEnv('VITE_SELLER_RPA_WS_INBOX_DESTINATION_PREFIX') || '/amq/queue/seller.rpa.user.inbox'
+  public static readonly GENERAL_WS_BASE_URL: string = readEnv('VITE_WS_BASE_URL')
+  public static readonly SELLER_RPA_WS_BASE_URL: string = readEnv(
+    'VITE_SELLER_RPA_WS_BASE_URL',
+    'VITE_WS_BASE_URL'
+  )
+  public static readonly USER_NOTIFICATION_WS_DESTINATION_PREFIX: string =
+    readEnv('VITE_USER_NOTIFICATION_WS_DESTINATION_PREFIX') || '/amq/queue/user.notification'
+  public static readonly TASK_MANAGER_POLLING_INTERVAL_MS: number = Math.max(
+    Number(readEnv('VITE_TASK_MANAGER_POLLING_INTERVAL_MS') || '20000') || 20000,
+    1000
+  )
   public static readonly DOWNLOAD_BASE_URL: string = ENV.VITE_DOWNLOAD_BASE_URL
   public static readonly OFFICIAL_WEBSITE_BASE_URL: string = ENV.VITE_OFFICIAL_WEBSITE_BASE_URL
   public static readonly EMBED_BASE_URL: string = ENV.VITE_EMBED_BASE_URL

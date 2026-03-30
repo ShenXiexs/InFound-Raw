@@ -4,34 +4,56 @@ import fs from 'fs'
 import { app, webContents } from 'electron'
 import pkg from 'node-machine-id'
 import { set } from 'radash'
-import { AppInfo, AppSetting, AppState, CurrentUserInfo } from '@infound/desktop-shared'
+import { AppInfo, AppSetting, AppState, CurrentUserInfo } from '@infound/desktop-base'
 import { logger } from '../../utils/logger'
 import { appStore } from '../store/app-store'
 import { credentialStore } from '../store/credential-store'
-import { AppConfig } from '@common/app-config'
 import { MonitorController } from '../ipc/monitor-controller'
 import { getFilePath } from '../../utils/path-helper'
+import { AppConfig } from '@common/app-config'
 
 const { machineIdSync } = pkg
 
 class GlobalState {
-  private state: AppState
+  private state!: AppState
 
   constructor() {
-    const userInfo = this.getCurrentUser()
+    /*const userInfo = this.getCurrentUser()
     const userEnableDebug = userInfo?.enableDebug ?? userInfo?.permission?.enableDebug ?? false
     this.state = {
       appInfo: this.getAppInfo(),
       appSetting: this.getAppSetting(),
+      isMac: process.platform === 'darwin',
       isUpdating: false,
       isLogin: AppConfig.IS_PRO ? userInfo != null && userInfo.userId !== '' : true,
+      isQuitting: false,
       enableDebug: userEnableDebug,
       currentUser: userInfo
-    } as AppState
+    } as AppState*/
   }
 
   public get currentState(): AppState {
     return this.state
+  }
+
+  /**
+   * 核心：异步初始化方法
+   * 必须在 appStore.init() 执行后再调用
+   */
+  public async init(): Promise<void> {
+    const userInfo = await this.getCurrentUser() // 改为 await
+    const userEnableDebug = userInfo?.enableDebug ?? userInfo?.permission?.enableDebug ?? false
+
+    this.state = {
+      appInfo: this.getAppInfo(),
+      appSetting: this.getAppSetting(),
+      isMac: process.platform === 'darwin',
+      isUpdating: false,
+      isLogin: AppConfig.IS_PRO ? userInfo != null && userInfo.userId !== '' : true,
+      isQuitting: false,
+      enableDebug: userEnableDebug,
+      currentUser: userInfo
+    } as AppState
   }
 
   public async saveState(path: string, value: any): Promise<void> {
@@ -112,10 +134,12 @@ class GlobalState {
     } as AppSetting
   }
 
-  private getCurrentUser(): CurrentUserInfo | undefined {
+  private async getCurrentUser(): Promise<CurrentUserInfo | undefined> {
     const userInfo = appStore.get<CurrentUserInfo>('currentUser')
     if (userInfo) {
-      credentialStore.getToken().then((token) => (userInfo.tokenValue = token || ''))
+      //credentialStore.getToken().then((token) => (userInfo.tokenValue = token || ''))
+      const token = await credentialStore.getToken()
+      userInfo.tokenValue = token || ''
       return userInfo as CurrentUserInfo
     } else return undefined
   }

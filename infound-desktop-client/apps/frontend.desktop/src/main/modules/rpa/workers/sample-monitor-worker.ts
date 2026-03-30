@@ -13,4 +13,8 @@ export class SampleMonitorWorker extends AbstractWorkerManager {
     await desktopRpaExecutionService.startSession(session)
     await desktopRpaExecutionService.runSampleManagement(payload)
   }
+
+  protected async abortCurrentTask(): Promise<void> {
+    await desktopRpaExecutionService.abortSampleManagement()
+  }
 }

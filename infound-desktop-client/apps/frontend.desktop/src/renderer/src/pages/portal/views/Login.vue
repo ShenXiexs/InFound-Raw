@@ -67,7 +67,7 @@ const canSubmit = computed(() => {
 })
 
 const logo = computed(() => {
-  return resolveResourceAssetUrl(rendererStore.currentState.appSetting.resourcesPath, 'logo.png')
+  return resolveResourceAssetUrl(rendererStore.currentState.appSetting.resourcesPath, 'icons/common/logo.png')
 })
 
 const onSubmit = async (): Promise<void> => {

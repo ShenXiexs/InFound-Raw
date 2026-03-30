@@ -4,13 +4,15 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import type { SellerChatbotPayloadInput } from '@common/types/rpa-chatbot'
-import type { SellerCreatorDetailPayloadInput } from '@common/types/rpa-creator-detail'
-import type { OutreachFilterConfigInput } from '@common/types/rpa-outreach'
-import type { SampleManagementPayloadInput } from '@common/types/rpa-sample-management'
-import type { PlaywrightSimulationPayloadInput } from '@common/types/rpa-simulation'
+import type {
+  OutreachFilterConfigInput,
+  PlaywrightSimulationPayloadInput,
+  SampleManagementPayloadInput,
+  SellerChatbotPayloadInput,
+  SellerCreatorDetailPayloadInput
+} from '@desktop-rpa'
 import { IPCManager } from './modules/ipc/base/ipc-manager'
-import { RPAController } from './modules/ipc/rpa-controller'
+import RPAController from './modules/ipc/rpa-controller'
 import { LoggerController } from './modules/ipc/logger-controller'
 import { appWindowsAndViewsManager } from './windows/app-windows-and-views-manager'
 import { AppController } from './modules/ipc/app-controller'
@@ -49,9 +51,7 @@ const resolveCliJsonPath = (inputPath: string): string => {
     }
   }
 
-  throw new Error(
-    `找不到 JSON 文件: ${trimmedPath}。已尝试从当前目录和仓库根目录解析，请检查路径是否存在。`
-  )
+  throw new Error(`找不到 JSON 文件: ${trimmedPath}。已尝试从当前目录和仓库根目录解析，请检查路径是否存在。`)
 }
 
 const setupTerminalRPACLI = (rpaController: RPAController): void => {

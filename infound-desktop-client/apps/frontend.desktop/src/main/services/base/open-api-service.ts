@@ -2,9 +2,8 @@ import { logger } from '../../utils/logger'
 import NetRequest, { InterceptorHooks } from '../../utils/net-request'
 import { globalState } from '../../modules/state/global-state'
 import { HTTP_HEADERS } from '@common/app-constants'
-import { AppConfig } from '@common/app-config' // 这里用我们之前封装的 net 模块版本
+import { AppConfig } from '@common/app-config'
 
-// 拦截器逻辑保持一致
 const transform: InterceptorHooks = {
   requestInterceptor(config) {
     const appInfo = globalState.currentState.appInfo
@@ -33,7 +32,7 @@ const transform: InterceptorHooks = {
         method: config.method,
         url: config.url,
         headers: config.headers,
-        data: config.body // net 模块用 body 而不是 data
+        data: config.body
       })
     }
 
@@ -64,11 +63,10 @@ const transform: InterceptorHooks = {
 
       return response
     } finally {
-      // 可放隐藏 loading 等逻辑
+      // noop
     }
   },
   responseInterceptorErrorCatch(error) {
-    // net 模块的 error 不一定有 response
     if ((error as any)?.status) {
       logger.error('❌ 响应错误:', {
         status: (error as any).status,
@@ -83,7 +81,6 @@ const transform: InterceptorHooks = {
   }
 }
 
-// 创建基于 Electron net 模块的 Request 实例
 const openapiRequest = new NetRequest(transform)
 
 export default openapiRequest

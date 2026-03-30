@@ -20,6 +20,15 @@ export const TAB_TYPES = {
   TIKTOK: 'tk'
 } as const
 
+export const TK_CONTENTS = {
+  KEY: 'tk',
+  BASE_URL: 'seller-mx.tiktok.com',
+  LOGIN_PAGE_URL_FLAG: '/login',
+  DEFAULT_TITLE: '商家中心',
+  LOGIN_STATE_COOKIE_KEY: 'sid_guard_tiktokseller',
+  SHOP_ID_COOKIE_KEY: 'SHOP_ID'
+} as const
+
 export const TAB_MAX_COUNT = 20
 
 export const REGEX = {

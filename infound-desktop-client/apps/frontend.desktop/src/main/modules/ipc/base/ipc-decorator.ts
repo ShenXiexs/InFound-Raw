@@ -9,6 +9,7 @@ export enum IPCGateway {
   APP = 'gateway:app',
   MONITOR = 'gateway:monitor',
   TK = 'gateway:tk',
+  TAB = 'gateway:tab',
   RPA = 'gateway:rpa',
   API = 'gateway:api',
   WS = 'gateway:ws'

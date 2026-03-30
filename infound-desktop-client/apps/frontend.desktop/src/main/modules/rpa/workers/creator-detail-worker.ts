@@ -13,4 +13,8 @@ export class CreatorDetailWorkerManager extends AbstractWorkerManager {
     await desktopRpaExecutionService.startSession(session)
     await desktopRpaExecutionService.runCreatorDetail(payload)
   }
+
+  protected async abortCurrentTask(): Promise<void> {
+    await desktopRpaExecutionService.abortCreatorDetail()
+  }
 }

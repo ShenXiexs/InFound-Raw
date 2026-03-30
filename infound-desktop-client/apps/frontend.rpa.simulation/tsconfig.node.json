@@ -1,19 +1,21 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": [
-    "electron.vite.config.*",
-    "env.d.ts",
-    "src/common/**/*",
-    "src/main/**/*",
-    "src/preload/**/*"
-  ],
+  "include": ["electron.vite.config.*", "env.d.ts", "src/common/**/*", "src/main/**/*", "src/preload/**/*"],
   "compilerOptions": {
     "baseUrl": ".",
     "composite": true,
     "types": ["electron-vite/node"],
     "paths": {
       "@common/*": ["src/common/*"],
-      "@sim-common/*": ["src/common/*"]
+      "@desktop-rpa": ["../../packages/frontend.desktop.rpa/src/index.ts"],
+      "@desktop-rpa/*": ["../../packages/frontend.desktop.rpa/src/*"],
+      "@infound/desktop-base": ["../../packages/frontend.desktop.base/src/index.ts"],
+      "@infound/desktop-electron": ["../../packages/frontend.desktop.electron/src/index.ts"],
+      "naive-ui": ["node_modules/naive-ui"],
+      "pino": ["../../packages/frontend.desktop.electron/src/types/pino.d.ts"],
+      "pino-roll": ["../../packages/frontend.desktop.electron/src/types/pino-roll.d.ts"],
+      "playwright-core": ["node_modules/playwright-core"],
+      "xlsx": ["../../packages/frontend.desktop.rpa/src/types/xlsx.d.ts"]
     },
     "module": "ESNext",
     "target": "ESNext",

@@ -1,7 +1,7 @@
 import path from 'path'
 import { app, BrowserWindow, Menu } from 'electron'
 import { AppConfig } from '@common/app-config'
-import { logger } from '../utils/logger'
+import { initializeLogger, logger } from '../utils/logger'
 import { appWindowsAndViewsManager } from '../windows/app-windows-and-views-manager'
 import { globalState } from '../modules/state/global-state'
 import { AppTray } from './app-tray'
@@ -17,6 +17,7 @@ import { AuthController } from '../modules/ipc/openapi/auth-controller'
 import { TabController } from '../modules/ipc/tab-controller'
 import { WebSocketController } from '../modules/ipc/web-socket-controller'
 import { RPAController } from '../modules/ipc/rpa-controller'
+import { appStore } from '../modules/store/app-store'
 
 export class AppAdapter {
   private static instance: AppAdapter
@@ -41,14 +42,17 @@ export class AppAdapter {
     this.watchLifecycleEvents()
 
     app.whenReady().then(async () => {
+      // 在这里“激活”这两个单例
+      await appStore.init() // 填充内部的 Store 实例
+      await globalState.init() // 读取 Store 并生成初始 State
+
       await this.setupComponents()
     })
   }
 
   private async setupComponents(): Promise<void> {
-    electronApp.setAppUserModelId('xunda.client')
+    electronApp.setAppUserModelId('if.xunda.desktop')
     Menu.setApplicationMenu(null)
-    AppTray.getInstance().setup()
 
     IPCManager.register(new LoggerController())
     IPCManager.register(new GlobalStateController())
@@ -64,6 +68,7 @@ export class AppAdapter {
     await appWindowsAndViewsManager.splashWindow.initWindow()
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.INIT_APP)
 
+    //AppDock.getInstance().setup()
     AppTray.getInstance().setup()
 
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.LOAD_CORE_MODULES)
@@ -76,7 +81,12 @@ export class AppAdapter {
     app.on('activate', async function () {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
-      if (BrowserWindow.getAllWindows().length === 0) await appWindowsAndViewsManager.initMainWindow()
+      if (BrowserWindow.getAllWindows().length === 0) {
+        await appWindowsAndViewsManager.initMainWindow()
+      } else {
+        appWindowsAndViewsManager.mainWindow.showWindow()
+        app.dock?.show()
+      }
     })
 
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.COMPLETE_STARTUP)
@@ -105,6 +115,11 @@ export class AppAdapter {
    * 通用生命周期（window-all-closed, before-quit）
    */
   private watchLifecycleEvents(): void {
+    // 当点击 Dock 菜单的“退出”或按下 Cmd+Q 时触发
+    app.on('before-quit', () => {
+      globalState.currentState.isQuitting = true
+    })
+
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
         app.quit()
@@ -229,11 +244,12 @@ export class AppAdapter {
 
     // 处理用户数据路径 (区分开发/生产环境)
     const isProd = AppConfig.IS_PRO
-    const baseName = app.getName()
+    const baseName = 'xunda'
     const folderName = isProd ? baseName : `${baseName}${import.meta.env.MODE}`
 
     const userDataPath = path.join(app.getPath('appData'), folderName)
     app.setPath('userData', userDataPath)
+    initializeLogger()
 
     // 非生产环境下忽略证书错误
     if (!isProd) {

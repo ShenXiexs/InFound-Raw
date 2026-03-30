@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.portal_seller_open_api.core.config import Settings
 from apps.portal_seller_open_api.models.entities import CurrentUserInfo
 from apps.portal_seller_open_api.models.sample_monitor_result import (
     SampleMonitorResultIngestionRequest,
@@ -24,6 +25,9 @@ from apps.portal_seller_open_api.services.normalization import (
     normalize_region_code,
     normalize_utc_datetime,
 )
+from apps.portal_seller_open_api.services.task_orchestration_service import (
+    SellerRpaTaskOrchestrationService,
+)
 from shared_domain.models.infound import (
     SellerTkProducts,
     SellerTkSampleContentCrawlLogs,
@@ -35,8 +39,11 @@ from shared_domain.models.infound import (
 
 
 class SampleMonitorResultIngestionService:
-    def __init__(self, db_session: AsyncSession) -> None:
+    def __init__(self, db_session: AsyncSession, settings: Settings) -> None:
         self.db_session = db_session
+        self.task_orchestration_service = SellerRpaTaskOrchestrationService(
+            db_session, settings
+        )
 
     async def ingest(
         self,
@@ -172,7 +179,15 @@ class SampleMonitorResultIngestionService:
                 )
                 sample_content_crawl_logs_inserted += 1
 
+        derived_task_plans = await self.task_orchestration_service.prepare_sample_follow_up_tasks(
+            current_user,
+            task_id=task_id,
+            shop_id=shop.id,
+            shop_region_code=clean_text(payload.shop_region_code) or shop.shop_region_code,
+            rows=rows,
+        )
         await self.db_session.commit()
+        await self.task_orchestration_service.dispatch_task_plans(derived_task_plans)
 
         return SampleMonitorResultIngestionResult(
             task_id=task_id,

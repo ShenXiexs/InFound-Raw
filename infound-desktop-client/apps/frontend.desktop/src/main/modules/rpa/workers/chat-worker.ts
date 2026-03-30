@@ -13,4 +13,8 @@ export class ChatWorkerManager extends AbstractWorkerManager {
     await desktopRpaExecutionService.startSession(session)
     await desktopRpaExecutionService.runChatbot(payload)
   }
+
+  protected async abortCurrentTask(): Promise<void> {
+    await desktopRpaExecutionService.abortChatbot()
+  }
 }
