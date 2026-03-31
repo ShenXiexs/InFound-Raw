@@ -2,6 +2,19 @@
 name = "portal-async-scheduler"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "apscheduler>=3.11.2",
+    "core-base",
+    "core-redis",
+    "shared-application-services",
+    "shared-domain",
+    "shared-infrastructure",
+]
+
+[tool.uv.sources]
+core-base = { workspace = true }
+core-redis = { workspace = true }
+shared-application-services = { workspace = true }
+shared-domain = { workspace = true }
+shared-infrastructure = { workspace = true }

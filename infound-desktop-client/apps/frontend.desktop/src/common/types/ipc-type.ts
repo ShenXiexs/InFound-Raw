@@ -1,4 +1,4 @@
-import { AppState, WebSocketMessage } from '@infound/desktop-base'
+import { AppState } from '@infound/desktop-base'
 import { LoggerLevel } from '@infound/desktop-electron'
 import { TkShopSetting } from '@common/types/tk-type'
 import { Tab } from '@common/types/tab-type'
@@ -24,8 +24,6 @@ export const IPC_CHANNELS = {
 
   WEBSOCKET_CONNECT: 'websocket-connect',
   WEBSOCKET_DISCONNECT: 'websocket-disconnect',
-  WEBSOCKET_SEND: 'websocket-send',
-  WEBSOCKET_TEST: 'websocket-test',
 
   TK_SHOP_OPEN_WINDOW: 'tk-shop-open-window',
   TK_SHOP_GET_TKSHOP_SETTING: 'tk-shop-get-tk-shop-setting',
@@ -50,7 +48,6 @@ export const IPC_CHANNELS = {
   RENDERER_MONITOR_APP_GLOBAL_STATE_SYNC: 'renderer-monitor-app-global-state-sync',
   RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC: 'renderer-monitor-app-splash-window-state-sync',
   RENDERER_MONITOR_TK_SHOP_ALL_TAB_ITEM_SETTINGS_SYNC: 'renderer-monitor-tk-shop-all-tab-item-settings-sync',
-  RENDERER_MONITOR_WEBSOCKET_RECEIVE: 'renderer-monitor-websocket-receive',
   RENDERER_MONITOR_TABS_UPDATED: 'renderer-monitor-tabs-updated',
   RENDERER_MONITOR_TABS_NAVIGATION_STATE: 'renderer-monitor-tabs-navigation-state'
 } as const
@@ -149,7 +146,6 @@ export interface AppProtocol {
 
   [IPC_CHANNELS.RENDERER_MONITOR_APP_GLOBAL_STATE_SYNC]: { params: [{ path: string; value: any }]; return: void }
   [IPC_CHANNELS.RENDERER_MONITOR_APP_SPLASH_WINDOW_STATE_SYNC]: { params: [{ percent: number; status: string }]; return: void }
-  [IPC_CHANNELS.RENDERER_MONITOR_WEBSOCKET_RECEIVE]: { params: [WebSocketMessage]; return: void }
   [IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED]: { params: [{ activeId: string; tabs: Tab[] }]; return: void }
   [IPC_CHANNELS.RENDERER_MONITOR_TABS_NAVIGATION_STATE]: {
     params: [{ canGoBack: boolean; canGoForward: boolean }]

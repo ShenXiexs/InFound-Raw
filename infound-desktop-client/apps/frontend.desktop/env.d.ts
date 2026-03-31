@@ -4,8 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_PROTOCOL: string
   readonly VITE_APP_HARDCODED_SALT: string
   readonly VITE_OPENAPI_BASE_URL: string
-  readonly VITE_WS_BASE_URL: string
-  readonly VITE_SELLER_RPA_WS_BASE_URL?: string
+  readonly VITE_SELLER_RPA_WS_BASE_URL: string
   readonly VITE_USER_NOTIFICATION_WS_DESTINATION_PREFIX?: string
   readonly VITE_TASK_MANAGER_POLLING_INTERVAL_MS?: string
   readonly VITE_DOWNLOAD_BASE_URL: string

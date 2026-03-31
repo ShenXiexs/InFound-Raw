@@ -1,4 +1,4 @@
-app_name: "infound-portal-inner-open-api"
+app_name: "infound-portal-operation-open-api"
 env: "dev"
 debug: true
 
@@ -77,12 +77,25 @@ rabbitmq:
       control_queue: "chatbot.outreach.control.queue"
       control_routing_key_prefix: "chatbot.outreach.control"
 
+#    notification:
+#      exchange: "infound.topic"
+#      routing_key_pattern: "infound.notification.*"
+#      queue_name: "notifications.queue"
+#      durable: false
+#      auto_delete: true
+#
+#    data_sync:
+#      exchange: "infound.topic"
+#      routing_key_pattern: "infound.sync.*"
+#      queue_name: "data.sync.queue"
+#      durable: true
+#      auto_delete: false
 
 # ============================================================
 # 认证配置
 # ============================================================
 auth:
-  required_header: "X-INFound-Inner-Service-Token"
-  secret_key: "844a22c4c6d47231bb4fc89c3e8a64ca5b09ec5de8f6d4bf65dacd7d"
+  required_header: "INFoundOperationAuth"
+  secret_key: "3500f737887bd22f5bba0f0f0d55f516cb643ba328b388034aeddfc094f1b4d5"
   expire_days: 14
   max_token: 5

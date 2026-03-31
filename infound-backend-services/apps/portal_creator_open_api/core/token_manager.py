@@ -117,4 +117,4 @@ class TokenManager:
 
     def _get_redis_key(self, username: str) -> str:
         """内部方法：构建统一的 Redis Key"""
-        return f"{self.settings.redis.prefix}:authTokens:{username}"
+        return f"{self.settings.redis.prefix}:creator:authTokens:{username}"

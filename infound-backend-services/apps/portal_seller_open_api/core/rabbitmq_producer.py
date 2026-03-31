@@ -27,7 +27,6 @@ class RabbitMQProducer:
     _declared_queues: set[str] = set()
 
     USER_NOTIFICATION_QUEUE_PREFIX = "user.notification"
-    USER_NOTIFICATION_MAX_LENGTH = 1000
     USER_NOTIFICATION_QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000
     DEFAULT_MESSAGE_TTL_MS = 6 * 60 * 60 * 1000
     EVENT_NEW_TASK_READY = "NEW_TASK_READY"
@@ -116,10 +115,6 @@ class RabbitMQProducer:
                 queue_name,
                 durable=True,
                 auto_delete=False,
-                arguments={
-                    "x-message-ttl": cls.USER_NOTIFICATION_QUEUE_TTL_MS,
-                    "x-max-length": cls.USER_NOTIFICATION_MAX_LENGTH,
-                },
             )
             await queue.bind(exchange, routing_key=binding_key)
             cls._declared_queues.add(queue_name)
@@ -127,8 +122,6 @@ class RabbitMQProducer:
                 "用户通知队列已声明并绑定",
                 queue_name=queue_name,
                 binding_key=binding_key,
-                queue_ttl_ms=cls.USER_NOTIFICATION_QUEUE_TTL_MS,
-                max_length=cls.USER_NOTIFICATION_MAX_LENGTH,
             )
 
         return queue_name, binding_key, publish_routing_key
@@ -286,6 +279,69 @@ class RabbitMQProducer:
             "routing_key": publish_routing_key,
             "message_ttl_ms": ttl_ms,
             "expires_at": _to_utc_iso(expires_at),
+        }
+
+    @classmethod
+    async def publish_user_notification_message(
+        cls,
+        *,
+        user_id: str,
+        title: str,
+        content: str,
+        message_type: str = "notification",
+        extra_data: dict[str, Any] | None = None,
+        message_ttl_ms: Optional[int] = None,
+    ) -> dict[str, Any]:
+        ttl_ms = int(message_ttl_ms or cls.USER_NOTIFICATION_QUEUE_TTL_MS)
+        queue_name, binding_key, publish_routing_key = (
+            await cls.ensure_user_notification_queue(user_id=user_id)
+        )
+        exchange = await cls._get_exchange()
+
+        message_id = f"msg-{uuid4()}"
+        timestamp = datetime.now(timezone.utc)
+        message_body = {
+            "messages": [
+                {
+                    "id": message_id,
+                    "title": str(title).strip(),
+                    "content": str(content).strip(),
+                    "type": str(message_type or "notification").strip() or "notification",
+                    "timestamp": timestamp.isoformat(),
+                    "userId": str(user_id).strip(),
+                    **(extra_data or {}),
+                }
+            ]
+        }
+
+        message = Message(
+            json.dumps(message_body, ensure_ascii=False, default=str).encode("utf-8"),
+            content_type="application/json",
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            expiration=_build_message_expiration(ttl_ms),
+            message_id=message_id,
+            headers={
+                "message_type": str(message_type or "notification").strip() or "notification",
+                "user_id": str(user_id).strip(),
+                "queue_name": queue_name,
+                "binding_key": binding_key,
+            },
+        )
+        await exchange.publish(message, routing_key=publish_routing_key)
+        cls._logger.info(
+            "通用用户通知消息已发送到用户通知队列",
+            queue_name=queue_name,
+            routing_key=publish_routing_key,
+            message_id=message_id,
+            user_id=user_id,
+        )
+        return {
+            "message_id": message_id,
+            "queue_name": queue_name,
+            "binding_key": binding_key,
+            "routing_key": publish_routing_key,
+            "message_ttl_ms": ttl_ms,
+            "published_at": timestamp.isoformat(),
         }
 
 

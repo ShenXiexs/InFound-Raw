@@ -1,5 +1,5 @@
 def main():
-    print("Hello from portal-mqconsummers!")
+    print("Hello from portal-mq-consummers!")
 
 
 if __name__ == "__main__":

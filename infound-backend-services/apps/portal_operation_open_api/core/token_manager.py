@@ -6,8 +6,8 @@ from typing import Optional
 import bcrypt
 import jwt
 
-from apps.portal_creator_open_api.core.config import Settings
-from apps.portal_creator_open_api.models.entities import CurrentUserInfo
+from apps.portal_operation_open_api.core.config import Settings
+from apps.portal_operation_open_api.models.entities import CurrentUserInfo
 from core_base import get_logger
 from core_redis import RedisClientManager
 
@@ -160,4 +160,4 @@ class TokenManager:
 
     def _get_redis_key(self, username: str) -> str:
         """内部方法：构建统一的 Redis Key"""
-        return f"{self.settings.redis.prefix}:authTokens:{username}"
+        return f"{self.settings.redis.prefix}:operation:authTokens:{username}"

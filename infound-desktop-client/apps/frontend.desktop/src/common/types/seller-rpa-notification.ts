@@ -3,7 +3,6 @@ import type { TaskType } from '../../main/services/task-service'
 export type SellerRpaNotificationEventType =
   | 'NEW_TASK_READY'
   | 'CANCEL_TASK'
-  | 'RPA_TASK_READY'
 
 export interface SellerRpaTaskEnvelopePayload {
   [key: string]: unknown

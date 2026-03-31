@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+**/__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+env/
+.python-version
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+.project
+.metadata
+bin/
+tmp/
+
+# Build
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Docs
+docs/_build/
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Git
+.git
+.gitignore
+!.gitignore
+
+# Local settings
+.env
+.settings
+settings.local.*
+
+# Testing
+.pytest/
+.coverage
+.nyc_output
+coverage/
+.reports
+
+# Backup files
+*~
+*.bak
+*.tmp
+
+# Development tools
+.cache
+.pip
+
+# Project specific
+logs/
+backup/

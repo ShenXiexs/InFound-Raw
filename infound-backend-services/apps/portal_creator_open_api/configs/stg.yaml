@@ -1,9 +1,0 @@
-env: "stg"
-debug: false
-
-mysql:
-  host: "172.17.0.1"
-
-redis:
-  host: "172.17.0.1"
-  prefix: "if.stg:creator"

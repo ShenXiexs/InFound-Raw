@@ -2,17 +2,17 @@ env: "pro"
 debug: false
 
 mysql:
-  host: "172.17.0.1"
+  host: "172.18.0.1"
   user: "infound-pro"
   password: "J6B^tu)E~$HJBb"
   db: "infound.pro"
 
 redis:
-  host: "172.17.0.1"
-  prefix: "if.pro:creator"
+  host: "172.18.0.1"
+  prefix: "if.pro"
 
 rabbitmq:
-  host: "172.17.0.1"
+  host: "172.18.0.1"
   username: "infound.pro"
   password: "Fwur5r1R#%I9+2a"
   vhost: "/infound.pro"

@@ -13,7 +13,7 @@ import { SellerRpaNotificationPayload } from '@common/types/seller-rpa-notificat
 type NotificationPayload = Record<string, unknown>
 
 const MESSAGE_CACHE_TTL_MS = 6 * 60 * 60 * 1000
-const KNOWN_RPA_EVENT_TYPES = new Set(['NEW_TASK_READY', 'CANCEL_TASK', 'RPA_TASK_READY'])
+const KNOWN_RPA_EVENT_TYPES = new Set(['NEW_TASK_READY', 'CANCEL_TASK'])
 
 const asRecord = (value: unknown): NotificationPayload | undefined =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as NotificationPayload) : undefined
@@ -192,10 +192,7 @@ const isSellerRpaNotificationPayload = (
 ): payload is SellerRpaNotificationPayload =>
   Boolean(
     payload &&
-      (
-        normalizeEventType(payload) ||
-        extractTaskType(payload)
-      )
+      normalizeEventType(payload)
   )
 
 const buildUserNotificationDestination = (userId: string): string => {
@@ -204,10 +201,8 @@ const buildUserNotificationDestination = (userId: string): string => {
 }
 
 export class WebSocketService {
-  private generalClient: Client | null = null
-  private sellerRpaClient: Client | null = null
-  private generalConnected = false
-  private sellerRpaConnected = false
+  private client: Client | null = null
+  private connected = false
   private readonly processedMessageIds = new Map<string, number>()
 
   public async connect(): Promise<boolean> {
@@ -220,45 +215,30 @@ export class WebSocketService {
     }
 
     const userId = globalState.currentState.currentUser?.userId
-    const generalUrl = String(AppConfig.GENERAL_WS_BASE_URL || '').trim()
-    const sellerRpaUrl = String(AppConfig.SELLER_RPA_WS_BASE_URL || '').trim()
+    const serverUrl = String(AppConfig.SELLER_RPA_WS_BASE_URL || '').trim()
 
-    if (generalUrl) {
-      this.generalClient = this.createClient({
-        serverUrl: generalUrl,
-        channelName: 'general',
-        onConnect: (client) => {
-          this.generalConnected = true
-          logger.info(`✅ STOMP 连接成功: general ${generalUrl}`)
-          if (userId && !sellerRpaUrl) {
-            this.subscribeUserNotifications(client, userId, 'general')
-          }
-        }
-      })
-      this.generalClient.activate()
+    if (!serverUrl) {
+      logger.error('Seller RPA WebSocket 地址未配置')
+      return false
     }
 
-    if (sellerRpaUrl) {
-      this.sellerRpaClient = this.createClient({
-        serverUrl: sellerRpaUrl,
-        channelName: 'seller-rpa',
-        onConnect: (client) => {
-          this.sellerRpaConnected = true
-          logger.info(`✅ STOMP 连接成功: seller-rpa ${sellerRpaUrl}`)
-          if (userId) {
-            this.subscribeUserNotifications(client, userId, 'seller-rpa')
-          }
+    this.client = this.createClient({
+      serverUrl,
+      onConnect: (client) => {
+        this.connected = true
+        logger.info(`✅ STOMP 连接成功: ${serverUrl}`)
+        if (userId) {
+          this.subscribeUserNotifications(client, userId)
         }
-      })
-      this.sellerRpaClient.activate()
-    }
+      }
+    })
+    this.client.activate()
 
-    return Boolean(generalUrl || sellerRpaUrl)
+    return true
   }
 
   private createClient(options: {
     serverUrl: string
-    channelName: string
     onConnect: (client: Client) => void
   }): Client {
     const auth = resolveWsAuthHeader()
@@ -277,7 +257,8 @@ export class WebSocketService {
         })
 
         ws.on('close', () => {
-          logger.warn(`WebSocket 已关闭，准备重新连接: ${options.channelName}`)
+          this.connected = false
+          logger.warn(`WebSocket 已关闭，准备重新连接: ${options.serverUrl}`)
           try {
             ws.terminate()
           } catch {
@@ -295,11 +276,13 @@ export class WebSocketService {
         return true
       },
       onStompError: (frame) => {
-        logger.error(`STOMP 错误[${options.channelName}]:`, frame.body)
+        this.connected = false
+        logger.error('STOMP 错误:', frame.body)
         return false
       },
       onWebSocketError: (error) => {
-        logger.error(`WebSocket 错误[${options.channelName}]:`, JSON.stringify(error))
+        this.connected = false
+        logger.error('WebSocket 错误:', JSON.stringify(error))
         return false
       },
       reconnectDelay: 3000
@@ -308,30 +291,24 @@ export class WebSocketService {
   }
 
   public async disconnect(): Promise<void> {
-    if (this.generalClient) {
-      logger.info('断开 general websocket 连接')
-      await this.generalClient.deactivate()
-      this.generalConnected = false
-      this.generalClient = null
+    if (this.client) {
+      logger.info('断开 websocket 连接')
+      await this.client.deactivate()
+      this.client = null
     }
-    if (this.sellerRpaClient) {
-      logger.info('断开 seller-rpa websocket 连接')
-      await this.sellerRpaClient.deactivate()
-      this.sellerRpaConnected = false
-      this.sellerRpaClient = null
-    }
+    this.connected = false
   }
 
   public isConnected(): boolean {
-    return this.generalConnected || this.sellerRpaConnected
+    return this.connected
   }
 
-  private subscribeUserNotifications(client: Client, userId: string, channelName: string): void {
+  private subscribeUserNotifications(client: Client, userId: string): void {
     const destination = buildUserNotificationDestination(userId)
     client.subscribe(
       destination,
       (message: Message) => {
-        logger.info(`📨 收到用户通知: channel=${channelName} destination=${destination} body=${message.body}`)
+        logger.info(`📨 收到用户通知: destination=${destination} body=${message.body}`)
         void this.handleUserNotificationMessage(message)
       },
       {
@@ -409,20 +386,16 @@ export class WebSocketService {
       this.compactProcessedMessageIds()
       message.ack()
 
-      if ((eventType === 'NEW_TASK_READY' || eventType === 'RPA_TASK_READY') && taskType) {
+      if (eventType === 'NEW_TASK_READY' && taskType) {
         logger.info(
           `收到新任务触发通知，立即尝试 claim: eventType=${eventType} taskType=${taskType} taskId=${toText(payload.taskId) || '(empty)'}`
         )
         await taskWorkersManager.wakeUp(taskType)
-      } else if (eventType === 'NEW_TASK_READY' || eventType === 'RPA_TASK_READY') {
+      } else if (eventType === 'NEW_TASK_READY') {
         logger.info(`收到新任务触发通知但未携带 taskType，唤醒全部 worker 竞争 claim`)
         await taskWorkersManager.wakeUp()
-      } else if (taskType) {
-        logger.info(`任务通知命中 eventType=${eventType} taskType=${taskType}，唤醒对应 worker`)
-        await taskWorkersManager.wakeUp(taskType)
       } else {
-        logger.info('任务通知未包含可识别 taskType，唤醒全部 worker')
-        await taskWorkersManager.wakeUp()
+        logger.warn(`忽略未支持的 RPA 事件: eventType=${eventType || '(empty)'}`)
       }
     } catch (error) {
       logger.error(`RPA 任务通知处理失败: ${(error as Error)?.message || error}`)

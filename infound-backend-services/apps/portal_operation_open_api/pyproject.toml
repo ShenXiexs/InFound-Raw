@@ -13,6 +13,8 @@ dependencies = [
     "shared-application-services",
     "shared-domain",
     "shared-infrastructure",
+    "pyjwt>=2.11.0",
+    "uvicorn[standard]>=0.41.0",
 ]
 
 [tool.uv.sources]

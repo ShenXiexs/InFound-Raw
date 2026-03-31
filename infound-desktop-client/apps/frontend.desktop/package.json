@@ -17,7 +17,8 @@
     "dev": "pnpm -r --filter=@infound/* build && electron-vite dev --mode dev",
     "dev:mac": "pnpm -r --filter=@infound/* build && electron-vite dev --mode dev",
     "dev:win": "chcp 65001 && pnpm -r --filter=@infound/* build && electron-vite dev --mode dev",
-    "prepare:playwright": "electron-builder install-app-deps && cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium"
+    "prepare:playwright": "electron-builder install-app-deps && cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
+    "test:stomp-ws": "node ./scripts/test-stomp-ws.mjs"
   },
   "dependencies": {
     "@infound/desktop-base": "workspace:*",

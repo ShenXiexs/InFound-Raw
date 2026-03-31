@@ -1,0 +1,12 @@
+env: "stg"
+debug: false
+
+mysql:
+  host: "172.18.0.1"
+
+redis:
+  host: "172.18.0.1"
+  prefix: "if.stg"
+
+rabbitmq:
+  host: "172.18.0.1"
