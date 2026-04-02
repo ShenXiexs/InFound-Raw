@@ -22,11 +22,11 @@ export const TAB_TYPES = {
 
 export const TK_CONTENTS = {
   KEY: 'tk',
-  BASE_URL: 'seller-mx.tiktok.com',
+  BASE_DOMAIN: '.tiktok.com',
   LOGIN_PAGE_URL_FLAG: '/login',
   DEFAULT_TITLE: '商家中心',
   LOGIN_STATE_COOKIE_KEY: 'sid_guard_tiktokseller',
-  SHOP_ID_COOKIE_KEY: 'SHOP_ID'
+  PLATFORM_SHOP_ID_COOKIE_KEYS: ['SHOP_ID', 'oec_seller_id_unified_seller_env', 'global_seller_id_unified_seller_env']
 } as const
 
 export const TAB_MAX_COUNT = 20

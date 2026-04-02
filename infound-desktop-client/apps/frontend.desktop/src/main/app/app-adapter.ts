@@ -1,5 +1,6 @@
 import path from 'path'
 import { app, BrowserWindow, Menu } from 'electron'
+import electronUpdater from 'electron-updater'
 import { AppConfig } from '@common/app-config'
 import { initializeLogger, logger } from '../utils/logger'
 import { appWindowsAndViewsManager } from '../windows/app-windows-and-views-manager'
@@ -18,6 +19,7 @@ import { TabController } from '../modules/ipc/tab-controller'
 import { WebSocketController } from '../modules/ipc/web-socket-controller'
 import { RPAController } from '../modules/ipc/rpa-controller'
 import { appStore } from '../modules/store/app-store'
+import { UpdaterController } from '../modules/ipc/updater-controller'
 
 export class AppAdapter {
   private static instance: AppAdapter
@@ -58,6 +60,7 @@ export class AppAdapter {
     IPCManager.register(new GlobalStateController())
     IPCManager.register(new AppController())
     IPCManager.register(MonitorController.getInstance())
+    IPCManager.register(UpdaterController.getInstance())
     IPCManager.register(new TabController())
     IPCManager.register(new WebSocketController())
     IPCManager.register(new TkShopController())
@@ -68,26 +71,31 @@ export class AppAdapter {
     await appWindowsAndViewsManager.splashWindow.initWindow()
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.INIT_APP)
 
-    //AppDock.getInstance().setup()
-    AppTray.getInstance().setup()
-
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.LOAD_CORE_MODULES)
 
-    //TODO: 检测更新
+    const { autoUpdater } = electronUpdater
 
-    await appWindowsAndViewsManager.initMainWindow()
+    try {
+      const res = await autoUpdater.checkForUpdatesAndNotify()
+      logger.info('检查版本更新')
+      if (res?.isUpdateAvailable) {
+        logger.info('有新版本可用')
+        globalState.currentState.isUpdating = true
+        appWindowsAndViewsManager.splashWindow.closeWindow()
+        await appWindowsAndViewsManager.updaterWindow.initWindow()
+      }
+    } catch (err) {
+      logger.error('更新检查失败:', err)
+      globalState.currentState.isUpdating = false
+    } finally {
+      await appWindowsAndViewsManager.initMainWindow()
+    }
+
+    if (globalState.currentState.isUpdating) return
+
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.PREPARE_UI)
 
-    app.on('activate', async function () {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
-      if (BrowserWindow.getAllWindows().length === 0) {
-        await appWindowsAndViewsManager.initMainWindow()
-      } else {
-        appWindowsAndViewsManager.mainWindow.showWindow()
-        app.dock?.show()
-      }
-    })
+    AppTray.getInstance().setup()
 
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.COMPLETE_STARTUP)
     //await new Promise((resolve) => setTimeout(resolve, 3000))
@@ -123,6 +131,17 @@ export class AppAdapter {
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
         app.quit()
+      }
+    })
+
+    app.on('activate', async function () {
+      // On macOS it's common to re-create a window in the app when the
+      // dock icon is clicked and there are no other windows open.
+      if (BrowserWindow.getAllWindows().length === 0) {
+        await appWindowsAndViewsManager.initMainWindow()
+      } else {
+        appWindowsAndViewsManager.mainWindow.showWindow()
+        app.dock?.show()
       }
     })
 

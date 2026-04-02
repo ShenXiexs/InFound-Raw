@@ -24,6 +24,8 @@ const canGoForward = ref(false)
 const scrollLeftDisabled = ref(true)
 const scrollRightDisabled = ref(true)
 
+let wheelListener: ((e: WheelEvent) => void) | null = null
+
 // 监听标签更新
 const handleTabsUpdated = (data: { activeId: string; tabs: Tab[] }): void => {
   tabs.value = data.tabs
@@ -71,10 +73,10 @@ const goForward = async (): Promise<void> => await window.ipc.invoke(IPC_CHANNEL
 const reload = async (): Promise<void> => await window.ipc.invoke(IPC_CHANNELS.TABS_NAVIGATE_RELOAD)
 
 // 下拉菜单
-const showTabsMenu = async (event: MouseEvent): Promise<void> => {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  await window.ipc.invoke(IPC_CHANNELS.TABS_SHOW_ITEMS_MENU, rect.left, rect.bottom)
-}
+// const showTabsMenu = async (event: MouseEvent): Promise<void> => {
+//   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+//   await window.ipc.invoke(IPC_CHANNELS.TABS_SHOW_ITEMS_MENU, rect.left, rect.bottom)
+// }
 
 // 拖拽排序
 const dragSourceId = ref<string | null>(null)
@@ -116,6 +118,7 @@ const scrollLeft = (): void => {
     setTimeout(updateScrollButtons, 300)
   }
 }
+
 const scrollRight = (): void => {
   if (tabListRef.value) {
     tabListRef.value.scrollBy({ left: 200, behavior: 'smooth' })
@@ -150,6 +153,19 @@ onMounted(async () => {
   window.addEventListener('resize', updateScrollButtons)
 
   shopName.value = '寻达'
+
+  if (tabListRef.value) {
+    tabListRef.value.addEventListener('wheel', (e) => {
+      if (e.deltaY === 0) return
+      e.preventDefault()
+      const firstTab = tabListRef.value!.querySelector('.tab') as HTMLElement
+      const tabWidth = firstTab ? firstTab.offsetWidth : 100
+      const step = e.deltaY > 0 ? tabWidth : -tabWidth
+      tabListRef.value!.scrollLeft += step
+      updateScrollButtons()
+    })
+  }
+
   // 尝试获取商铺信息，但不要阻塞后续逻辑
   try {
     const result = await window.ipc.invoke(IPC_CHANNELS.TK_SHOP_GET_TKSHOP_SETTING, globalState.windowId)
@@ -161,6 +177,44 @@ onMounted(async () => {
   } catch (error) {
     console.error('获取商铺信息失败，使用默认名称', error)
   }
+
+  // 添加滚轮滚动功能
+  if (tabListRef.value) {
+    let isScrolling = false
+    wheelListener = (e: WheelEvent) => {
+      if (e.deltaY === 0) return
+      e.preventDefault()
+      if (isScrolling) return
+
+      isScrolling = true
+
+      const firstTab = tabListRef.value!.querySelector('.tab') as HTMLElement
+      const tabWidth = firstTab ? firstTab.offsetWidth : 100
+      const step = e.deltaY > 0 ? tabWidth : -tabWidth
+
+      const start = tabListRef.value!.scrollLeft
+      const end = start + step
+      const duration = 100 // 动画时长（毫秒）
+      const startTime = performance.now()
+
+      const animateScroll = (now: number) => {
+        const elapsed = now - startTime
+        const progress = Math.min(1, elapsed / duration)
+        const newScroll = start + (end - start) * progress
+        if (tabListRef.value) tabListRef.value.scrollLeft = newScroll
+        if (progress < 1) {
+          requestAnimationFrame(animateScroll)
+        } else {
+          isScrolling = false
+          updateScrollButtons() // 滚动结束后更新按钮状态
+        }
+      }
+
+      requestAnimationFrame(animateScroll)
+      updateScrollButtons() // 立即更新按钮状态（可选）
+    }
+    tabListRef.value.addEventListener('wheel', wheelListener)
+  }
 })
 
 onUnmounted(() => {
@@ -168,6 +222,12 @@ onUnmounted(() => {
   offNav?.()
   window.removeEventListener('resize', updateScrollButtons)
 })
+
+const onDropdownClick = async (event: MouseEvent) => {
+  const x = event.screenX
+  const y = event.screenY
+  await window.ipc.send(IPC_CHANNELS.TABS_CREATE_TAB_MENU, x, y)
+}
 </script>
 
 <template>
@@ -186,7 +246,7 @@ onUnmounted(() => {
           <div class="header-center">
             <div class="header-center-inner">
               <!-- 下拉菜单按钮 -->
-              <n-button circle quaternary title="切换标签页" @click="showTabsMenu">
+              <n-button circle quaternary title="切换标签页" @click="onDropdownClick">
                 <template #icon>
                   <n-icon>
                     <i-hugeicons-circle-arrow-down-01 />
@@ -215,9 +275,11 @@ onUnmounted(() => {
                   @dragstart="handleDragStart($event, tab.id)"
                   @drop="handleDrop($event, tab.id)"
                 >
-                  <img v-if="tab.favicon" :alt="tab.title" :src="tab.favicon" class="favicon" />
-                  <span :title="tab.title" class="tab-title">{{ truncatedTitle(tab.title) }}</span>
-                  <span class="close" @click.stop="handleClose(tab.id)">×</span>
+                  <div class="tab-inner">
+                    <img v-if="tab.favicon" :alt="tab.title" :src="tab.favicon" class="favicon" />
+                    <span :title="tab.title" class="tab-title">{{ truncatedTitle(tab.title) }}</span>
+                    <span class="close" @click.stop="handleClose(tab.id)">×</span>
+                  </div>
                 </div>
               </div>
               <!-- 右滚动按钮 -->
@@ -300,56 +362,136 @@ onUnmounted(() => {
 .app-container {
   height: 100vh;
 }
+/* 第一行TabBar */
+.header {
+  .header-center {
+    height: 40px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    .header-center-inner {
+      display: flex !important;
+      align-items: center !important;
+      margin-top: 0 !important;
+      gap: 4px;
+      min-width: 0 !important;
+      height: 100%;
+    }
+  }
+}
 
-/* 标签列表区域 */
+.header-center-inner {
+  .n-button {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 14px !important;
+    .n-button__icon {
+      font-size: 16px !important;
+    }
+  }
+  .n-button--circle {
+    padding: 0 !important;
+  }
+}
+
 .tab-list {
   display: flex;
   flex: 1;
-  overflow-x: hidden;
-  align-items: center;
-  margin: 0 3px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
   height: 100%;
   white-space: nowrap;
-  gap: 2px;
+  gap: 0;
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
   }
+  min-width: 0;
 }
 
 .tab {
   display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  height: 38px;
-  background: #e0e0e0;
-  border: 1px solid #ccc;
-  border-bottom: none;
-  border-radius: 5px 5px 0 0;
+  flex-shrink: 0;
+  position: relative;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  flex-shrink: 0;
-  margin-right: 3px;
-  &:hover {
-    background: #d0d0d0;
+  height: 32px;
+  margin-top: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 2px;
+
+  /* 分隔线：默认非激活且非最后一个显示 */
+  &:not(:last-child)::after {
+    content: '|';
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ccc;
+    font-size: 12px;
   }
+
+  /* 隐藏分隔线的条件 */
+  &.active::after,
+  &:has(+ .tab.active)::after,
+  &:hover::after,
+  &:has(+ .tab:hover)::after {
+    content: none;
+  }
+
+  /* 内部内容容器：负责 hover 背景和内边距 */
+  .tab-inner {
+    display: inline-flex;
+    align-items: center;
+    //padding: 4px 8px; /* 控制 hover 背景四周间隙 */
+    border-radius: 12px;
+    transition: background 0.1s;
+    background: transparent;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 6px;
+    padding-bottom: 4px;
+  }
+
+  &:hover .tab-inner {
+    //background: rgba(0, 0, 0, 0.04);
+    background: rgba(0, 0, 0, 0.08);
+  }
+
   &.active {
-    background: #f9f9f9;
-    font-weight: bold;
-    height: 42px;
+    background-color: #ffffff !important;
+    border-color: #ccc !important;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    /* 激活时内部背景透明，避免重叠 */
+    .tab-inner {
+      background: transparent;
+    }
   }
+
   .favicon {
     width: 16px;
     height: 16px;
-    margin-right: 4px;
+    margin-right: 6px;
   }
+
   .tab-title {
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+    line-height: 1.2;
   }
+
   .close {
     width: 16px;
     height: 16px;
@@ -360,12 +502,27 @@ onUnmounted(() => {
     color: #666;
     cursor: pointer;
     font-size: 14px;
-    margin-left: 4px;
+    margin-left: 6px;
+    opacity: 0;
+    transition: opacity 0.2s;
     &:hover {
-      background: rgba(0, 0, 0, 0.2);
-      color: #333;
+      background: rgba(0, 0, 0, 0.1);
     }
   }
+
+  &:hover .close {
+    opacity: 1;
+  }
+}
+
+.header-right :deep(.n-button.n-button--medium-type) {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 14px !important;
+  --n-width: 28px !important;
+  --n-height: 28px !important;
+  --n-border-radius: 14px !important;
+  --n-icon-size: 16px !important;
 }
 
 /* 第二行导航栏 */
@@ -375,7 +532,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  background: #f9f9f9;
+  background: #fff;
   border-bottom: 1px solid #aaa;
   flex-shrink: 0;
 
@@ -385,6 +542,7 @@ onUnmounted(() => {
     gap: 5px;
     flex-shrink: 0;
   }
+
   .nav-center {
     flex: 1;
     padding: 0 12px;

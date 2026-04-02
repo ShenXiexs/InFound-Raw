@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>标签页列表</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .menu-card {
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 8px;
+            width: 280px;
+            margin: 0 auto;
+            box-shadow: -4px 0 8px rgba(0, 0, 0, 0.08), 4px 0 8px rgba(0, 0, 0, 0.08), 0 6px 16px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .search-box {
+            padding: 12px 12px 8px 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .search-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .search-wrapper input {
+            width: 100%;
+            padding: 8px 32px 8px 16px;
+            border: 1px solid #ccc;
+            border-radius: 24px;
+            font-size: 12px;
+            outline: none;
+            background-color: #fff;
+        }
+        .search-wrapper input:focus { border-color: #1a73e8; }
+        .search-wrapper input::placeholder {
+            color: #b0b3b8;
+            font-weight: 400;
+        }
+        .clear-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            color: #b0b3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .clear-btn:hover {
+            background: rgba(0,0,0,0.1);
+            color: #5f6368;
+        }
+        .tab-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        .tab-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            position: relative;
+        }
+        .tab-item:hover { background-color: #f5f5f5; }
+        .tab-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+        }
+        .favicon { width: 16px; height: 16px; flex-shrink: 0; }
+        .tab-title {
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+        .drag-icon {
+            margin-left: 6px;
+            color: #aaa;
+            font-size: 12px;
+            cursor: grab;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            user-select: none;
+        }
+        .tab-item:hover .drag-icon {
+            opacity: 0.8;
+        }
+        .close-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: transparent;
+            color: #5f6368;
+            font-size: 14px;
+            flex-shrink: 0;
+            margin-left: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .tab-item:hover .close-btn {
+            opacity: 1;
+        }
+        .close-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+        .no-results { padding: 20px; text-align: center; color: #5f6368; }
+    </style>
+</head>
+<body>
+<div class="menu-card">
+    <div class="search-box">
+        <div class="search-wrapper">
+            <input type="text" id="searchInput" placeholder="搜索标签页" autofocus>
+            <button id="clearSearchBtn" class="clear-btn" style="display: none;">✕</button>
+        </div>
+    </div>
+    <div id="tabList" class="tab-list"></div>
+</div>
+<script>
+  let allTabs = window.__allTabs || [];
+  let currentActiveId = window.__currentActiveId || '';
+
+  const tabList = document.getElementById('tabList');
+  const searchInput = document.getElementById('searchInput');
+  const clearBtn = document.getElementById('clearSearchBtn');
+
+  // 监听主进程发送的数据（通过 ipcRenderer.on，但需要预加载脚本暴露的 ipc 对象）
+  if (window.ipc) {
+    window.ipc.on('set-menu-data', (_event, tabs, activeId) => {
+      allTabs = tabs;
+      currentActiveId = activeId;
+      renderTabs(allTabs);
+    });
+
+    window.ipc.on('refresh-tabs', (_event, tabs, activeId) => {
+      allTabs = tabs;
+      currentActiveId = activeId;
+      filterTabs();
+    });
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  function truncateTitle(title, maxLength = 20) {
+    if (!title) return '';
+    if (title.length > maxLength) return title.substring(0, maxLength) + '…';
+    return title;
+  }
+
+  function renderTabs(tabs) {
+    if (!tabs || !tabs.length) {
+      tabList.innerHTML = '<div class="no-results">无匹配标签页</div>';
+      return;
+    }
+    const html = tabs.map(tab => {
+      const displayTitle = truncateTitle(tab.title);
+      const favicon = tab.favicon || '';
+      const fullTitle = escapeHtml(tab.title);
+      const imgTag = favicon ? `<img class="favicon" src="${escapeHtml(favicon)}" onerror="this.style.display='none'">` : '';
+      return `
+                <div class="tab-item" data-id="${escapeHtml(tab.id)}" draggable="true">
+                    <div class="tab-info">
+                        ${imgTag}
+                        <div class="tab-title" title="${fullTitle}">${escapeHtml(displayTitle)}</div>
+                    </div>
+                    <div class="drag-icon" title="可拖拽调整顺序">⋮⋮</div>
+                    <div class="close-btn" data-id="${escapeHtml(tab.id)}">✕</div>
+                </div>
+            `;
+    }).join('');
+    tabList.innerHTML = html;
+  }
+
+  function filterTabs() {
+    const query = searchInput.value.trim().toLowerCase();
+    if (!query) {
+      renderTabs(allTabs);
+      return;
+    }
+    const filtered = allTabs.filter(tab =>
+      (tab.title && tab.title.toLowerCase().includes(query)) ||
+      (tab.url && tab.url.toLowerCase().includes(query))
+    );
+    renderTabs(filtered);
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearBtn.style.display = searchInput.value ? 'flex' : 'none';
+    filterTabs();
+  });
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    clearBtn.style.display = 'none';
+    filterTabs();
+    searchInput.focus();
+  });
+
+  let dragSourceId = null;
+
+  tabList.addEventListener('dragstart', (e) => {
+    const tabItem = e.target.closest('.tab-item');
+    if (!tabItem) return;
+    dragSourceId = tabItem.dataset.id;
+    e.dataTransfer.setData('text/plain', dragSourceId);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  tabList.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  tabList.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const targetItem = e.target.closest('.tab-item');
+    if (!targetItem) return;
+    const targetId = targetItem.dataset.id;
+    if (!dragSourceId || dragSourceId === targetId) return;
+
+    const currentIds = allTabs.map(t => t.id);
+    const sourceIndex = currentIds.indexOf(dragSourceId);
+    const targetIndex = currentIds.indexOf(targetId);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const newOrder = [...currentIds];
+    newOrder.splice(sourceIndex, 1);
+    newOrder.splice(targetIndex, 0, dragSourceId);
+
+    if (window.ipc) {
+      window.ipc.invoke('tabs-reorder-from-menu', newOrder);
+    }
+    dragSourceId = null;
+  });
+
+  tabList.addEventListener('dragend', () => {
+    dragSourceId = null;
+  });
+
+  tabList.addEventListener('click', (e) => {
+    const closeBtn = e.target.closest('.close-btn');
+    if (closeBtn) {
+      e.stopPropagation();
+      const id = closeBtn.dataset.id;
+      console.log('要关闭tab页了', id)
+      if (window.ipc) {
+        console.log('tabs-menu-close-tab', id)
+        window.ipc.invoke('tabs-menu-close-tab', id).catch(e => console.error(e));
+      }
+      return;
+    }
+    const tabItem = e.target.closest('.tab-item');
+    if (tabItem) {
+      const id = tabItem.dataset.id;
+      console.log('要切换tab页了', id);
+      if (window.ipc) {
+        console.log('tabs-menu-switch-tab', id);
+        window.ipc.invoke('tabs-menu-switch-tab', id).catch(e => console.error(e));
+        //window.ipc.invoke('tabs-menu-close-window', id).catch(e => console.error(e));
+      }
+    }
+  });
+
+  // 将 renderTabs 挂载到 window，供主进程注入数据后调用
+  window.renderTabs = renderTabs;
+  window.filterTabs = filterTabs;
+</script>
+</body>
+</html>

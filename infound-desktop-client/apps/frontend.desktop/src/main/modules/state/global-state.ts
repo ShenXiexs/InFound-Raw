@@ -5,14 +5,52 @@ import { app, webContents } from 'electron'
 import pkg from 'node-machine-id'
 import { set } from 'radash'
 import { AppInfo, AppSetting, AppState, CurrentUserInfo } from '@infound/desktop-base'
+import { AppConfig } from '@common/app-config'
 import { logger } from '../../utils/logger'
 import { appStore } from '../store/app-store'
 import { credentialStore } from '../store/credential-store'
 import { MonitorController } from '../ipc/monitor-controller'
 import { getFilePath } from '../../utils/path-helper'
-import { AppConfig } from '@common/app-config'
+import { CookieMap, parseSetCookie } from '../../utils/set-cookie-parser'
 
 const { machineIdSync } = pkg
+const PLACEHOLDER_USER_ID = '00000000-0000-0000-0000-000000000001'
+const PLACEHOLDER_USERNAME = 'demo'
+
+const isPlaceholderUser = (userInfo?: CurrentUserInfo | null): boolean =>
+  Boolean(
+    userInfo &&
+    String(userInfo.userId || '').trim() === PLACEHOLDER_USER_ID &&
+    String(userInfo.username || '')
+      .trim()
+      .toLowerCase() === PLACEHOLDER_USERNAME
+  )
+
+const readTokenFromApiCookie = (): { tokenName: string; tokenValue: string } | undefined => {
+  const apiCookie = appStore.get<string | string[] | undefined>('apiCookie')
+  if (!apiCookie) {
+    return undefined
+  }
+
+  const cookieMap: CookieMap = parseSetCookie(apiCookie, { map: true })
+  const tokenName = cookieMap.xunda_token_name?.value?.trim()
+  const tokenValue = cookieMap.xunda_token_value?.value?.trim()
+  if (!tokenName || !tokenValue) {
+    return undefined
+  }
+
+  return { tokenName, tokenValue }
+}
+
+const hasValidCurrentUserSession = (userInfo?: CurrentUserInfo): boolean =>
+  Boolean(
+    userInfo &&
+    !isPlaceholderUser(userInfo) &&
+    String(userInfo.userId || '').trim() &&
+    String(userInfo.username || '').trim() &&
+    String(userInfo.tokenName || '').trim() &&
+    String(userInfo.tokenValue || '').trim()
+  )
 
 class GlobalState {
   private state!: AppState
@@ -43,20 +81,27 @@ class GlobalState {
   public async init(): Promise<void> {
     const userInfo = await this.getCurrentUser() // 改为 await
     const userEnableDebug = userInfo?.enableDebug ?? userInfo?.permission?.enableDebug ?? false
+    const hasValidSession = hasValidCurrentUserSession(userInfo)
 
     this.state = {
       appInfo: this.getAppInfo(),
       appSetting: this.getAppSetting(),
       isMac: process.platform === 'darwin',
       isUpdating: false,
-      isLogin: AppConfig.IS_PRO ? userInfo != null && userInfo.userId !== '' : true,
+      isLogin: hasValidSession,
       isQuitting: false,
-      enableDebug: userEnableDebug,
+      enableDebug: !AppConfig.IS_PRO || userEnableDebug,
       currentUser: userInfo
     } as AppState
   }
 
   public async saveState(path: string, value: any): Promise<void> {
+    if (path === 'currentUser.tokenValue' && !this.state?.currentUser) {
+      await credentialStore.saveToken(value)
+      logger.info(`State updated: ${path} = ${value}`)
+      return
+    }
+
     // 1. 更新内存状态 (确保主进程内逻辑拿到的始终是最新的)
     this.state = set(this.state, path, value)
 
@@ -135,13 +180,17 @@ class GlobalState {
   }
 
   private async getCurrentUser(): Promise<CurrentUserInfo | undefined> {
-    const userInfo = appStore.get<CurrentUserInfo>('currentUser')
-    if (userInfo) {
-      //credentialStore.getToken().then((token) => (userInfo.tokenValue = token || ''))
-      const token = await credentialStore.getToken()
-      userInfo.tokenValue = token || ''
-      return userInfo as CurrentUserInfo
-    } else return undefined
+    const userInfo = appStore.get<CurrentUserInfo | null>('currentUser')
+    if (!userInfo || isPlaceholderUser(userInfo)) {
+      return undefined
+    }
+
+    const keytarToken = String((await credentialStore.getToken()) || '').trim()
+    const cookieToken = readTokenFromApiCookie()
+    userInfo.tokenName = String(userInfo.tokenName || cookieToken?.tokenName || '').trim()
+    userInfo.tokenValue = keytarToken || String(userInfo.tokenValue || cookieToken?.tokenValue || '').trim()
+
+    return userInfo as CurrentUserInfo
   }
 }
 

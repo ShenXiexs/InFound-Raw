@@ -1,14 +1,17 @@
 import { MainWindow } from './main-window'
 import { SplashWindow } from './splash-window'
 import { TkShopWindowManager } from './tk-shop-window-manager'
+import { UpdaterWindow } from './updater-window'
 
 class AppWindowsAndViewsManager {
   private readonly _mainWindow: MainWindow | null = null
   private readonly _splashWindow: SplashWindow | null = null
+  private readonly _updaterWindow: UpdaterWindow | null = null
   private readonly _tkShopWindowManager: TkShopWindowManager | null = null
 
   constructor() {
     this._splashWindow = new SplashWindow()
+    this._updaterWindow = new UpdaterWindow()
     this._mainWindow = new MainWindow()
     this._tkShopWindowManager = new TkShopWindowManager()
   }
@@ -25,6 +28,13 @@ class AppWindowsAndViewsManager {
       throw new Error('SplashWindow 尚未初始化，请先调用 initWindow')
     }
     return this._splashWindow
+  }
+
+  public get updaterWindow(): UpdaterWindow {
+    if (!this._updaterWindow) {
+      throw new Error('UpdaterWindow 尚未初始化，请先调用 initWindow')
+    }
+    return this._updaterWindow
   }
 
   public get tkShopWindowManager(): TkShopWindowManager {

@@ -29,6 +29,11 @@ export class MonitorController {
     // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑
   }
 
+  @IPCHandle(IPCGateway.MONITOR, IPC_CHANNELS.RENDERER_MONITOR_APP_UPDATE_PROGRESS, IPCType.ON)
+  syncAppUpdateProgress(_webContents: WebContents, _speed: string, _percent: number): void {
+    // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑
+  }
+
   @IPCHandle(IPCGateway.MONITOR, IPC_CHANNELS.RENDERER_MONITOR_TK_SHOP_ALL_TAB_ITEM_SETTINGS_SYNC, IPCType.ON)
   syncTkShopAllTabItemSettings(_webContents: WebContents, _payload: Record<string, TkShopTabItemSetting>): void {
     // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑

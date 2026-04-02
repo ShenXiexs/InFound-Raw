@@ -22,9 +22,22 @@ const router = createRouter({
   ]
 })
 
+const PLACEHOLDER_USER_ID = '00000000-0000-0000-0000-000000000001'
+
 const hasValidSession = (globalState: AppState): boolean => {
-  const token = globalState.currentUser?.tokenValue?.trim()
-  return Boolean(globalState.isLogin && token)
+  const currentUser = globalState.currentUser
+  const userId = currentUser?.userId?.trim()
+  const username = currentUser?.username?.trim()
+  const tokenName = currentUser?.tokenName?.trim()
+  const tokenValue = currentUser?.tokenValue?.trim()
+  return Boolean(
+    globalState.isLogin &&
+      userId &&
+      userId !== PLACEHOLDER_USER_ID &&
+      username &&
+      tokenName &&
+      tokenValue
+  )
 }
 
 // 登录验证

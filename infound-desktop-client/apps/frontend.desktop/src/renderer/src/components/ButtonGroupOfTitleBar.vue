@@ -25,26 +25,26 @@ const onOpenDevTools = (): void => {
   window.ipc.send(IPC_CHANNELS.APP_OPEN_WINDOW_DEV_TOOLS, globalState.windowId, 'undocked')
 }
 
-const onOpenSubDevTools = (): void => {
+/*const onOpenSubDevTools = (): void => {
   window.ipc.send(IPC_CHANNELS.APP_OPEN_SUB_WINDOW_DEV_TOOLS, globalState.windowId, 'undocked')
-}
+}*/
 </script>
 
 <template>
-  <n-button :focusable="false" circle quaternary @click="onOpenDevTools">
+  <n-button v-if="globalState.enableDebug" :focusable="false" circle quaternary @click="onOpenDevTools">
     <template #icon>
       <n-icon>
         <i-hugeicons-code-simple />
       </n-icon>
     </template>
   </n-button>
-  <n-button :focusable="false" circle quaternary @click="onOpenSubDevTools">
+  <!--  <n-button :focusable="false" circle quaternary @click="onOpenSubDevTools">
     <template #icon>
       <n-icon>
         <i-hugeicons-source-code />
       </n-icon>
     </template>
-  </n-button>
+  </n-button>-->
   <n-button :focusable="false" circle quaternary @click="onMinimize">
     <template #icon>
       <n-icon>

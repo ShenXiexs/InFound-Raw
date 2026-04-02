@@ -28,6 +28,7 @@ export class TkTabItemManager {
 
   //tk login related contents
   private lastSavedKeyCookie: string | null = null
+  private loginStateExportSerials: Map<string, number> = new Map()
 
   constructor(baseWindow: BrowserWindow, shopSetting: TkShopSetting) {
     this.baseWindow = baseWindow
@@ -118,6 +119,7 @@ export class TkTabItemManager {
       logger.info('closeTab returned false, maybe only one tab')
       return
     }
+    this.loginStateExportSerials.delete(id)
     this.businessData.delete(id)
   }
 
@@ -193,6 +195,11 @@ export class TkTabItemManager {
     })
   }
 
+  public dispose(): void {
+    //清理所有占用资源
+    this.tabManager.dispose()
+  }
+
   private async createTabView(id: string, url: string, type: string, activate: boolean, insertAfterActive: boolean): Promise<string | undefined> {
     const newId = this.tabManager.createTab(id, url, type, {
       hideAddress: type === TAB_TYPES.XUNDA,
@@ -242,6 +249,7 @@ export class TkTabItemManager {
         if (biz) {
           biz.pageLoadStatus = PageLoadStatus.TargetPage
         }
+        this.scheduleLoginStateExport(id, view, view.webContents.getURL(), 'did-frame-finish-load')
         // 如果当前标签是激活的，隐藏过渡动画
         if (this.currentTabItemId === id) {
           //logger.info('正在调用 transitionWcv.displayTransitionLoadingWCV()')
@@ -264,14 +272,13 @@ export class TkTabItemManager {
 
     // 监听TK页面，保存登录态
     view.webContents.on('did-navigate', async (_, url) => {
-      if (url.includes(TK_CONTENTS.BASE_URL) && !url.includes(TK_CONTENTS.LOGIN_PAGE_URL_FLAG)) {
-        await this.checkAndExportCookies(view)
-      }
+      this.scheduleLoginStateExport(id, view, url, 'did-navigate')
     })
 
     //优化处理：TK商家中心单页面切页时，某些功能模块没有title（如订单相关模志），尝试加载后取title，如为空则显示默认标题
     view.webContents.on('did-navigate-in-page', async (_, url, isMainFrame) => {
-      if (isMainFrame && url.includes(TK_CONTENTS.BASE_URL)) {
+      if (isMainFrame && this.isTkContentUrl(url)) {
+        this.scheduleLoginStateExport(id, view, url, 'did-navigate-in-page')
         try {
           const title = await view.webContents.executeJavaScript('document.title')
           const finalTitle = title && title.trim() ? title : TK_CONTENTS.DEFAULT_TITLE
@@ -322,28 +329,120 @@ export class TkTabItemManager {
   }
 
   // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
-  private getLoginStateCookieFilePath(platformShopId: string): string {
+  private getLoginStateCookieFolderPath(): string {
     const userId = this.currentUser?.userId || '00000000-0000-0000-0000-000000000000'
     const shopId = this.shopSetting?.id || '000000'
-    const loginStateFolder = path.join(app.getPath('userData'), TK_CONTENTS.KEY, userId, shopId)
-    return path.join(loginStateFolder, `${platformShopId}.json`)
+    return path.join(app.getPath('userData'), TK_CONTENTS.KEY, userId, shopId)
   }
 
-  // 注意：在跳转到登录页时，无法获得 SHOP_ID，因此无法删除对应的 Cookie 文件，因此登录态cookie是否能用，由RPA模块判断，保留或删除都可
-  // 用户重新登录时，新文件会覆盖或新增，旧文件保留不影响使用。
   // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
-  private async checkAndExportCookies(view: WebContentsView) {
-    const cookies = await view.webContents.session.cookies.get({})
-    const currentKeyCookie = cookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null
-    const shopIdCookie = cookies.find((c) => c.name === TK_CONTENTS.SHOP_ID_COOKIE_KEY)?.value
+  private getLoginStateCookieFilePath(platformShopId: string): string {
+    return path.join(this.getLoginStateCookieFolderPath(), `${platformShopId}.json`)
+  }
 
-    if (!shopIdCookie) {
-      console.log('未找到 SHOP_ID Cookie，跳过保存')
-      logger.debug('未找到 SHOP_ID Cookie，跳过保存')
+  private isTkContentUrl(url: string): boolean {
+    try {
+      const parsedUrl = new URL(url)
+      const hostname = parsedUrl.hostname.toLowerCase()
+      return hostname === 'tiktok.com' || hostname.endsWith(TK_CONTENTS.BASE_DOMAIN)
+    } catch {
+      return false
+    }
+  }
+
+  private shouldExportLoginState(url: string): boolean {
+    if (!this.isTkContentUrl(url)) {
+      return false
+    }
+
+    try {
+      const parsedUrl = new URL(url)
+      return !parsedUrl.pathname.includes(TK_CONTENTS.LOGIN_PAGE_URL_FLAG)
+    } catch {
+      return false
+    }
+  }
+
+  private resolvePlatformShopIdFromExistingFile(): string {
+    const loginStateFolder = this.getLoginStateCookieFolderPath()
+    if (!fs.existsSync(loginStateFolder)) {
+      return ''
+    }
+
+    const candidates = fs
+      .readdirSync(loginStateFolder, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .map((entry) => {
+        const filePath = path.join(loginStateFolder, entry.name)
+        return {
+          filePath,
+          platformShopId: path.basename(entry.name, '.json'),
+          mtimeMs: fs.statSync(filePath).mtimeMs
+        }
+      })
+      .filter((entry) => Boolean(entry.platformShopId))
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+
+    return candidates[0]?.platformShopId || ''
+  }
+
+  private resolvePlatformShopIdFromCookies(cookies: Electron.Cookie[]): string {
+    for (const cookieName of TK_CONTENTS.PLATFORM_SHOP_ID_COOKIE_KEYS) {
+      const cookieValue = cookies.find((cookie) => cookie.name === cookieName)?.value?.trim()
+      if (cookieValue) {
+        return cookieValue
+      }
+    }
+
+    return ''
+  }
+
+  private scheduleLoginStateExport(id: string, view: WebContentsView, url: string, trigger: string): void {
+    if (!this.shouldExportLoginState(url)) {
       return
     }
 
-    const filePath = this.getLoginStateCookieFilePath(shopIdCookie)
+    const exportSerial = (this.loginStateExportSerials.get(id) || 0) + 1
+    this.loginStateExportSerials.set(id, exportSerial)
+    const retryDelays = [0, 1200, 3500]
+
+    retryDelays.forEach((delay, index) => {
+      setTimeout(() => {
+        if (this.loginStateExportSerials.get(id) !== exportSerial) {
+          return
+        }
+        if (view.webContents.isDestroyed()) {
+          return
+        }
+        void this.checkAndExportCookies(view, `${trigger}#${index + 1}`)
+      }, delay)
+    })
+  }
+
+  // 注意：在跳转到登录页时，无法稳定获取平台店铺ID，因此不删除已有登录态文件，由RPA模块在任务启动时判断是否可复用
+  // 用户重新登录时，新文件会覆盖或新增，旧文件保留不影响使用。
+  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
+  private async checkAndExportCookies(view: WebContentsView, trigger: string): Promise<void> {
+    const currentUrl = view.webContents.getURL()
+    if (!this.shouldExportLoginState(currentUrl)) {
+      return
+    }
+
+    const cookies = await view.webContents.session.cookies.get({})
+    const currentKeyCookie = cookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null
+    const platformShopId = this.resolvePlatformShopIdFromCookies(cookies) || this.resolvePlatformShopIdFromExistingFile()
+
+    if (!currentKeyCookie) {
+      logger.debug(`[TK登录态] 未找到关键 Cookie，暂不导出: trigger=${trigger} url=${currentUrl}`)
+      return
+    }
+
+    if (!platformShopId) {
+      logger.debug(`[TK登录态] 未找到平台店铺ID，暂不导出: trigger=${trigger} url=${currentUrl}`)
+      return
+    }
+
+    const filePath = this.getLoginStateCookieFilePath(platformShopId)
 
     if (this.lastSavedKeyCookie === null && fs.existsSync(filePath)) {
       try {
@@ -356,14 +455,13 @@ export class TkTabItemManager {
       }
     }
 
-    if (this.lastSavedKeyCookie === currentKeyCookie) {
-      console.log('关键 Cookie 值未变化，跳过保存')
-      logger.debug('关键 Cookie 值未变化，跳过保存')
+    if (this.lastSavedKeyCookie === currentKeyCookie && fs.existsSync(filePath)) {
+      logger.debug(`[TK登录态] 关键 Cookie 未变化，跳过导出: ${filePath}`)
       return
     }
 
     this.tabManager.exportCookiesToFile(filePath, cookies)
-
     this.lastSavedKeyCookie = currentKeyCookie
+    logger.info(`[TK登录态] 已导出登录态: ${filePath}`)
   }
 }

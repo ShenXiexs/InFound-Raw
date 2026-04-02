@@ -1,5 +1,5 @@
 import { AbstractWorkerManager } from './abstract-worker-manager'
-import { TaskInfo, TaskType } from '../../services/task-service'
+import { TaskType } from '../../services/task-service'
 import { ChatWorkerManager } from './workers/chat-worker'
 import { CreatorDetailWorkerManager } from './workers/creator-detail-worker'
 import { OutReachWorkerManager } from './workers/out-reach-worker'
@@ -34,24 +34,13 @@ export class TaskWorkersManager {
       void this.wakeUp()
     }, TaskWorkersManager.POLLING_INTERVAL_MS)
 
-    logger.info(
-      `任务管理器已启动: workers=${Object.keys(this.workers).join(',')} poll=${TaskWorkersManager.POLLING_INTERVAL_MS}ms`
-    )
+    logger.info(`任务管理器已启动: workers=${Object.keys(this.workers).join(',')} poll=${TaskWorkersManager.POLLING_INTERVAL_MS}ms`)
     await this.wakeUp()
   }
 
   public async wakeUp(taskType?: TaskType | string): Promise<void> {
     const targetWorkers = this.resolveTargetWorkers(taskType)
     await Promise.allSettled(targetWorkers.map((worker) => worker.wakeUp()))
-  }
-
-  public enqueueTask(task: TaskInfo): void {
-    const worker = this.workers[task.task_type]
-    if (!worker) {
-      logger.warn(`未找到对应 worker，忽略收件箱任务: type=${task.task_type} id=${task.id}`)
-      return
-    }
-    worker.enqueueTask(task)
   }
 
   public async cancelTask(
@@ -61,9 +50,7 @@ export class TaskWorkersManager {
       cancelScope?: string
     }
   ): Promise<void> {
-    await Promise.allSettled(
-      this.getAllWorkers().map((worker) => worker.cancelTask(taskId, options))
-    )
+    await Promise.allSettled(this.getAllWorkers().map((worker) => worker.cancelTask(taskId, options)))
   }
 
   public async stop(): Promise<void> {

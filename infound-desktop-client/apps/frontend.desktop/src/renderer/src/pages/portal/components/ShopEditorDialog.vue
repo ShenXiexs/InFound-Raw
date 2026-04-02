@@ -3,7 +3,6 @@ import { computed, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
-import type { ShopEntryInfoDTO, ShopListInfoDTO } from '@common/types/ipc-type'
 
 type ShopType = 'cross-border' | 'local' | null
 type ApiShopType = 'LOCAL' | 'CROSS_BORDER'
@@ -12,7 +11,17 @@ type ShopDialogMode = 'add' | 'edit'
 interface ShopDialogProps {
   show: boolean
   mode?: ShopDialogMode
-  shop?: ShopListInfoDTO | null
+  shop?: {
+    id: string
+    name: string
+    entryId?: number
+    remark?: string
+    shopLastOpen?: string
+    regionCode: string
+    regionName: string
+    shopType: 'LOCAL' | 'CROSS_BORDER'
+    loginUrl: string
+  } | null
 }
 
 interface CountryOption {
@@ -23,8 +32,12 @@ interface CountryOption {
   flag: string
 }
 
-interface ShopEntryWithId extends ShopEntryInfoDTO {
+interface ShopEntryWithId {
   entryId: number
+  regionCode: string
+  regionName: string
+  shopType: 'LOCAL' | 'CROSS_BORDER'
+  loginUrl: string
 }
 
 interface ShopFormModel {
@@ -393,7 +406,7 @@ watch(
 
 <template>
   <n-modal v-model:show="modalVisible" :mask-closable="true">
-    <n-card class="shop-form-card" :bordered="false" role="dialog">
+    <n-card :bordered="false" class="shop-form-card" role="dialog">
       <template #header>
         <div class="page-header">
           <n-h2 class="page-title">{{ dialogTitle }}</n-h2>
@@ -405,11 +418,11 @@ watch(
 
       <n-form ref="formRef" :model="formValue" :rules="rules" label-placement="top" size="large">
         <n-form-item label="店铺名称" path="storeName" required>
-          <n-input v-model:value="formValue.storeName" maxlength="50" show-count clearable placeholder="请输入店铺名称" />
+          <n-input v-model:value="formValue.storeName" clearable maxlength="50" placeholder="请输入店铺名称" show-count />
         </n-form-item>
 
         <n-form-item label="店铺类型" path="shopType" required>
-          <n-radio-group :value="formValue.shopType" :disabled="isEditMode" @update:value="onTypeChange">
+          <n-radio-group :disabled="isEditMode" :value="formValue.shopType" @update:value="onTypeChange">
             <n-space>
               <n-radio-button value="cross-border">跨境店铺</n-radio-button>
               <n-radio-button value="local">本土店铺</n-radio-button>
@@ -419,15 +432,15 @@ watch(
 
         <n-form-item label="选择国家" path="countryCode" required>
           <n-spin :show="isLoadingEntries">
-            <n-space class="country-grid" :size="10">
+            <n-space :size="10" class="country-grid">
               <n-button
                 v-for="country in countryOptions"
                 :key="country.regionCode"
-                :secondary="formValue.countryCode === country.regionCode"
-                :type="formValue.countryCode === country.regionCode ? 'primary' : 'default'"
                 :color="formValue.countryCode === country.regionCode ? '#8142f6' : undefined"
-                :text-color="formValue.countryCode === country.regionCode ? '#ffffff' : undefined"
                 :disabled="isEditMode"
+                :secondary="formValue.countryCode === country.regionCode"
+                :text-color="formValue.countryCode === country.regionCode ? '#ffffff' : undefined"
+                :type="formValue.countryCode === country.regionCode ? 'primary' : 'default'"
                 class="country-btn"
                 @click="onSelectCountry(country.regionCode)"
               >
@@ -439,21 +452,21 @@ watch(
         </n-form-item>
 
         <n-form-item label="备注" path="remark">
-          <n-input v-model:value="formValue.remark" type="textarea" :autosize="{ minRows: 3, maxRows: 4 }" maxlength="200" show-count placeholder="请输入备注（选填，200字内）" />
+          <n-input v-model:value="formValue.remark" :autosize="{ minRows: 3, maxRows: 4 }" maxlength="200" placeholder="请输入备注（选填，200字内）" show-count type="textarea" />
         </n-form-item>
 
-        <n-form-item path="agreementAccepted" required class="agreement-check-item">
+        <n-form-item class="agreement-check-item" path="agreementAccepted" required>
           <n-checkbox v-model:checked="formValue.agreementAccepted">我已阅读并同意授权协议</n-checkbox>
         </n-form-item>
 
         <n-form-item label="授权协议正文">
           <div class="agreement-wrap">
-            <textarea class="agreement-text" :value="AGREEMENT_TEXT" readonly rows="5" />
+            <textarea :value="AGREEMENT_TEXT" class="agreement-text" readonly rows="5" />
           </div>
         </n-form-item>
 
         <div class="action-row">
-          <n-button :loading="isSubmitting" type="primary" color="#8142f6" text-color="#ffffff" @click="onSubmit">{{ submitBtnText }}</n-button>
+          <n-button :loading="isSubmitting" color="#8142f6" text-color="#ffffff" type="primary" @click="onSubmit">{{ submitBtnText }}</n-button>
           <n-button @click="onClose">取消</n-button>
         </div>
       </n-form>

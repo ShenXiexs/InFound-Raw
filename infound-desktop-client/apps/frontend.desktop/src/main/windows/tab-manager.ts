@@ -19,8 +19,15 @@ export class TabManager {
   private views: Map<string, WebContentsView> = new Map()
   private tabs: Tab[] = []
   private activeTabId: string | null = null
-  private readonly tabBarHeight = 45 // 必须与 CSS 中标签栏高度一致
+  private readonly tabBarHeight = 40
   private readonly addressBarHeight = 44
+
+  private menuWindow: BrowserWindow | null = null
+  private readonly MENU_WIDTH = 280
+  private readonly SHADOW_SPACE = 12
+  private readonly ITEM_HEIGHT = 36
+  private readonly SEARCH_BOX_HEIGHT = 56
+  private readonly BOTTOM_SHADOW_SPACE = 12
 
   constructor(private mainWindow: BrowserWindow) {
     this.setupListeners()
@@ -90,11 +97,15 @@ export class TabManager {
     view.webContents.setWindowOpenHandler((details) => {
       const currentTab = this.tabs.find((t) => t.id === newId)
       const inheritHideAddress = currentTab ? currentTab.hideAddress : false
+      const currentWebPrefs = baseWebPreferences
+
       this.createTab(null, details.url, type, {
         insertAfterActive: true,
         activate: true,
-        hideAddress: inheritHideAddress
-        //webPreferences: {} // 不传入 partition，保持默认
+        hideAddress: inheritHideAddress,
+        webPreferences: {
+          partition: currentWebPrefs.partition
+        }
       })
 
       return { action: 'deny' }
@@ -349,7 +360,7 @@ export class TabManager {
     }
   }
 
-  public exportCookiesToFile(filePath: string, cookies: Electron.Cookie[]) {
+  public exportCookiesToFile(filePath: string, cookies: Electron.Cookie[]): void {
     try {
       const content = JSON.stringify(cookies, null, 2)
       const dir = path.dirname(filePath)
@@ -362,6 +373,90 @@ export class TabManager {
       console.info('导出Cookie文件失败', err)
       logger.error('导出Cookie文件失败', err)
     }
+  }
+
+  public showMenuWindow(x: number, y: number): void {
+    // 获取当前标签数据
+    const tabs = this.getTabs()
+    const activeId = this.getActiveTabId()
+
+    // 关闭已有菜单窗口
+    if (this.menuWindow && !this.menuWindow.isDestroyed()) {
+      this.menuWindow.close()
+    }
+
+    const windowWidth = this.MENU_WIDTH + this.SHADOW_SPACE * 2
+    const windowHeight = Math.min(tabs.length * this.ITEM_HEIGHT + this.SEARCH_BOX_HEIGHT, 500) + this.BOTTOM_SHADOW_SPACE
+    const windowX = Math.round(x) - this.SHADOW_SPACE
+    const windowY = Math.round(y)
+
+    this.menuWindow = new BrowserWindow({
+      width: windowWidth,
+      height: windowHeight,
+      x: windowX,
+      y: windowY,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, '../preload/tab-menu-preload.cjs')
+      }
+    })
+
+    // 加载模板文件
+    const templatePath = path.join(__dirname, '../renderer/tab-menu-template.html')
+    this.menuWindow.loadFile(templatePath)
+    ;(this.menuWindow as any).tabManager = this
+
+    this.menuWindow.webContents.openDevTools({ mode: 'detach' })
+
+    // 注入数据
+    this.menuWindow.webContents.once('dom-ready', () => {
+      this.menuWindow?.webContents.executeJavaScript(`
+        allTabs = ${JSON.stringify(tabs)};
+        currentActiveId = '${activeId || ''}';
+        if (typeof renderTabs === 'function') renderTabs(allTabs);
+      `)
+    })
+
+    // 失去焦点时自动关闭
+    this.menuWindow.on('blur', () => {
+      if (this.menuWindow && !this.menuWindow.isDestroyed()) this.menuWindow.close()
+    })
+
+    this.menuWindow.on('closed', () => {
+      this.menuWindow = null
+    })
+
+    this.menuWindow.show()
+    this.menuWindow.focus()
+  }
+
+  public closeMenuWindow(): void {
+    if (this.menuWindow && !this.menuWindow.isDestroyed()) {
+      this.menuWindow.close()
+    }
+  }
+
+  public refreshMenuWindow(): void {
+    if (!this.menuWindow || this.menuWindow.isDestroyed()) return
+    const updatedTabs = this.getTabs()
+    const activeId = this.getActiveTabId()
+    const newHeight = Math.min(updatedTabs.length * this.ITEM_HEIGHT + this.SEARCH_BOX_HEIGHT, 500) + this.BOTTOM_SHADOW_SPACE
+    this.menuWindow.setSize(this.MENU_WIDTH + this.SHADOW_SPACE * 2, newHeight)
+    this.menuWindow.webContents.send('refresh-tabs', updatedTabs, activeId)
+  }
+
+  public dispose(): void {
+    // 关闭菜单窗口
+    if (this.menuWindow && !this.menuWindow.isDestroyed()) {
+      this.menuWindow.close()
+    }
+    // 清理其他资源（如全局监听器）
   }
 
   // 监听窗口大小变化，更新当前激活视图的边界

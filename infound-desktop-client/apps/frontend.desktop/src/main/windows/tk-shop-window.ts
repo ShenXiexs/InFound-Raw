@@ -62,6 +62,7 @@ export class TkShopWindow {
       e.preventDefault()
       this.tabItemManager!.saveTabItemSettings() //关闭时保存Tab页状态
       this.tabItemManager!.closeTabItems()
+      this.tabItemManager!.dispose()
       this.baseWindow?.hide()
     })
 

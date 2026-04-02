@@ -8,51 +8,10 @@ import { HTTP_HEADERS } from '@common/app-constants'
 import { globalState } from '../../modules/state/global-state'
 import { taskWorkersManager } from '../../modules/rpa/task-workers-manager'
 import { TaskType } from '../task-service'
-import { SellerRpaNotificationPayload } from '@common/types/seller-rpa-notification'
-
-type NotificationPayload = Record<string, unknown>
+import { SellerRpaNotificationEventType, SellerRpaNotificationPayload } from '@common/types/seller-rpa-notification'
 
 const MESSAGE_CACHE_TTL_MS = 6 * 60 * 60 * 1000
-const KNOWN_RPA_EVENT_TYPES = new Set(['NEW_TASK_READY', 'CANCEL_TASK'])
-
-const asRecord = (value: unknown): NotificationPayload | undefined =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as NotificationPayload) : undefined
-
-const parseNotificationPayload = (body: string): NotificationPayload | undefined => {
-  const text = body.trim()
-  if (!text) {
-    return undefined
-  }
-
-  try {
-    const parsed = JSON.parse(text) as unknown
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const root = parsed as NotificationPayload
-      const firstMessage = Array.isArray(root.messages)
-        ? asRecord(root.messages[0])
-        : undefined
-      if (!firstMessage) {
-        return root
-      }
-
-      const normalized: NotificationPayload = {
-        ...root,
-        ...firstMessage
-      }
-      if (!normalized.eventType && typeof firstMessage.title === 'string') {
-        normalized.eventType = firstMessage.title
-      }
-      if (!normalized.messageId && firstMessage.id) {
-        normalized.messageId = firstMessage.id
-      }
-      return normalized
-    }
-  } catch {
-    // ignore non-json body
-  }
-
-  return undefined
-}
+const KNOWN_RPA_EVENT_TYPES = new Set<SellerRpaNotificationEventType>(['NEW_TASK_READY', 'CANCEL_TASK'])
 
 const resolveWsAuthHeader = (): { tokenName: string; tokenValue: string } | undefined => {
   const currentUser = globalState.currentState.currentUser
@@ -93,116 +52,88 @@ const toText = (value: unknown): string => {
   return ''
 }
 
-const extractTaskType = (payload?: NotificationPayload): TaskType | undefined => {
-  if (!payload) {
-    return undefined
+const normalizeEventType = (value: unknown): SellerRpaNotificationEventType | undefined => {
+  const normalized = toText(value).toUpperCase()
+  if (KNOWN_RPA_EVENT_TYPES.has(normalized as SellerRpaNotificationEventType)) {
+    return normalized as SellerRpaNotificationEventType
   }
-
-  const candidates = [
-    payload.taskType,
-    payload.task_type,
-    (payload.data as NotificationPayload | undefined)?.taskType,
-    (payload.data as NotificationPayload | undefined)?.task_type,
-    (payload.payload as NotificationPayload | undefined)?.taskType,
-    (payload.payload as NotificationPayload | undefined)?.task_type,
-    ((payload.payload as NotificationPayload | undefined)?.task as NotificationPayload | undefined)?.taskType,
-    ((payload.payload as NotificationPayload | undefined)?.task as NotificationPayload | undefined)?.task_type
-  ]
-
-  for (const candidate of candidates) {
-    const normalized = String(candidate || '').trim().toUpperCase()
-    if (Object.values(TaskType).includes(normalized as TaskType)) {
-      return normalized as TaskType
-    }
-  }
-
   return undefined
 }
 
-const extractRootTaskId = (payload?: NotificationPayload): string => {
-  if (!payload) {
-    return ''
+const parseNotificationPayload = (body: string): SellerRpaNotificationPayload | undefined => {
+  const text = body.trim()
+  if (!text) {
+    return undefined
   }
 
-  const candidates = [
-    payload.rootTaskId,
-    (payload.payload as NotificationPayload | undefined)?.rootTaskId,
-    ((payload.payload as NotificationPayload | undefined)?.task as NotificationPayload | undefined)
-      ?.rootTaskId,
-    (
-      ((payload.payload as NotificationPayload | undefined)?.input as NotificationPayload | undefined)
-        ?.payload as NotificationPayload | undefined
-    )?.rootTaskId
-  ]
-
-  for (const candidate of candidates) {
-    const normalized = toText(candidate)
-    if (normalized) {
-      return normalized
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return undefined
     }
+    const payload = parsed as SellerRpaNotificationPayload
+    const eventType = normalizeEventType(payload.eventType)
+    if (!eventType) {
+      return undefined
+    }
+    return {
+      ...payload,
+      eventType
+    }
+  } catch {
+    return undefined
   }
-
-  return ''
 }
 
-const extractCancelScope = (payload?: NotificationPayload): string => {
-  if (!payload) {
-    return ''
+const extractTaskType = (payload?: SellerRpaNotificationPayload): TaskType | undefined => {
+  const normalized = toText(payload?.taskType).toUpperCase()
+  if (Object.values(TaskType).includes(normalized as TaskType)) {
+    return normalized as TaskType
   }
-
-  const candidates = [
-    payload.cancelScope,
-    (payload.payload as NotificationPayload | undefined)?.cancelScope
-  ]
-
-  for (const candidate of candidates) {
-    const normalized = toText(candidate).toUpperCase()
-    if (normalized) {
-      return normalized
-    }
-  }
-
-  return ''
+  return undefined
 }
 
-const normalizeEventType = (payload?: NotificationPayload): string => {
-  const candidates = [
-    payload?.eventType,
-    payload?.event_type,
-    payload?.title,
-    payload?.type,
-    (payload?.data as NotificationPayload | undefined)?.eventType,
-    (payload?.data as NotificationPayload | undefined)?.event_type,
-    (payload?.data as NotificationPayload | undefined)?.title,
-    (payload?.data as NotificationPayload | undefined)?.type
-  ]
+const extractRootTaskId = (payload?: SellerRpaNotificationPayload): string => toText(payload?.rootTaskId)
 
-  for (const candidate of candidates) {
-    const normalized = toText(candidate).toUpperCase()
-    if (KNOWN_RPA_EVENT_TYPES.has(normalized)) {
-      return normalized
-    }
-  }
-
-  return ''
-}
-
-const isSellerRpaNotificationPayload = (
-  payload?: NotificationPayload
-): payload is SellerRpaNotificationPayload =>
-  Boolean(
-    payload &&
-      normalizeEventType(payload)
-  )
+const extractCancelScope = (payload?: SellerRpaNotificationPayload): string => toText(payload?.cancelScope).toUpperCase()
 
 const buildUserNotificationDestination = (userId: string): string => {
-  const prefix = String(AppConfig.USER_NOTIFICATION_WS_DESTINATION_PREFIX || '').trim().replace(/\/+$/, '')
+  const prefix = String(AppConfig.USER_NOTIFICATION_WS_DESTINATION_PREFIX || '')
+    .trim()
+    .replace(/\/+$/, '')
   return `${prefix}.${userId}`
+}
+
+const formatWebSocketError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.stack || error.message
+  }
+
+  if (error && typeof error === 'object') {
+    const candidate = error as Record<string, unknown>
+    const eventMessage = String(candidate.message || '').trim()
+    const nestedError = candidate.error
+    if (nestedError instanceof Error) {
+      return nestedError.stack || nestedError.message
+    }
+    if (eventMessage) {
+      return eventMessage
+    }
+    try {
+      const json = JSON.stringify(error)
+      if (json && json !== '{}') {
+        return json
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return String(error)
 }
 
 export class WebSocketService {
   private client: Client | null = null
-  private connected = false
   private readonly processedMessageIds = new Map<string, number>()
 
   public async connect(): Promise<boolean> {
@@ -225,7 +156,6 @@ export class WebSocketService {
     this.client = this.createClient({
       serverUrl,
       onConnect: (client) => {
-        this.connected = true
         logger.info(`✅ STOMP 连接成功: ${serverUrl}`)
         if (userId) {
           this.subscribeUserNotifications(client, userId)
@@ -237,10 +167,7 @@ export class WebSocketService {
     return true
   }
 
-  private createClient(options: {
-    serverUrl: string
-    onConnect: (client: Client) => void
-  }): Client {
+  private createClient(options: { serverUrl: string; onConnect: (client: Client) => void }): Client {
     const auth = resolveWsAuthHeader()
     if (!auth) {
       throw new Error('请先登录')
@@ -257,7 +184,6 @@ export class WebSocketService {
         })
 
         ws.on('close', () => {
-          this.connected = false
           logger.warn(`WebSocket 已关闭，准备重新连接: ${options.serverUrl}`)
           try {
             ws.terminate()
@@ -276,13 +202,11 @@ export class WebSocketService {
         return true
       },
       onStompError: (frame) => {
-        this.connected = false
-        logger.error('STOMP 错误:', frame.body)
+        logger.error(`STOMP 错误: message=${frame.headers.message || ''} body=${frame.body || ''}`)
         return false
       },
       onWebSocketError: (error) => {
-        this.connected = false
-        logger.error('WebSocket 错误:', JSON.stringify(error))
+        logger.error(`WebSocket 错误: url=${options.serverUrl} detail=${formatWebSocketError(error)}`)
         return false
       },
       reconnectDelay: 3000
@@ -296,11 +220,6 @@ export class WebSocketService {
       await this.client.deactivate()
       this.client = null
     }
-    this.connected = false
-  }
-
-  public isConnected(): boolean {
-    return this.connected
   }
 
   private subscribeUserNotifications(client: Client, userId: string): void {
@@ -320,24 +239,18 @@ export class WebSocketService {
 
   private async handleUserNotificationMessage(message: Message): Promise<void> {
     const payload = parseNotificationPayload(message.body)
-    if (!isSellerRpaNotificationPayload(payload)) {
+    if (!payload) {
       logger.info('当前用户通知不是 RPA 任务事件，直接 ack')
       message.ack()
       return
     }
 
-    await this.handleRpaNotificationMessage(
-      message,
-      payload as SellerRpaNotificationPayload
-    )
+    await this.handleRpaNotificationMessage(message, payload)
   }
 
-  private async handleRpaNotificationMessage(
-    message: Message,
-    payload: SellerRpaNotificationPayload
-  ): Promise<void> {
-    const eventType = normalizeEventType(payload as NotificationPayload)
-    const taskType = extractTaskType(payload as NotificationPayload)
+  private async handleRpaNotificationMessage(message: Message, payload: SellerRpaNotificationPayload): Promise<void> {
+    const eventType = payload.eventType
+    const taskType = extractTaskType(payload)
     const messageId = toText(payload.messageId)
 
     if (messageId && this.isRecentlyProcessed(messageId)) {
@@ -387,15 +300,11 @@ export class WebSocketService {
       message.ack()
 
       if (eventType === 'NEW_TASK_READY' && taskType) {
-        logger.info(
-          `收到新任务触发通知，立即尝试 claim: eventType=${eventType} taskType=${taskType} taskId=${toText(payload.taskId) || '(empty)'}`
-        )
+        logger.info(`收到新任务触发通知，立即尝试 claim: eventType=${eventType} taskType=${taskType} taskId=${toText(payload.taskId) || '(empty)'}`)
         await taskWorkersManager.wakeUp(taskType)
       } else if (eventType === 'NEW_TASK_READY') {
         logger.info(`收到新任务触发通知但未携带 taskType，唤醒全部 worker 竞争 claim`)
         await taskWorkersManager.wakeUp()
-      } else {
-        logger.warn(`忽略未支持的 RPA 事件: eventType=${eventType || '(empty)'}`)
       }
     } catch (error) {
       logger.error(`RPA 任务通知处理失败: ${(error as Error)?.message || error}`)

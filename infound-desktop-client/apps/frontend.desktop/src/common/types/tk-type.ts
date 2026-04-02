@@ -22,3 +22,10 @@ export enum PageLoadStatus {
   TargetPage = 'TargetPage',
   ErrorPage = 'ErrorPage'
 }
+
+export interface TkShopOpenWindowPayload {
+  id: string
+  name: string
+  region: string
+  loginUrl: string
+}

@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import type { ShopEntryInfoDTO, ShopListInfoDTO } from '@common/types/ipc-type'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { rendererStore } from '@renderer/store/renderer-store'
 import ShopEditorDialog from '@renderer/pages/portal/components/ShopEditorDialog.vue'
@@ -11,8 +10,16 @@ import { formatBackendDateTime } from '@renderer/utils/date-time'
 const TOKEN_INVALID_CODE = 1251
 type ShopType = 'CROSS_BORDER' | 'LOCAL'
 
-interface ShopRow extends ShopListInfoDTO {
-  remark: string
+interface ShopRow {
+  id: string
+  name: string
+  entryId?: number
+  remark?: string
+  shopLastOpen?: string
+  regionCode: string
+  regionName: string
+  shopType: 'LOCAL' | 'CROSS_BORDER'
+  loginUrl: string
   lastOpenTime: string
 }
 
@@ -65,10 +72,21 @@ const ensureEntryIdMap = async (): Promise<boolean> => {
     }
 
     const map = new Map<string, number>()
-    ;(result.data || []).forEach((item: ShopEntryInfoDTO, index: number) => {
-      const entryId = typeof item.entryId === 'number' ? item.entryId : index + 1
-      map.set(getEntryMapKey(item.shopType, item.regionCode), entryId)
-    })
+    ;(result.data || []).forEach(
+      (
+        item: {
+          entryId?: number
+          regionCode: string
+          regionName: string
+          shopType: 'LOCAL' | 'CROSS_BORDER'
+          loginUrl: string
+        },
+        index: number
+      ) => {
+        const entryId = typeof item.entryId === 'number' ? item.entryId : index + 1
+        map.set(getEntryMapKey(item.shopType, item.regionCode), entryId)
+      }
+    )
     entryIdMap.value = map
     return true
   } catch (error) {
@@ -158,7 +176,7 @@ const onPageChange = (page: number): void => {
 
 const openRemarkModal = (row: ShopRow): void => {
   editingShopId.value = row.id
-  editingRemark.value = row.remark
+  editingRemark.value = row.remark || ''
   remarkModalVisible.value = true
 }
 

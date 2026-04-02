@@ -1,9 +1,8 @@
 import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
-import type { TkShopOpenWindowPayload } from '@common/types/ipc-type'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { appWindowsAndViewsManager } from '../../windows/app-windows-and-views-manager'
 import { logger } from '../../utils/logger'
-import type { TkShopSetting } from '@common/types/tk-type'
+import type { TkShopOpenWindowPayload, TkShopSetting } from '@common/types/tk-type'
 import type { AddShopPayload, DeleteShopPayload, UpdateShopPayload } from '../../services/shop-service'
 import { addShopApi, deleteShopApi, getShopEntriesApi, getShopListApi, openShopApi, updateShopApi } from '../../services/shop-service'
 

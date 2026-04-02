@@ -9,14 +9,26 @@ import { commonThemeOverrides } from '@infound/desktop-base'
 
 const CHECK_TOKEN_INTERVAL_MS = 60 * 60 * 1000
 const TOKEN_INVALID_CODE = 1251
+const PLACEHOLDER_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 const router = useRouter()
 let checkTokenTimer: ReturnType<typeof setInterval> | null = null
 let isCheckingToken = false
 
 const hasValidLocalSession = (): boolean => {
-  const token = rendererStore.currentState.currentUser?.tokenValue?.trim()
-  return Boolean(rendererStore.currentState.isLogin && token)
+  const currentUser = rendererStore.currentState.currentUser
+  const userId = currentUser?.userId?.trim()
+  const username = currentUser?.username?.trim()
+  const tokenName = currentUser?.tokenName?.trim()
+  const tokenValue = currentUser?.tokenValue?.trim()
+  return Boolean(
+    rendererStore.currentState.isLogin &&
+      userId &&
+      userId !== PLACEHOLDER_USER_ID &&
+      username &&
+      tokenName &&
+      tokenValue
+  )
 }
 
 const forceBackToLogin = async (): Promise<void> => {

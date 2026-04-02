@@ -3,7 +3,7 @@ import { app } from 'electron'
 import pkg from 'node-machine-id'
 //import Store from 'electron-store'
 import Store from 'electron-store'
-import { AppStoreSchema, CurrentUserInfo } from '@infound/desktop-base'
+import { AppStoreSchema } from '@infound/desktop-base'
 import { AppConfig } from '@common/app-config'
 import { logger } from '../../utils/logger'
 import { credentialStore } from './credential-store'
@@ -18,22 +18,7 @@ const defaultData: AppStoreSchema = {
       splitSpace: 4
     }
   },
-  currentUser: {
-    userId: '00000000-0000-0000-0000-000000000001',
-    username: 'demo',
-    email: undefined,
-    phoneNumber: undefined,
-    avatar: undefined,
-    nickname: undefined,
-    tokenName: '',
-    tokenValue: '',
-    startTime: 0,
-    endTime: 0,
-    maxShopsCount: 5,
-    updateTime: 0,
-    enableDebug: false,
-    inviteCode: ''
-  } as CurrentUserInfo,
+  currentUser: undefined,
   apiCookie: undefined
 }
 

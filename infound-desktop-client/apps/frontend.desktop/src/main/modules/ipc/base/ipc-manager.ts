@@ -4,6 +4,7 @@ import { logger } from '../../../utils/logger'
 
 export class IPCManager {
   private static gatewayHandlers = new Map<string, Map<string, (...args: any[]) => any>>()
+
   private static senders = new Set<string>()
 
   public static register(controller: any): void {

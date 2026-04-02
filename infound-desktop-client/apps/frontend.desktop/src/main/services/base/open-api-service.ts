@@ -2,7 +2,6 @@ import { logger } from '../../utils/logger'
 import NetRequest, { InterceptorHooks } from '../../utils/net-request'
 import { globalState } from '../../modules/state/global-state'
 import { HTTP_HEADERS } from '@common/app-constants'
-import { AppConfig } from '@common/app-config'
 
 const transform: InterceptorHooks = {
   requestInterceptor(config) {
@@ -27,14 +26,14 @@ const transform: InterceptorHooks = {
       config.headers[currentUser.tokenName] = currentUser.tokenValue
     }
 
-    if (!AppConfig.IS_PRO) {
+    /*if (!AppConfig.IS_PRO) {
       logger.info('[Request]', {
         method: config.method,
         url: config.url,
         headers: config.headers,
         data: config.body
       })
-    }
+    }*/
 
     return config
   },
@@ -43,18 +42,18 @@ const transform: InterceptorHooks = {
   },
   responseInterceptor(response) {
     try {
-      if (!AppConfig.IS_PRO) {
+      /*if (!AppConfig.IS_PRO) {
         logger.info('[Response]', {
           status: response.status,
           headers: response.headers,
           data: response.data,
           dataStr: JSON.stringify(response.data)
         })
-      }
+      }*/
 
-      if (response.status !== 200) {
+      /*if (response.status !== 200) {
         logger.error(`Request failed, the status code is ${response.status}`)
-      }
+      }*/
 
       if (response?.data?.code === 3001) {
         logger.error('Login failed: ' + response.data.msg)

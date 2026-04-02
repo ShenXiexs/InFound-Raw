@@ -84,7 +84,7 @@ const onSelectUserMenu = async (key: string | number): Promise<void> => {
           </template>
           升级套餐
         </n-button>
-        <n-dropdown :options="userMenuOptions" trigger="click" @select="onSelectUserMenu">
+        <n-dropdown v-if="globalState.isLogin" :options="userMenuOptions" trigger="click" @select="onSelectUserMenu">
           <div class="user-menu-trigger">
             <n-avatar :size="30" class="user-avatar" round>{{ userAvatarText }}</n-avatar>
             <span class="user-name ellipsis-1">{{ displayUserName }}</span>

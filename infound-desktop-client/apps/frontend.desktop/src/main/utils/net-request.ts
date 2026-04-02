@@ -110,6 +110,8 @@ export default class NetRequest {
         // 监听响应
         request.on('response', (response: IncomingMessage) => {
           const chunks: Buffer[] = []
+          // 记录请求日志
+          logger.info(`Request: ${finalConfig.method || 'GET'} ${finalConfig.url} - Status: ${response.statusCode}`)
           response.on('data', (chunk: Buffer) => chunks.push(chunk))
           response.on('end', async () => {
             if (timeoutId) clearTimeout(timeoutId)
@@ -180,7 +182,7 @@ export default class NetRequest {
 
   public async post<T = any>(url: string, data?: any, config?: NetRequestConfig): Promise<T> {
     const response = await this.request<T>({ ...config, method: 'POST', url, body: data })
-    logger.info('Post Response: ' + JSON.stringify(response.data))
+    //logger.info('Post Response: ' + JSON.stringify(response.data))
     return response.data
   }
 

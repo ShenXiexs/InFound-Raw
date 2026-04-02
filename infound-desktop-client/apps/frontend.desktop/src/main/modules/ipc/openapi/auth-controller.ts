@@ -89,11 +89,11 @@ export class AuthController {
   @IPCHandle(IPCGateway.APP, IPC_CHANNELS.API_AUTH_LOGOUT, IPCType.INVOKE)
   async logout(): Promise<{ success: boolean; error?: string }> {
     try {
-      await globalState.saveState('currentUser.tokenValue', '')
-      await globalState.saveState('currentUser', null)
+      appStore.set('apiCookie', null)
       await globalState.saveState('isLogin', false)
       await globalState.saveState('enableDebug', false)
-      appStore.set('apiCookie', null)
+      await globalState.saveState('currentUser', null)
+      await globalState.saveState('currentUser.tokenValue', '')
       return { success: true }
     } catch (error: any) {
       logger.error('退出登录失败', error)

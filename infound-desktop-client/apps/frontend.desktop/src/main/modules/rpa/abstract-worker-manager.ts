@@ -4,7 +4,6 @@ import { WorkerStatus } from './task-type'
 
 export abstract class AbstractWorkerManager {
   protected status: WorkerStatus = WorkerStatus.IDLE
-  private readonly pendingTasks: TaskInfo[] = []
   private currentTask: TaskInfo | undefined
   private currentCancelled = false
   private currentCancelReason: string | undefined
@@ -17,12 +16,7 @@ export abstract class AbstractWorkerManager {
   }
 
   public async wakeUp(): Promise<void> {
-    await this.consumeNextTaskOrClaim()
-  }
-
-  public enqueueTask(task: TaskInfo): void {
-    this.pendingTasks.push(task)
-    void this.consumeNextTaskOrClaim()
+    await this.requestNextTask()
   }
 
   // 1. 宣告空闲并拉取
@@ -31,14 +25,7 @@ export abstract class AbstractWorkerManager {
       return
     }
     this.status = WorkerStatus.IDLE
-    await this.consumeNextTaskOrClaim()
-  }
-
-  // 子类必须实现具体的任务执行逻辑
-  protected abstract run(task: TaskInfo): Promise<void>
-
-  protected async abortCurrentTask(): Promise<void> {
-    // 子类按需覆盖，默认不执行额外中断逻辑
+    await this.requestNextTask()
   }
 
   public async cancelTask(
@@ -55,46 +42,27 @@ export abstract class AbstractWorkerManager {
       return
     }
 
-    const pendingBefore = this.pendingTasks.length
-    const remainingTasks = this.pendingTasks.filter(
-      (task) =>
-        !this.matchesCancellation(task, normalizedTaskId, normalizedRootTaskId, normalizedCancelScope)
-    )
-    if (remainingTasks.length !== pendingBefore) {
-      this.pendingTasks.splice(0, this.pendingTasks.length, ...remainingTasks)
-      logger.warn(
-        `已移除待执行任务: type=${this.taskType} removed=${pendingBefore - remainingTasks.length} taskId=${normalizedTaskId || '(empty)'}`
-      )
-    }
-
-    if (
-      this.currentTask &&
-      !this.currentCancelled &&
-      this.matchesCancellation(
-        this.currentTask,
-        normalizedTaskId,
-        normalizedRootTaskId,
-        normalizedCancelScope
-      )
-    ) {
+    if (this.currentTask && !this.currentCancelled && this.matchesCancellation(this.currentTask, normalizedTaskId, normalizedRootTaskId, normalizedCancelScope)) {
       this.currentCancelled = true
-      this.currentCancelReason =
-        normalizedTaskId ||
-        normalizedRootTaskId ||
-        `cancel_scope=${normalizedCancelScope || 'TASK'}`
+      this.currentCancelReason = normalizedTaskId || normalizedRootTaskId || `cancel_scope=${normalizedCancelScope || 'TASK'}`
 
       try {
         await this.abortCurrentTask()
       } catch (error) {
-        logger.error(
-          `中断运行中任务失败: type=${this.taskType} taskId=${this.currentTask.id} error=${(error as Error)?.message || error}`
-        )
+        logger.error(`中断运行中任务失败: type=${this.taskType} taskId=${this.currentTask.id} error=${(error as Error)?.message || error}`)
       }
     }
   }
 
+  // 子类必须实现具体的任务执行逻辑
+  protected abstract run(task: TaskInfo): Promise<void>
+
+  protected async abortCurrentTask(): Promise<void> {
+    // 子类按需覆盖，默认不执行额外中断逻辑
+  }
+
   protected async requestNextTask(): Promise<void> {
-    if (!this.isIdle() || this.pendingTasks.length > 0) {
+    if (!this.isIdle()) {
       return
     }
 
@@ -103,9 +71,7 @@ export abstract class AbstractWorkerManager {
     try {
       const result = await claimTaskAsync(this.taskType)
       if (result.code !== 200) {
-        logger.warn(
-          `CLAIM 返回非成功状态(类型: ${this.taskType}): code=${result.code} msg=${result.msg || ''}`
-        )
+        logger.warn(`CLAIM 返回非成功状态(类型: ${this.taskType}): code=${result.code} msg=${result.msg || ''}`)
         return
       }
 
@@ -114,7 +80,6 @@ export abstract class AbstractWorkerManager {
         return
       }
 
-      result.data.task_source = 'claim'
       logger.info(`任务已 CLAIM 成功, 开始执行任务(类型: ${this.taskType}): ${result.data.id}`)
       await this.runEngine(result.data)
     } catch (error) {
@@ -133,22 +98,6 @@ export abstract class AbstractWorkerManager {
     this.currentCancelled = false
     this.currentCancelReason = undefined
     let taskError: Error | undefined
-    let shouldExecute = true
-
-    try {
-      shouldExecute = await this.prepareTaskForExecution(task)
-      if (!shouldExecute) {
-        logger.warn(`任务未通过执行前校验，跳过: taskId=${task.id} type=${this.taskType}`)
-      }
-    } catch (error) {
-      taskError = error as Error
-      logger.error(`任务执行准备失败：${taskError.message}`)
-    }
-
-    if (!shouldExecute) {
-      await this.finalizeTaskExecution(task, undefined)
-      return
-    }
 
     // 开启心跳上报定时器 (每30秒)
     const heartbeatTimer = this.currentCancelled
@@ -176,59 +125,6 @@ export abstract class AbstractWorkerManager {
     }
   }
 
-  private async prepareTaskForExecution(task: TaskInfo): Promise<boolean> {
-    if (task.task_source !== 'inbox') {
-      return true
-    }
-
-    const result = await claimTaskAsync(this.taskType, task.id)
-    if (result.code !== 200) {
-      logger.warn(
-        `收件箱任务 CLAIM 失败(类型: ${this.taskType}): taskId=${task.id} code=${result.code} msg=${result.msg || ''}`
-      )
-      return false
-    }
-
-    if (!result.data) {
-      logger.warn(`收件箱任务已不可执行，跳过: taskId=${task.id} type=${this.taskType}`)
-      return false
-    }
-
-    task.task_status = result.data.task_status as TaskStatus
-    task.updated_at = result.data.updated_at
-    if (
-      task.task_data &&
-      result.data.task_data &&
-      typeof task.task_data === 'object' &&
-      !Array.isArray(task.task_data) &&
-      typeof result.data.task_data === 'object' &&
-      !Array.isArray(result.data.task_data)
-    ) {
-      task.task_data = {
-        ...(result.data.task_data as Record<string, unknown>),
-        ...(task.task_data as Record<string, unknown>)
-      }
-    } else if (!task.task_data && result.data.task_data) {
-      task.task_data = result.data.task_data
-    }
-    task.task_source = 'claim'
-    return true
-  }
-
-  private async consumeNextTaskOrClaim(): Promise<void> {
-    if (!this.isIdle()) {
-      return
-    }
-
-    const nextTask = this.pendingTasks.shift()
-    if (nextTask) {
-      await this.runEngine(nextTask)
-      return
-    }
-
-    await this.requestNextTask()
-  }
-
   private async sendHeartbeat(taskId: string): Promise<void> {
     try {
       await heartbeatAsync(taskId)
@@ -241,9 +137,7 @@ export abstract class AbstractWorkerManager {
     try {
       await reportAsync(taskId, taskStatus, error)
     } catch (reportError) {
-      logger.error(
-        `任务状态上报失败: taskId=${taskId} status=${taskStatus} error=${(reportError as Error)?.message || reportError}`
-      )
+      logger.error(`任务状态上报失败: taskId=${taskId} status=${taskStatus} error=${(reportError as Error)?.message || reportError}`)
     }
   }
 
@@ -251,11 +145,7 @@ export abstract class AbstractWorkerManager {
     try {
       if (this.currentCancelled) {
         logger.warn(`任务已取消：${task.id}`)
-        await this.sendReport(
-          task.id,
-          TaskStatus.Cancelled,
-          this.currentCancelReason || taskError?.message
-        )
+        await this.sendReport(task.id, TaskStatus.Cancelled, this.currentCancelReason || taskError?.message)
       } else if (taskError) {
         await this.sendReport(task.id, TaskStatus.Failed, taskError.message)
       } else {
@@ -267,16 +157,11 @@ export abstract class AbstractWorkerManager {
       this.currentCancelled = false
       this.currentCancelReason = undefined
       this.status = WorkerStatus.IDLE
-      await this.consumeNextTaskOrClaim()
+      await this.requestNextTask()
     }
   }
 
-  private matchesCancellation(
-    task: TaskInfo,
-    taskId: string,
-    rootTaskId: string,
-    cancelScope: string
-  ): boolean {
+  private matchesCancellation(task: TaskInfo, taskId: string, rootTaskId: string, cancelScope: string): boolean {
     const currentTaskId = this.normalizeText(task.id)
     const currentRootTaskId = this.extractRootTaskId(task)
 
@@ -286,13 +171,7 @@ export abstract class AbstractWorkerManager {
     if (rootTaskId && currentRootTaskId && currentRootTaskId === rootTaskId) {
       return true
     }
-    if (
-      cancelScope &&
-      ['ROOT', 'CHAIN', 'CASCADE', 'ALL'].includes(cancelScope) &&
-      taskId &&
-      currentRootTaskId &&
-      currentRootTaskId === taskId
-    ) {
+    if (cancelScope && ['ROOT', 'CHAIN', 'CASCADE', 'ALL'].includes(cancelScope) && taskId && currentRootTaskId && currentRootTaskId === taskId) {
       return true
     }
     return false
@@ -304,36 +183,23 @@ export abstract class AbstractWorkerManager {
     const payloadTask = this.asRecord(payload.task)
     const input = this.asRecord(payload.input)
     const inputPayload = this.asRecord(input.payload)
-    return (
-      this.normalizeText(payloadTask.rootTaskId) ||
-      this.normalizeText(inputPayload.rootTaskId) ||
-      this.normalizeText(taskData.rootTaskId) ||
-      ''
-    )
+    return this.normalizeText(payloadTask.rootTaskId) || this.normalizeText(inputPayload.rootTaskId) || this.normalizeText(taskData.rootTaskId) || ''
   }
 
   private asRecord(value: unknown): Record<string, unknown> {
     if (typeof value === 'string') {
       const trimmed = value.trim()
-      if (
-        trimmed &&
-        ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-          (trimmed.startsWith('[') && trimmed.endsWith(']')))
-      ) {
+      if (trimmed && ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
         try {
           const parsed = JSON.parse(trimmed) as unknown
-          return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : {}
+          return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
         } catch {
           return {}
         }
       }
       return {}
     }
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {}
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
   }
 
   private normalizeText(value: unknown): string {

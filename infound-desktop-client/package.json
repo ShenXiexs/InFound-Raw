@@ -2,8 +2,11 @@
   "name": "infound-desktop-client",
   "private": true,
   "version": "1.0.0",
-  "packageManager": "pnpm@10.30.2",
+  "packageManager": "pnpm@10.33.0",
   "pnpm": {
+    "overrides": {
+      "sass": "^1.97.3"
+    },
     "onlyBuiltDependencies": [
       "electron",
       "esbuild",
@@ -11,7 +14,11 @@
     ]
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "publish:infound": "node scripts/publish-packages.js",
+    "prepare:build": "node scripts/prepare-electron-build.js",
+    "pack:win:stg": "npm run prepare:build && cd dist-build && npm run build",
+    "pack:mac:stg": "npm run prepare:build && cd dist-build && npm run build:mac"
   },
   "author": "INFound"
 }
