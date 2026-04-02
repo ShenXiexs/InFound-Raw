@@ -13,6 +13,7 @@ from apps.portal_seller_open_api.services.task_slot_dispatch_service import (
     SellerRpaTaskSingleSlotDispatchService,
 )
 from core_base import SettingsFactory, get_logger
+from core_redis import RedisClientManager
 from shared_domain import DatabaseManager
 from shared_domain.models.infound import SellerTkRpaTaskPlans, SellerTkShops
 
@@ -121,6 +122,7 @@ async def main() -> int:
         config_dir=Path(__file__).resolve().parents[1] / "configs",
     )
     DatabaseManager.initialize(settings.mysql)
+    RedisClientManager.initialize(settings.redis)
 
     task_type = str(args.task_type or "").strip().upper()
     utc_now = datetime.now(UTC).replace(tzinfo=None)
@@ -276,6 +278,7 @@ async def main() -> int:
         return 0
     finally:
         await DatabaseManager.close()
+        RedisClientManager.close()
 
 
 if __name__ == "__main__":

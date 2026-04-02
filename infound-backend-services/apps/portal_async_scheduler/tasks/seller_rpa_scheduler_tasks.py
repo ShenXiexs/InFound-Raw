@@ -1,7 +1,9 @@
 import time
 
 from apps.portal_async_scheduler.core.config import Settings
-from apps.portal_seller_open_api.services.scheduler_service import SellerRpaSchedulerService
+from apps.portal_async_scheduler.services.seller_rpa_scheduler_service import (
+    SellerRpaSchedulerService,
+)
 from core_base import SettingsFactory, get_logger
 
 _last_running_recovery_monotonic: float = 0.0

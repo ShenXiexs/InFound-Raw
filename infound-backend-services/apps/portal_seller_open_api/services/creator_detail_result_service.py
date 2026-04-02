@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Iterable
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -184,6 +185,12 @@ class CreatorDetailResultIngestionService:
             or normalize_region_code(payload.shop_region_code)
             or "MX"
         )
+        chat_url = self._resolve_chat_url(
+            platform=platform,
+            explicit_chat_url=context.chat_url,
+            platform_creator_id=platform_creator_id,
+            region=region,
+        )
         follower_gender = self._ensure_mapping(detail.follower_gender)
         follower_age = self._ensure_mapping(detail.follower_age)
 
@@ -198,7 +205,7 @@ class CreatorDetailResultIngestionService:
             "region": region,
             "currency": clean_text(context.currency) or self._currency_for_region(region),
             "categories": self._stringify_text_value(context.categories),
-            "chat_url": clean_text(context.chat_url),
+            "chat_url": chat_url,
             "search_keywords": clean_text(context.search_keywords or context.search_keyword),
             "brand_name": clean_text(context.brand_name),
             "followers": normalize_int(detail.creator_followers_count),
@@ -370,6 +377,29 @@ class CreatorDetailResultIngestionService:
             return None
         quant = Decimal("1").scaleb(-scale)
         return value.quantize(quant)
+
+    def _resolve_chat_url(
+        self,
+        *,
+        platform: str,
+        explicit_chat_url: Any,
+        platform_creator_id: str,
+        region: str | None,
+    ) -> str | None:
+        chat_url = clean_text(explicit_chat_url)
+        if chat_url:
+            return chat_url
+
+        normalized_platform = (platform or "").strip().lower()
+        normalized_region = normalize_region_code(region)
+        if normalized_platform != "tiktok" or not platform_creator_id or not normalized_region:
+            return None
+
+        return (
+            "https://affiliate.tiktok.com/seller/im?"
+            f"creator_id={quote(platform_creator_id, safe='')}"
+            f"&shop_region={quote(normalized_region, safe='')}"
+        )
 
     def _normalize_key(self, value: Any) -> str:
         return str(value or "").strip().lower().replace(" ", "").replace("_", "")

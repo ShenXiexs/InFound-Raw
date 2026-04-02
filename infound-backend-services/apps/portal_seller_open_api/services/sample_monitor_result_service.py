@@ -83,6 +83,8 @@ class SampleMonitorResultIngestionService:
                 continue
 
             platform_creator_id = normalize_identifier(row.creator_id)
+            creator_name = clean_text(row.creator_name)
+            available_sample_count = normalize_int(row.available_sample_count)
             product_key = (current_user.user_id, shop.id, platform_product_id)
             product_keys.add(product_key)
             await self._upsert_product(
@@ -108,14 +110,14 @@ class SampleMonitorResultIngestionService:
                     platform_product_id=platform_product_id,
                     crawl_date=self._resolve_crawl_date(row, utc_now),
                     product_sku=clean_text(row.sku_id),
-                    available_sample_count=None,
+                    available_sample_count=available_sample_count,
                     is_uncooperative=self._to_bit_value(None),
                     is_unapprovable=self._to_bit_value(None),
                     status=self._normalize_sample_status(row.status or row.tab),
                     request_time_remaining=clean_text(row.expired_in_text),
                     platform_creator_id=platform_creator_id,
-                    platform_creator_username=None,
-                    platform_creator_display_name=clean_text(row.creator_name),
+                    platform_creator_username=creator_name,
+                    platform_creator_display_name=creator_name,
                     post_rate=self._quantize_decimal(
                         normalize_ratio_decimal(row.commission_rate), 4
                     ),
@@ -161,8 +163,8 @@ class SampleMonitorResultIngestionService:
                         crawl_date=self._resolve_crawl_date(row, utc_now),
                         type=self._normalize_content_type(item.get("content_type")),
                         platform_creator_id=platform_creator_id,
-                        platform_creator_display_name=clean_text(row.creator_name),
-                        platform_creator_username=None,
+                        platform_creator_display_name=creator_name,
+                        platform_creator_username=creator_name,
                         platform_detail_url=None,
                         promotion_name=clean_text(item.get("content_title")),
                         promotion_time=clean_text(item.get("content_time")),
@@ -228,13 +230,20 @@ class SampleMonitorResultIngestionService:
         utc_now: datetime,
     ) -> SellerTkProducts:
         platform_product_id = normalize_identifier(row.product_id)
-        stmt = select(SellerTkProducts).where(
-            SellerTkProducts.user_id == current_user.user_id,
-            SellerTkProducts.shop_id == shop_id,
-            SellerTkProducts.platform_product_id == platform_product_id,
+        stmt = (
+            select(SellerTkProducts)
+            .where(
+                SellerTkProducts.user_id == current_user.user_id,
+                SellerTkProducts.shop_id == shop_id,
+                SellerTkProducts.platform_product_id == platform_product_id,
+            )
+            .order_by(
+                SellerTkProducts.last_modification_time.desc(),
+                SellerTkProducts.id.desc(),
+            )
         )
         result = await self.db_session.execute(stmt)
-        existing = result.scalar_one_or_none()
+        existing = result.scalars().first()
         values = {
             "user_id": current_user.user_id,
             "shop_id": shop_id,
@@ -277,26 +286,33 @@ class SampleMonitorResultIngestionService:
     ) -> SellerTkSamples:
         platform_product_id = normalize_identifier(row.product_id)
         platform_creator_id = normalize_identifier(row.creator_id)
-        stmt = select(SellerTkSamples).where(
-            SellerTkSamples.user_id == current_user.user_id,
-            SellerTkSamples.shop_id == shop_id,
-            SellerTkSamples.platform_product_id == platform_product_id,
-            self._eq_or_is_null(SellerTkSamples.platform_creator_id, platform_creator_id),
+        stmt = (
+            select(SellerTkSamples)
+            .where(
+                SellerTkSamples.user_id == current_user.user_id,
+                SellerTkSamples.shop_id == shop_id,
+                SellerTkSamples.platform_product_id == platform_product_id,
+                self._eq_or_is_null(SellerTkSamples.platform_creator_id, platform_creator_id),
+            )
+            .order_by(
+                SellerTkSamples.last_modification_time.desc(),
+                SellerTkSamples.id.desc(),
+            )
         )
         result = await self.db_session.execute(stmt)
-        existing = result.scalar_one_or_none()
+        existing = result.scalars().first()
         values = {
             "user_id": current_user.user_id,
             "shop_id": shop_id,
             "platform_product_id": platform_product_id,
             "product_sku": clean_text(row.sku_id),
-            "available_sample_count": None,
+            "available_sample_count": normalize_int(row.available_sample_count),
             "is_uncooperative": self._to_bit_value(None),
             "is_unapprovable": self._to_bit_value(None),
             "status": self._normalize_sample_status(row.status or row.tab),
             "request_time_remaining": clean_text(row.expired_in_text),
             "platform_creator_id": platform_creator_id,
-            "platform_creator_username": None,
+            "platform_creator_username": clean_text(row.creator_name),
             "platform_creator_display_name": clean_text(row.creator_name),
             "post_rate": self._quantize_decimal(
                 normalize_ratio_decimal(row.commission_rate), 4
@@ -363,7 +379,7 @@ class SampleMonitorResultIngestionService:
             .limit(1)
         )
         result = await self.db_session.execute(stmt)
-        existing = result.scalar_one_or_none()
+        existing = result.scalars().first()
 
         values = {
             "user_id": current_user.user_id,
@@ -372,7 +388,7 @@ class SampleMonitorResultIngestionService:
             "type": content_type,
             "platform_creator_id": platform_creator_id,
             "platform_creator_display_name": clean_text(row.creator_name),
-            "platform_creator_username": None,
+            "platform_creator_username": clean_text(row.creator_name),
             "platform_detail_url": None,
             "promotion_name": promotion_name,
             "promotion_time": promotion_time,

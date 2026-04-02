@@ -16,7 +16,6 @@ from apps.portal_seller_open_api.services.contract_reminder_service import (
 )
 from apps.portal_seller_open_api.services.normalization import (
     clean_text,
-    generate_uppercase_uuid,
     normalize_identifier,
 )
 from apps.portal_seller_open_api.services.task_dispatch_service import (
@@ -32,7 +31,8 @@ from core_base import get_logger
 from shared_seller_application_services.current_user_info import CurrentUserInfo
 from shared_domain.models.infound import (
     SellerTkContractMonitorLogs,
-    SellerTkContractMonitors,
+    SellerTkSampleCrawlLogs,
+    SellerTkSamples,
     SellerTkRpaTaskPlans,
 )
 
@@ -248,7 +248,7 @@ class SellerRpaTaskOrchestrationService:
             if row_context is None:
                 continue
 
-            monitor = await self._upsert_contract_monitor(
+            monitor = await self._load_contract_monitor_state(
                 current_user,
                 shop_id=shop_id,
                 row_context=row_context,
@@ -263,13 +263,18 @@ class SellerRpaTaskOrchestrationService:
             if not due_rule_bindings:
                 continue
 
-            creator_name = clean_text(monitor.creator_name) or monitor.platform_creator_id
-            days_overdue = self._calculate_days_overdue(monitor.expired_in_ms)
+            creator_name = clean_text(monitor.get("creator_name")) or str(
+                monitor["platform_creator_id"]
+            )
+            days_overdue = self._calculate_days_overdue(monitor.get("expired_in_ms"))
+            status_anchor = clean_text(monitor.get("status_anchor")) or str(
+                monitor["current_status"]
+            )
 
             for binding in due_rule_bindings:
                 rule = binding.rule
                 task_id_seed = (
-                    f"seller-rpa:urge:{root_task_id}:{rule.code}:{monitor.cycle_token}:{monitor.platform_product_id}:{monitor.platform_creator_id}"
+                    f"seller-rpa:urge:{root_task_id}:{rule.code}:{status_anchor}:{monitor['platform_product_id']}:{monitor['platform_creator_id']}"
                 )
                 child_task_id = self._stable_task_id(task_id_seed)
                 existing_plan = await self._find_task_plan(child_task_id)
@@ -287,16 +292,8 @@ class SellerRpaTaskOrchestrationService:
                         user_id=current_user.user_id,
                         shop_id=shop_id,
                         rule_code=rule.code,
-                        platform_product_id=monitor.platform_product_id,
-                        platform_creator_id=monitor.platform_creator_id,
-                        sample_request_id=monitor.sample_request_id,
-                        current_status=monitor.current_status,
-                        cycle_token=monitor.cycle_token,
-                        task_plan_id=child_task_id,
+                        platform_creator_id=str(monitor["platform_creator_id"]),
                         message=message or "",
-                        triggered_at=now,
-                        send_status="PLANNED",
-                        error_msg=None,
                         creator_id=current_user.user_id,
                         creation_time=now,
                         last_modifier_id=current_user.user_id,
@@ -320,7 +317,7 @@ class SellerRpaTaskOrchestrationService:
                 urge_input_payload = self._mutable_record(urge_input_node, "payload")
                 urge_input_payload.update(
                     {
-                        "creatorId": monitor.platform_creator_id,
+                        "creatorId": monitor["platform_creator_id"],
                         "creatorName": creator_name,
                         "taskType": "URGE_CHAT",
                         "businessMode": "urge",
@@ -334,11 +331,11 @@ class SellerRpaTaskOrchestrationService:
                         "secondMessage": message,
                         "recipients": [
                             {
-                                "creatorId": monitor.platform_creator_id,
+                                "creatorId": monitor["platform_creator_id"],
                                 "creatorName": creator_name,
-                                "sampleId": monitor.sample_request_id,
-                                "productId": monitor.platform_product_id,
-                                "orderStatus": monitor.current_status,
+                                "sampleId": monitor.get("sample_request_id"),
+                                "productId": monitor["platform_product_id"],
+                                "orderStatus": monitor["current_status"],
                                 "daysOverdue": days_overdue,
                                 "message": message,
                             }
@@ -410,77 +407,85 @@ class SellerRpaTaskOrchestrationService:
             binding for binding in bindings if binding.rule.code in self.ACTIVE_CONTRACT_RULE_CODES
         ]
 
-    async def _upsert_contract_monitor(
+    async def _load_contract_monitor_state(
         self,
         current_user: CurrentUserInfo,
         *,
         shop_id: str,
         row_context: dict[str, Any],
         updated_at: datetime,
-    ) -> SellerTkContractMonitors | None:
+    ) -> dict[str, Any] | None:
         platform_product_id = normalize_identifier(row_context.get("platform_product_id"))
         platform_creator_id = normalize_identifier(row_context.get("platform_creator_id"))
         current_status = clean_text(row_context.get("current_status"))
         if not platform_product_id or not platform_creator_id or not current_status:
             return None
 
-        stmt = select(SellerTkContractMonitors).where(
-            SellerTkContractMonitors.user_id == current_user.user_id,
-            SellerTkContractMonitors.shop_id == shop_id,
-            SellerTkContractMonitors.platform_product_id == platform_product_id,
-            SellerTkContractMonitors.platform_creator_id == platform_creator_id,
+        sample_stmt = select(SellerTkSamples).where(
+            SellerTkSamples.user_id == current_user.user_id,
+            SellerTkSamples.shop_id == shop_id,
+            SellerTkSamples.platform_product_id == platform_product_id,
+            SellerTkSamples.platform_creator_id == platform_creator_id,
         )
-        result = await self.db_session.execute(stmt)
-        monitor = result.scalar_one_or_none()
+        sample_result = await self.db_session.execute(sample_stmt)
+        try:
+            sample = sample_result.scalar_one_or_none()
+        finally:
+            sample_result.close()
+        if sample is None:
+            return None
 
-        sample_request_id = normalize_identifier(row_context.get("sample_request_id"))
-        creator_name = clean_text(row_context.get("creator_name"))
-        expired_in_ms = self._coerce_int(row_context.get("expired_in_ms"))
-        expired_in_text = clean_text(row_context.get("expired_in_text"))
-        content_summary = self._coerce_json_value(row_context.get("content_summary"))
-
-        if monitor is None:
-            monitor = SellerTkContractMonitors(
-                id=generate_uppercase_uuid(),
-                user_id=current_user.user_id,
-                shop_id=shop_id,
-                platform_product_id=platform_product_id,
-                platform_creator_id=platform_creator_id,
-                sample_request_id=sample_request_id,
-                creator_name=creator_name,
-                current_status=current_status,
-                previous_status=None,
-                status_entered_at=updated_at,
-                last_crawled_at=updated_at,
-                expired_in_ms=expired_in_ms,
-                expired_in_text=expired_in_text,
-                content_summary=content_summary,
-                ad_code=None,
-                cycle_token=generate_uppercase_uuid(),
-                creator_id=current_user.user_id,
-                creation_time=updated_at,
-                last_modifier_id=current_user.user_id,
-                last_modification_time=updated_at,
+        previous_status: str | None = None
+        status_entered_at = updated_at
+        last_crawled_at = sample.last_modification_time or updated_at
+        if (
+            current_status in {"content_pending", "completed"}
+            and self._contract_status_to_sample_status(current_status) is not None
+        ):
+            history_result = await self.db_session.execute(
+                select(SellerTkSampleCrawlLogs)
+                .where(SellerTkSampleCrawlLogs.sample_id == sample.id)
+                .order_by(
+                    SellerTkSampleCrawlLogs.creation_time.desc(),
+                    SellerTkSampleCrawlLogs.id.desc(),
+                )
             )
-            self.db_session.add(monitor)
-            return monitor
+            try:
+                history_rows = history_result.scalars().all()
+            finally:
+                history_result.close()
+            if history_rows:
+                last_crawled_at = history_rows[0].creation_time or last_crawled_at
+                status_entered_at, previous_status = self._resolve_contract_status_window(
+                    history_rows,
+                    expected_status=current_status,
+                    fallback_time=last_crawled_at,
+                )
 
-        previous_current_status = clean_text(monitor.current_status)
-        if previous_current_status != current_status:
-            monitor.previous_status = previous_current_status
-            monitor.current_status = current_status
-            monitor.status_entered_at = updated_at
-            monitor.cycle_token = generate_uppercase_uuid()
+        days_overdue = self._calculate_days_overdue(row_context.get("expired_in_ms"))
+        if current_status == "overdue":
+            previous_status = "content_pending"
 
-        monitor.sample_request_id = sample_request_id or monitor.sample_request_id
-        monitor.creator_name = creator_name or monitor.creator_name
-        monitor.last_crawled_at = updated_at
-        monitor.expired_in_ms = expired_in_ms
-        monitor.expired_in_text = expired_in_text
-        monitor.content_summary = content_summary
-        monitor.last_modifier_id = current_user.user_id
-        monitor.last_modification_time = updated_at
-        return monitor
+        status_anchor = (
+            f"{current_status}:{days_overdue}"
+            if current_status == "overdue"
+            else f"{current_status}:{status_entered_at.isoformat()}"
+        )
+        return {
+            "sample_id": sample.id,
+            "platform_product_id": platform_product_id,
+            "platform_creator_id": platform_creator_id,
+            "sample_request_id": normalize_identifier(row_context.get("sample_request_id")),
+            "creator_name": clean_text(row_context.get("creator_name"))
+            or clean_text(sample.platform_creator_display_name),
+            "current_status": current_status,
+            "previous_status": previous_status,
+            "status_entered_at": status_entered_at,
+            "last_crawled_at": last_crawled_at,
+            "expired_in_ms": row_context.get("expired_in_ms"),
+            "expired_in_text": clean_text(row_context.get("expired_in_text")),
+            "status_anchor": status_anchor,
+        }
 
     async def _create_child_task_plan(
         self,
@@ -666,28 +671,23 @@ class SellerRpaTaskOrchestrationService:
             "current_status": current_status,
             "expired_in_ms": row.get("expired_in_ms"),
             "expired_in_text": row.get("expired_in_text"),
-            "content_summary": row.get("content_summary"),
         }
 
     def _select_due_contract_rules(
         self,
-        monitor: SellerTkContractMonitors,
+        monitor: dict[str, Any],
         rules: Iterable[ContractReminderEffectiveRule],
         now: datetime,
     ) -> list[ContractReminderEffectiveRule]:
         due_rules: list[ContractReminderEffectiveRule] = []
-        current_status = clean_text(monitor.current_status)
-        previous_status = clean_text(monitor.previous_status)
-        status_entered_at = monitor.status_entered_at or now
+        current_status = clean_text(monitor.get("current_status"))
+        status_entered_at = monitor.get("status_entered_at") or now
+        days_overdue = self._calculate_days_overdue(monitor.get("expired_in_ms"))
 
         for binding in rules:
             rule = binding.rule
             if rule.code == self.RULE_OVERDUE_URGE:
-                if (
-                    current_status == "overdue"
-                    and previous_status == "content_pending"
-                    and status_entered_at.date() == now.date()
-                ):
+                if current_status == "overdue" and days_overdue == 1:
                     due_rules.append(binding)
                 continue
 
@@ -705,26 +705,25 @@ class SellerRpaTaskOrchestrationService:
 
         return due_rules
 
-    @staticmethod
-    def _coerce_int(value: Any) -> int | None:
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    @staticmethod
-    def _coerce_json_value(value: Any) -> Any:
-        if value is None or value == "":
-            return None
-        if isinstance(value, (dict, list)):
-            return deepcopy(value)
-        text = str(value).strip()
-        if not text:
-            return None
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return {"raw": text}
+    def _resolve_contract_status_window(
+        self,
+        history_rows: list[SellerTkSampleCrawlLogs],
+        *,
+        expected_status: str,
+        fallback_time: datetime,
+    ) -> tuple[datetime, str | None]:
+        status_entered_at = fallback_time
+        previous_status: str | None = None
+        for row in history_rows:
+            status = self._sample_status_to_contract_status(row.status)
+            if not status:
+                continue
+            if status == expected_status:
+                status_entered_at = row.creation_time or status_entered_at
+                continue
+            previous_status = status
+            break
+        return status_entered_at, previous_status
 
     @staticmethod
     def _calculate_days_overdue(value: Any) -> int | None:
@@ -735,3 +734,31 @@ class SellerRpaTaskOrchestrationService:
         if milliseconds >= 0:
             return 0
         return max(int(abs(milliseconds) // 86_400_000), 0)
+
+    @staticmethod
+    def _contract_status_to_sample_status(value: str | None) -> int | None:
+        mapping = {
+            "to_review": 1,
+            "ready_to_ship": 2,
+            "shipped": 3,
+            "content_pending": 4,
+            "overdue": 4,
+            "completed": 5,
+            "cancelled": 6,
+        }
+        return mapping.get(clean_text(value))
+
+    @staticmethod
+    def _sample_status_to_contract_status(value: Any) -> str | None:
+        mapping = {
+            1: "to_review",
+            2: "ready_to_ship",
+            3: "shipped",
+            4: "content_pending",
+            5: "completed",
+            6: "cancelled",
+        }
+        try:
+            return mapping.get(int(value))
+        except (TypeError, ValueError):
+            return None

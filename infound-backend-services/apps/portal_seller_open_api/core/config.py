@@ -29,6 +29,10 @@ class IFAliSmsSettings(SettingsBase):
 
 class SellerRpaSchedulerSettings(BaseModel):
     enabled: bool = True
+    # 为 false 时不在 API 进程内跑对应循环，改由 portal_async_scheduler 执行
+    delayed_dispatch_run_in_process: bool = False
+    sample_monitor_daily_run_in_process: bool = False
+    running_recovery_interval_seconds: int = 60
     delayed_poll_interval_seconds: int = 5
     delayed_batch_size: int = 50
     dispatch_marker_ttl_seconds: int = 21600

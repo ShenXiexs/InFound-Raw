@@ -27,6 +27,7 @@ class SampleMonitorRowItem(BaseDTO):
     commission_rate_text: Optional[str] = None
     region: Optional[str] = None
     sku_stock: Optional[Any] = None
+    available_sample_count: Optional[Any] = None
     expired_in_ms: Optional[Any] = None
     expired_in_text: Optional[str] = None
     content_summary: Optional[Any] = None

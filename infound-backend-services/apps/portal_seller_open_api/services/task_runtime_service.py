@@ -21,10 +21,7 @@ from apps.portal_seller_open_api.services.task_slot_dispatch_service import (
 )
 from core_base import get_logger
 from shared_domain import DatabaseManager
-from shared_domain.models.infound import (
-    SellerTkContractMonitorLogs,
-    SellerTkRpaTaskPlans,
-)
+from shared_domain.models.infound import SellerTkRpaTaskPlans
 
 
 class SellerRpaTaskRuntimeService:
@@ -273,37 +270,4 @@ class SellerRpaTaskRuntimeService:
     ) -> None:
         if str(task_plan.task_type or "").strip().upper() != SellerRpaTaskType.URGE_CHAT.value:
             return
-
-        stmt = select(SellerTkContractMonitorLogs).where(
-            SellerTkContractMonitorLogs.user_id == current_user.user_id,
-            SellerTkContractMonitorLogs.task_plan_id == task_plan.id,
-        )
-        result = await session.execute(stmt)
-        logs = result.scalars().all()
-        if not logs:
-            self.logger.warning(
-                "URGE_CHAT 结果回写未命中 contract log",
-                user_id=current_user.user_id,
-                task_id=task_plan.id,
-                task_status=task_status.value,
-            )
-            return
-
-        if task_status == SellerRpaTaskStatus.COMPLETED:
-            send_status = "SENT"
-            error_msg = None
-        elif task_status == SellerRpaTaskStatus.CANCELLED:
-            send_status = "CANCELLED"
-            error_msg = None
-        elif task_status == SellerRpaTaskStatus.FAILED:
-            send_status = "FAILED"
-            error_msg = normalized_error
-        else:
-            send_status = task_status.value
-            error_msg = normalized_error
-
-        for log_row in logs:
-            log_row.send_status = send_status
-            log_row.error_msg = error_msg
-            log_row.last_modifier_id = current_user.user_id
-            log_row.last_modification_time = utc_now
+        return

@@ -139,7 +139,8 @@ class ContractReminderMonitorListData(BaseDTO):
 class ContractReminderLogItem(BaseDTO):
     id: int = Field(validation_alias=AliasChoices("id"), serialization_alias="id")
     ruleCode: str = Field(validation_alias=AliasChoices("ruleCode"), serialization_alias="ruleCode")
-    platformProductId: str = Field(
+    platformProductId: str | None = Field(
+        default=None,
         validation_alias=AliasChoices("platformProductId"),
         serialization_alias="platformProductId",
     )

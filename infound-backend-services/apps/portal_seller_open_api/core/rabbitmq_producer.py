@@ -27,6 +27,7 @@ class RabbitMQProducer:
     _declared_queues: set[str] = set()
 
     USER_NOTIFICATION_QUEUE_PREFIX = "user.notification"
+    USER_NOTIFICATION_MAX_LENGTH = 1000
     USER_NOTIFICATION_QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000
     DEFAULT_MESSAGE_TTL_MS = 6 * 60 * 60 * 1000
     EVENT_NEW_TASK_READY = "NEW_TASK_READY"
@@ -103,6 +104,44 @@ class RabbitMQProducer:
         return queue_name, routing_key, routing_key
 
     @classmethod
+    async def _try_reuse_existing_queue(
+        cls,
+        *,
+        queue_name: str,
+        binding_key: str,
+    ) -> bool:
+        if not cls._connection or not cls._settings:
+            return False
+
+        check_channel: AbstractRobustChannel | None = None
+        try:
+            # Use a separate channel for passive lookup so an absent queue
+            # won't poison the main producer channel.
+            check_channel = await cls._connection.channel()
+            queue = await check_channel.get_queue(queue_name, ensure=True)
+            await queue.bind(cls._settings.exchange_name, routing_key=binding_key)
+            cls._logger.info(
+                "复用已存在的用户通知队列",
+                queue_name=queue_name,
+                binding_key=binding_key,
+            )
+            return True
+        except Exception as exc:
+            cls._logger.debug(
+                "用户通知队列不存在或无法直接复用，准备按当前配置创建",
+                queue_name=queue_name,
+                binding_key=binding_key,
+                error=str(exc),
+            )
+            return False
+        finally:
+            if check_channel is not None:
+                try:
+                    await check_channel.close()
+                except Exception:
+                    pass
+
+    @classmethod
     async def ensure_user_notification_queue(cls, user_id: str) -> Tuple[str, str, str]:
         channel = await cls._get_channel()
         exchange = await cls._get_exchange()
@@ -111,18 +150,29 @@ class RabbitMQProducer:
         )
 
         if queue_name not in cls._declared_queues:
-            queue = await channel.declare_queue(
-                queue_name,
-                durable=True,
-                auto_delete=False,
-            )
-            await queue.bind(exchange, routing_key=binding_key)
-            cls._declared_queues.add(queue_name)
-            cls._logger.info(
-                "用户通知队列已声明并绑定",
+            reused = await cls._try_reuse_existing_queue(
                 queue_name=queue_name,
                 binding_key=binding_key,
             )
+            if not reused:
+                queue = await channel.declare_queue(
+                    queue_name,
+                    durable=True,
+                    auto_delete=False,
+                    arguments={
+                        "x-message-ttl": cls.USER_NOTIFICATION_QUEUE_TTL_MS,
+                        "x-max-length": cls.USER_NOTIFICATION_MAX_LENGTH,
+                    },
+                )
+                await queue.bind(exchange, routing_key=binding_key)
+                cls._logger.info(
+                    "用户通知队列已声明并绑定",
+                    queue_name=queue_name,
+                    binding_key=binding_key,
+                    queue_ttl_ms=cls.USER_NOTIFICATION_QUEUE_TTL_MS,
+                    max_length=cls.USER_NOTIFICATION_MAX_LENGTH,
+                )
+            cls._declared_queues.add(queue_name)
 
         return queue_name, binding_key, publish_routing_key
 

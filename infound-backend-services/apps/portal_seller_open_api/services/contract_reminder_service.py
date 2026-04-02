@@ -23,9 +23,9 @@ from apps.portal_seller_open_api.services.normalization import (
 )
 from shared_domain.models.infound import (
     SellerTkContractMonitorLogs,
-    SellerTkContractMonitorRuleSettings,
     SellerTkContractMonitorRules,
     SellerTkContractMonitors,
+    SellerTkSamples,
     SellerTkShops,
 )
 
@@ -33,7 +33,7 @@ from shared_domain.models.infound import (
 @dataclass(slots=True)
 class ContractReminderEffectiveRule:
     rule: SellerTkContractMonitorRules
-    setting: SellerTkContractMonitorRuleSettings | None
+    monitor: SellerTkContractMonitors | None
     message_template: str | None
     is_active: bool
 
@@ -64,10 +64,10 @@ class ContractReminderService:
                     defaultMessage=clean_text(effective.rule.description),
                     messageTemplate=effective.message_template,
                     isActive=effective.is_active,
-                    hasOverride=effective.setting is not None,
+                    hasOverride=effective.monitor is not None,
                     lastModificationTime=(
-                        effective.setting.last_modification_time
-                        if effective.setting is not None
+                        effective.monitor.last_modification_time
+                        if effective.monitor is not None
                         else effective.rule.last_modification_time
                     ),
                 )
@@ -106,21 +106,28 @@ class ContractReminderService:
             if normalized_rule_code not in rules:
                 raise ValueError(f"unknown ruleCode: {item.ruleCode}")
 
-            existing_stmt = select(SellerTkContractMonitorRuleSettings).where(
-                SellerTkContractMonitorRuleSettings.user_id == current_user.user_id,
-                SellerTkContractMonitorRuleSettings.shop_id == normalized_shop_id,
-                SellerTkContractMonitorRuleSettings.rule_code == normalized_rule_code,
+            existing_stmt = (
+                select(SellerTkContractMonitors)
+                .where(
+                    SellerTkContractMonitors.user_id == current_user.user_id,
+                    SellerTkContractMonitors.shop_id == normalized_shop_id,
+                    SellerTkContractMonitors.rule_code == normalized_rule_code,
+                )
+                .order_by(
+                    SellerTkContractMonitors.last_modification_time.desc(),
+                    SellerTkContractMonitors.id.desc(),
+                )
             )
             existing_result = await self.db_session.execute(existing_stmt)
             try:
-                existing = existing_result.scalar_one_or_none()
+                existing = existing_result.scalars().first()
             finally:
                 existing_result.close()
-            message_template = clean_text(item.messageTemplate)
+            message_template = clean_text(item.messageTemplate) or ""
 
             if existing is None:
                 self.db_session.add(
-                    SellerTkContractMonitorRuleSettings(
+                    SellerTkContractMonitors(
                         id=generate_uppercase_uuid(),
                         user_id=current_user.user_id,
                         shop_id=normalized_shop_id,
@@ -153,13 +160,13 @@ class ContractReminderService:
         page_size: int,
     ) -> ContractReminderMonitorListData:
         normalized_shop_id = await self._ensure_owned_shop(current_user.user_id, shop_id)
-        stmt = select(SellerTkContractMonitors).where(
-            SellerTkContractMonitors.user_id == current_user.user_id,
-            SellerTkContractMonitors.shop_id == normalized_shop_id,
+        stmt = select(SellerTkSamples).where(
+            SellerTkSamples.user_id == current_user.user_id,
+            SellerTkSamples.shop_id == normalized_shop_id,
         )
-        normalized_status = clean_text(current_status)
-        if normalized_status:
-            stmt = stmt.where(SellerTkContractMonitors.current_status == normalized_status)
+        normalized_status = self._normalize_sample_status_filter(current_status)
+        if normalized_status is not None:
+            stmt = stmt.where(SellerTkSamples.status == normalized_status)
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         count_result = await self.db_session.execute(count_stmt)
@@ -170,8 +177,8 @@ class ContractReminderService:
         offset = (page - 1) * page_size
         stmt = (
             stmt.order_by(
-                SellerTkContractMonitors.last_modification_time.desc(),
-                SellerTkContractMonitors.id.desc(),
+                SellerTkSamples.last_modification_time.desc(),
+                SellerTkSamples.id.desc(),
             )
             .offset(offset)
             .limit(page_size)
@@ -189,16 +196,16 @@ class ContractReminderService:
                 ContractReminderMonitorItem(
                     id=row.id,
                     platformProductId=row.platform_product_id,
-                    platformCreatorId=row.platform_creator_id,
-                    sampleRequestId=row.sample_request_id,
-                    creatorName=row.creator_name,
-                    currentStatus=row.current_status,
-                    previousStatus=row.previous_status,
-                    statusEnteredAt=row.status_entered_at,
-                    lastCrawledAt=row.last_crawled_at,
-                    expiredInMs=row.expired_in_ms,
-                    expiredInText=row.expired_in_text,
-                    cycleToken=row.cycle_token,
+                    platformCreatorId=row.platform_creator_id or "",
+                    sampleRequestId=None,
+                    creatorName=row.platform_creator_display_name,
+                    currentStatus=self._sample_status_to_label(row.status),
+                    previousStatus=None,
+                    statusEnteredAt=row.last_modification_time,
+                    lastCrawledAt=row.last_modification_time,
+                    expiredInMs=None,
+                    expiredInText=row.request_time_remaining,
+                    cycleToken=row.id,
                     lastModificationTime=row.last_modification_time,
                 )
                 for row in rows
@@ -230,12 +237,6 @@ class ContractReminderService:
             stmt = stmt.where(
                 SellerTkContractMonitorLogs.platform_creator_id == normalized_creator_id
             )
-        normalized_task_plan_id = normalize_identifier(task_plan_id)
-        if normalized_task_plan_id:
-            stmt = stmt.where(SellerTkContractMonitorLogs.task_plan_id == normalized_task_plan_id)
-        normalized_send_status = clean_text(send_status)
-        if normalized_send_status:
-            stmt = stmt.where(SellerTkContractMonitorLogs.send_status == normalized_send_status.upper())
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         count_result = await self.db_session.execute(count_stmt)
@@ -265,16 +266,16 @@ class ContractReminderService:
                 ContractReminderLogItem(
                     id=row.id,
                     ruleCode=row.rule_code,
-                    platformProductId=row.platform_product_id,
+                    platformProductId=None,
                     platformCreatorId=row.platform_creator_id,
-                    sampleRequestId=row.sample_request_id,
-                    currentStatus=row.current_status,
-                    cycleToken=row.cycle_token,
-                    taskPlanId=row.task_plan_id,
+                    sampleRequestId=None,
+                    currentStatus=None,
+                    cycleToken=None,
+                    taskPlanId=None,
                     message=row.message,
-                    triggeredAt=row.triggered_at,
-                    sendStatus=row.send_status,
-                    errorMsg=row.error_msg,
+                    triggeredAt=None,
+                    sendStatus=None,
+                    errorMsg=None,
                     creationTime=row.creation_time,
                 )
                 for row in rows
@@ -309,37 +310,77 @@ class ContractReminderService:
         finally:
             rule_result.close()
 
-        setting_stmt = select(SellerTkContractMonitorRuleSettings).where(
-            SellerTkContractMonitorRuleSettings.user_id == user_id,
-            SellerTkContractMonitorRuleSettings.shop_id == shop_id,
+        monitor_stmt = (
+            select(SellerTkContractMonitors)
+            .where(
+                SellerTkContractMonitors.user_id == user_id,
+                SellerTkContractMonitors.shop_id == shop_id,
+            )
+            .order_by(
+                SellerTkContractMonitors.last_modification_time.desc(),
+                SellerTkContractMonitors.id.desc(),
+            )
         )
-        setting_result = await self.db_session.execute(setting_stmt)
+        monitor_result = await self.db_session.execute(monitor_stmt)
         try:
-            settings = {row.rule_code: row for row in setting_result.scalars().all()}
+            monitors: dict[str, SellerTkContractMonitors] = {}
+            for row in monitor_result.scalars().all():
+                if row.rule_code not in monitors:
+                    monitors[row.rule_code] = row
         finally:
-            setting_result.close()
+            monitor_result.close()
 
         items: list[ContractReminderEffectiveRule] = []
         for rule in rules:
-            setting = settings.get(rule.code)
+            monitor = monitors.get(rule.code)
             effective_active = (
-                self._bit_to_bool(setting.is_active)
-                if setting is not None
+                self._bit_to_bool(monitor.is_active)
+                if monitor is not None
                 else self._bit_to_bool(rule.is_active)
             )
             items.append(
                 ContractReminderEffectiveRule(
                     rule=rule,
-                    setting=setting,
+                    monitor=monitor,
                     message_template=(
-                        clean_text(setting.message_template)
-                        if setting is not None
+                        clean_text(monitor.message_template)
+                        if monitor is not None
                         else clean_text(rule.description)
                     ),
                     is_active=effective_active,
                 )
             )
         return items
+
+    @staticmethod
+    def _normalize_sample_status_filter(value: str | None) -> int | None:
+        normalized = (clean_text(value) or "").lower().replace("-", "_").replace(" ", "_")
+        if not normalized:
+            return None
+        mapping = {
+            "to_review": 1,
+            "ready_to_ship": 2,
+            "shipped": 3,
+            "in_progress": 4,
+            "content_pending": 4,
+            "overdue": 4,
+            "completed": 5,
+            "cancelled": 6,
+            "canceled": 6,
+        }
+        return mapping.get(normalized)
+
+    @staticmethod
+    def _sample_status_to_label(value: int | None) -> str:
+        mapping = {
+            1: "to_review",
+            2: "ready_to_ship",
+            3: "shipped",
+            4: "content_pending",
+            5: "completed",
+            6: "cancelled",
+        }
+        return mapping.get(int(value or 0), "unknown")
 
     @staticmethod
     def _bit_to_bool(value: object) -> bool:

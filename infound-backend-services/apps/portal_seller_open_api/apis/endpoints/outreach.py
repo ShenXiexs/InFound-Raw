@@ -84,6 +84,235 @@ async def ingest_outreach_results(
     return success_response(result)
 
 
+@router.get(
+    "/outreach/creator-filter-items",
+    response_model=APIResponse[dict],
+    response_model_by_alias=True,
+)
+async def get_outreach_creator_filter_items(
+    shopId: str,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+) -> APIResponse[dict]:
+    """
+    返回前端筛选列表所需的达人过滤配置（creator_filter_items）。
+    """
+    user_id = current_user_info.user_id
+
+    stmt = (
+        select(SellerTkShopPlatformSettings.creator_filter_items)
+        .select_from(SellerTkShops)
+        .join(
+            SellerTkShopPlatformSettings,
+            SellerTkShopPlatformSettings.id == SellerTkShops.shop_entry_id,
+        )
+        .where(
+            and_(
+                SellerTkShops.id == shopId,
+                SellerTkShops.user_id == user_id,
+                SellerTkShops.deleted == 0,
+                SellerTkShopPlatformSettings.is_active == 1,
+            )
+        )
+    )
+
+    result = await db.execute(stmt)
+    creator_filter_items = result.scalar_one_or_none()
+    if creator_filter_items is None:
+        return error_response(message="未找到店铺的达人筛选配置", code=404)
+
+    if isinstance(creator_filter_items, str):
+        try:
+            creator_filter_items = json.loads(creator_filter_items)
+        except (TypeError, ValueError) as exc:
+            logger.error("达人筛选配置 JSON 解析失败", exc_info=exc, shop_id=shopId, user_id=user_id)
+            return error_response(message="达人筛选配置格式错误", code=500)
+
+    if creator_filter_items is None:
+        creator_filter_items = {}
+    if not isinstance(creator_filter_items, dict):
+        logger.error(
+            "达人筛选配置类型错误（应为 dict）",
+            shop_id=shopId,
+            user_id=user_id,
+            actual_type=str(type(creator_filter_items)),
+        )
+        return error_response(message="达人筛选配置格式错误", code=500)
+
+    modules = creator_filter_items.get("modules") or []
+    if not isinstance(modules, list):
+        modules = []
+
+    # 将 creator_filter_items 里的 modules.filters 抽取成 {filter_key: filter_spec}
+    filter_map: dict[str, dict] = {}
+    for module in modules:
+        if not isinstance(module, dict):
+            continue
+        for f in module.get("filters") or []:
+            if not isinstance(f, dict):
+                continue
+            filter_key = f.get("filter_key")
+            if isinstance(filter_key, str) and filter_key.strip():
+                filter_map[filter_key] = f
+
+    # 前端 CreatorFilter 字段名 -> creator_filter_items 里的 filter_key
+    ui_field_to_filter_key = {
+        "productCategories": "productCategorySelections",
+        "avgCommissionRate": "avgCommissionRate",
+        "contentTypes": "contentType",
+        "creatorAgency": "creatorAgency",
+        "fastGrowing": "fastGrowing",
+        "notInvitedInPast90Days": "notInvitedInPast90Days",
+        "fansAgeRange": "followerAgeSelections",
+        "fansGender": "followerGender",
+        "fansCountRange": "followerCountRange",
+        "gmvRange": "gmvSelections",
+        "salesCountRange": "itemsSoldSelections",
+        "minAvgVideoViews": "averageViewsPerVideoMin",
+        "minAvgLiveViews": "averageViewersPerLiveMin",
+        "minEngagementRate": "engagementRateMinPercent",
+        "creatorEstimatedPublishRate": "estPostRate",
+        "coBranding": "brandCollaborationSelections",
+    }
+
+    def _to_options(option_items: object) -> list[dict]:
+        if not isinstance(option_items, list):
+            return []
+        options: list[dict] = []
+        for item in option_items:
+            if not isinstance(item, dict):
+                continue
+            options.append({"label": item.get("label"), "value": item.get("value")})
+        return options
+
+    def _extract_single_select_options(spec: dict) -> list[dict]:
+        return _to_options(spec.get("option_items") or [])
+
+    def _extract_multi_select_options(spec: dict) -> list[dict]:
+        return _to_options(spec.get("option_items") or [])
+
+    def _extract_checkbox_options(spec: dict) -> list[dict]:
+        return _to_options(spec.get("toggle_option_items") or [])
+
+    def _extract_cascader_tree(spec: dict) -> list[dict]:
+        option_tree = spec.get("option_tree") or []
+        return option_tree if isinstance(option_tree, list) else []
+
+    def _extract_range_input_options(spec: dict) -> dict:
+        input_items = spec.get("input_items") or []
+        preset_option_items = spec.get("preset_option_items") or []
+        if not isinstance(input_items, list):
+            input_items = []
+        if not isinstance(preset_option_items, list):
+            preset_option_items = []
+        return {"presetOptions": preset_option_items, "inputItems": input_items}
+
+    def _extract_threshold_input_options(spec: dict) -> dict:
+        input_items = spec.get("input_items") or []
+        preset_option_items = spec.get("preset_option_items") or []
+        toggle_option_items = spec.get("toggle_option_items") or []
+        if not isinstance(input_items, list):
+            input_items = []
+        if not isinstance(preset_option_items, list):
+            preset_option_items = []
+        if not isinstance(toggle_option_items, list):
+            toggle_option_items = []
+        return {
+            "presetOptions": preset_option_items,
+            "inputItems": input_items,
+            "toggleOptionItems": toggle_option_items,
+        }
+
+    creator_filter_options: dict[str, object] = {}
+
+    for ui_field, filter_key in ui_field_to_filter_key.items():
+        spec = filter_map.get(filter_key)
+        if not spec:
+            continue
+
+        filter_kind = spec.get("filter_kind")
+
+        if filter_kind == "cascader_multiple":
+            creator_filter_options[ui_field] = {"optionTree": _extract_cascader_tree(spec)}
+            continue
+
+        if filter_kind == "single_select":
+            creator_filter_options[ui_field] = {"options": _extract_single_select_options(spec)}
+            continue
+
+        if filter_kind == "multi_select":
+            creator_filter_options[ui_field] = {"options": _extract_multi_select_options(spec)}
+            continue
+
+        if filter_kind == "checkbox":
+            creator_filter_options[ui_field] = {"options": _extract_checkbox_options(spec)}
+            continue
+
+        if filter_kind == "range_input":
+            creator_filter_options[ui_field] = _extract_range_input_options(spec)
+            continue
+
+        if filter_kind == "threshold_input":
+            creator_filter_options[ui_field] = _extract_threshold_input_options(spec)
+            continue
+
+    # sortBy：由 sort_binding.option_map 生成
+    sort_binding = creator_filter_items.get("sort_binding") or {}
+    if not isinstance(sort_binding, dict):
+        sort_binding = {}
+    dsl_binding = sort_binding.get("dsl_binding") or {}
+    if not isinstance(dsl_binding, dict):
+        dsl_binding = {}
+    sort_option_map = dsl_binding.get("option_map") or {}
+    if not isinstance(sort_option_map, dict):
+        sort_option_map = {}
+    sort_options: list[dict] = []
+    for k, label in sort_option_map.items():
+        try:
+            sort_value = int(k) - 1
+        except Exception:
+            continue
+        sort_options.append({"label": label, "value": sort_value})
+    if sort_options:
+        sort_options = sorted(sort_options, key=lambda x: int(x.get("value", 0)))
+    creator_filter_options["sortBy"] = {"options": sort_options}
+
+    creators_fields = {
+        "productCategories",
+        "avgCommissionRate",
+        "contentTypes",
+        "creatorAgency",
+        "fastGrowing",
+        "notInvitedInPast90Days",
+    }
+    followers_fields = {
+        "fansAgeRange",
+        "fansGender",
+        "fansCountRange",
+    }
+    performance_fields = {
+        "gmvRange",
+        "salesCountRange",
+        "minAvgVideoViews",
+        "minAvgLiveViews",
+        "minEngagementRate",
+        "creatorEstimatedPublishRate",
+        "coBranding",
+        "sortBy",
+    }
+
+    def _pick_fields(options: dict[str, object], fields: set[str]) -> dict[str, object]:
+        return {k: v for k, v in options.items() if k in fields}
+
+    return success_response(
+        data={
+            "creators": {"filters": _pick_fields(creator_filter_options, creators_fields)},
+            "followers": {"filters": _pick_fields(creator_filter_options, followers_fields)},
+            "performance": {"filters": _pick_fields(creator_filter_options, performance_fields)},
+        }
+    )
+
+
 def _to_bit(value: bool) -> int:
     return 1 if value else 0
 
@@ -1335,6 +1564,29 @@ async def end_outreach_task(
         real_start = _to_utc(task_row.real_start_at)
         spend_time = max(int((now - real_start).total_seconds()), 0)
 
+    plan_row = (
+        await db.execute(
+            select(SellerTkRpaTaskPlans).where(
+                SellerTkRpaTaskPlans.id == task_id,
+                SellerTkRpaTaskPlans.user_id == user_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if plan_row is not None:
+        settings = get_settings(request)
+        notification_service = SellerRpaTaskNotificationService(settings)
+        try:
+            await notification_service.notify_task_cancelled(
+                plan_row,
+                payload={
+                    "rootTaskId": task_id,
+                    "cancelScope": "ROOT",
+                },
+            )
+        except Exception as exc:
+            logger.error("结束建联任务前 CANCEL_TASK 事件发送失败", exc_info=exc, task_id=task_id, user_id=user_id)
+
     update_stmt = (
         update(SellerTkOutreachSettings)
         .where(
@@ -1359,33 +1611,11 @@ async def end_outreach_task(
         await db.rollback()
         return error_response(message="任务已被更新，请刷新后重试", code=409)
 
-    plan_row = (
-        await db.execute(
-            select(SellerTkRpaTaskPlans).where(
-                SellerTkRpaTaskPlans.id == task_id,
-                SellerTkRpaTaskPlans.user_id == user_id,
-            )
-        )
-    ).scalar_one_or_none()
     if plan_row is not None:
         plan_row.status = TaskStatus.CANCELLED.value
         plan_row.end_time = now
         plan_row.last_modifier_id = user_id
         plan_row.last_modification_time = now
-
-    if plan_row is not None:
-        settings = get_settings(request)
-        notification_service = SellerRpaTaskNotificationService(settings)
-        try:
-            await notification_service.notify_task_cancelled(
-                plan_row,
-                payload={
-                    "rootTaskId": task_id,
-                    "cancelScope": "ROOT",
-                },
-            )
-        except Exception as exc:
-            logger.error("结束建联任务后 CANCEL_TASK 事件发送失败", exc_info=exc, task_id=task_id, user_id=user_id)
 
     await db.commit()
     if plan_row is not None:
