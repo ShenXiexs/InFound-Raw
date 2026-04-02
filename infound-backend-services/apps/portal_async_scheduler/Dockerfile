@@ -27,6 +27,7 @@ COPY packages/ /app/packages/
 
 # 复制当前服务代码（保持 apps 目录结构）
 COPY apps/portal_async_scheduler/ /app/apps/portal_async_scheduler/
+COPY apps/portal_seller_open_api/ /app/apps/portal_seller_open_api/
 
 # 使用 uv sync 命令安装依赖，并验证锁文件
 RUN uv sync --frozen --no-dev --package portal-async-scheduler
@@ -57,6 +58,7 @@ LABEL build_version=${BUILD_DATE}
 
 # 复制服务代码（保持 apps 目录结构）
 COPY apps/portal_async_scheduler/ /app/apps/portal_async_scheduler/
+COPY apps/portal_seller_open_api/ /app/apps/portal_seller_open_api/
 
 # 复制 packages（运行时依赖）
 COPY packages/ /app/packages/

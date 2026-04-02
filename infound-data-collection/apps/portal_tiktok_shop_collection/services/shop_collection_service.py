@@ -16,6 +16,10 @@ from common.core.exceptions import PlaywrightError
 from common.core.logger import get_logger
 from ..scripts import get_outreach_filter_script, has_outreach_filter_script
 from ..scripts.outreach_filter_base import OutreachFilterScript
+from ..scripts.outreach_filter_snapshot_export import (
+    build_creator_filter_items_payload,
+    derive_creator_filter_items_output_path,
+)
 
 logger = get_logger()
 
@@ -138,6 +142,7 @@ class ShopCollectionService:
             await self._open_page(home_url)
 
         filter_snapshot_path = ""
+        creator_filter_items_path = ""
         capture_filters = bool(
             payload.get(
                 "captureOutreachFilters",
@@ -164,6 +169,9 @@ class ShopCollectionService:
                     or self.default_capture_timeout_seconds
                 ),
             )
+            creator_filter_items_path = str(
+                derive_creator_filter_items_output_path(Path(filter_snapshot_path))
+            )
         elif capture_filters:
             self.logger.warning(
                 "Skip filter snapshot because manual login was not confirmed",
@@ -179,6 +187,7 @@ class ShopCollectionService:
             shop_type=account.shop_type,
             current_url=self.current_url,
             filter_snapshot_path=filter_snapshot_path or None,
+            creator_filter_items_path=creator_filter_items_path or None,
         )
         return {
             "accountName": account.name,
@@ -186,6 +195,7 @@ class ShopCollectionService:
             "shopType": account.shop_type,
             "currentUrl": self.current_url,
             "filterSnapshotPath": filter_snapshot_path,
+            "creatorFilterItemsPath": creator_filter_items_path,
         }
 
     async def initialize(self) -> None:
@@ -323,10 +333,21 @@ class ShopCollectionService:
                 json.dumps(payload, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            creator_filter_items_payload = build_creator_filter_items_payload(payload)
+            creator_filter_items_output_path = derive_creator_filter_items_output_path(output_path)
+            creator_filter_items_output_path.write_text(
+                json.dumps(creator_filter_items_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
             self.logger.info(
                 "Outreach filter snapshot saved",
                 output_path=str(output_path),
                 module_count=len(modules),
+            )
+            self.logger.info(
+                "Creator filter items snapshot saved",
+                output_path=str(creator_filter_items_output_path),
+                module_count=len(creator_filter_items_payload.get("modules", [])),
             )
             self.logger.info(
                 "Outreach search binding prepared",
@@ -674,6 +695,45 @@ class ShopCollectionService:
                   }
                 }
               }
+              const popupIndex = (node) => {
+                if (!(node instanceof Element)) return -1
+                const matched = (node.id || '').match(/(?:select|cascader|trigger)-popup-(\\d+)/)
+                if (!matched) return -1
+                return Number(matched[1] || -1)
+              }
+              const scoreRoot = (root) => {
+                if (!(root instanceof Element)) {
+                  return { popupIndex: -1, optionCount: -1, inputCount: -1 }
+                }
+                const optionCount = spec.option_selector
+                  ? collectMatches(root, spec.option_selector).length
+                  : 0
+                const inputSelector = [spec.input_selector, spec.min_selector, spec.max_selector]
+                  .filter(Boolean)
+                  .join(',')
+                const inputCount = inputSelector
+                  ? collectMatches(root, inputSelector).length
+                  : 0
+                return {
+                  popupIndex: popupIndex(root),
+                  optionCount,
+                  inputCount
+                }
+              }
+              candidateRoots.sort((left, right) => {
+                const leftScore = scoreRoot(left)
+                const rightScore = scoreRoot(right)
+                if (leftScore.popupIndex !== rightScore.popupIndex) {
+                  return leftScore.popupIndex - rightScore.popupIndex
+                }
+                if (leftScore.optionCount !== rightScore.optionCount) {
+                  return leftScore.optionCount - rightScore.optionCount
+                }
+                if (leftScore.inputCount !== rightScore.inputCount) {
+                  return leftScore.inputCount - rightScore.inputCount
+                }
+                return 0
+              })
               const activeRoot = candidateRoots.at(-1) || null
               const queryVisible = (selector) => {
                 if (!selector) return []
@@ -759,6 +819,21 @@ class ShopCollectionService:
                 .join(',')
               const inputNodes = inputSelector ? queryVisible(inputSelector) : []
               const checkboxNodes = spec.checkbox_label_selector ? queryVisible(spec.checkbox_label_selector) : []
+              const buttonTexts = (() => {
+                const scope = activeRoot || document
+                const nodes = collectMatches(scope, 'button, [role="button"], label')
+                const seenTexts = new Set()
+                const texts = []
+                for (const node of nodes) {
+                  const text = normalize(node.textContent)
+                  if (!text || text.length > 80) continue
+                  const token = matchKey(text)
+                  if (!token || seenTexts.has(token)) continue
+                  seenTexts.add(token)
+                  texts.push(text)
+                }
+                return texts
+              })()
 
               return {
                 container_selector: spec.panel_selector || spec.wait_selector || spec.scroll_container_selector || '',
@@ -776,6 +851,7 @@ class ShopCollectionService:
                   label: normalize(node.textContent),
                   dom_path: domPath(node)
                 })),
+                button_texts: buttonTexts,
                 body_text_preview: normalize(document.body?.innerText || '').slice(0, 500)
               }
             }
@@ -1086,6 +1162,7 @@ class ShopCollectionService:
         options = snapshot.get("options") or []
         inputs = snapshot.get("inputs") or []
         checkbox_labels = snapshot.get("checkbox_labels") or []
+        button_texts = snapshot.get("button_texts") or []
         option_preview = [
             str(item.get("label") or item.get("value") or "").strip()
             for item in options
@@ -1108,6 +1185,8 @@ class ShopCollectionService:
             "input_preview": input_preview,
             "checkbox_count": len(checkbox_labels),
             "checkbox_preview": checkbox_preview,
+            "button_count": len(button_texts),
+            "button_preview": [str(item).strip() for item in button_texts if str(item).strip()][:6],
             "active_root_dom_path": snapshot.get("active_root_dom_path"),
         }
         if "found" in snapshot:

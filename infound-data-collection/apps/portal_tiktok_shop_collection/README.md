@@ -32,13 +32,20 @@ https://affiliate.tiktok.com/connection/creator?shop_region=<REGION>
    - filter titles
    - visible options
    - input/checkbox metadata
+   - button/preset texts when present
    - DSL binding hints aligned with `infound-desktop-client-master/apps/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts`
+6. Export a DB-ready `creator_filter_items` JSON that keeps the DSL bindings and also lists all captured filter option items, presets, and toggle items per filter.
 
 The JSON snapshot is written to:
 
 ```text
 apps/portal_tiktok_shop_collection/data/outreach-filter-snapshots/
 ```
+
+Each capture now produces two files in the same directory:
+
+- `outreach_filters_<region>_<account>_<timestamp>.json`: raw page capture
+- `creator_filter_items_<region>_<account>_<timestamp>.json`: normalized export for the `creator_filter_items` table field
 
 ## Default startup
 

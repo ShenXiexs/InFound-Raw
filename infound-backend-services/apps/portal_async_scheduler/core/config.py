@@ -1,9 +1,7 @@
 from pydantic import Field
 
-from core_base import BaseAppSettings
+from apps.portal_seller_open_api.core.config import Settings as SellerOpenApiSettings
 from core_base.settings import SettingsBase
-from core_redis.redis_setting import RedisSettings
-from shared_domain.mysql_setting import MySQLSettings
 
 
 class SchedulerExecutorSettings(SettingsBase):
@@ -29,7 +27,5 @@ class SchedulerSettings(SettingsBase):
     )
 
 
-class Settings(BaseAppSettings):
-    mysql: MySQLSettings = Field(default_factory=MySQLSettings)
-    redis: RedisSettings = Field(default_factory=RedisSettings)
+class Settings(SellerOpenApiSettings):
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)

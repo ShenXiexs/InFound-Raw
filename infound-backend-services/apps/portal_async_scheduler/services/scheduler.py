@@ -57,7 +57,7 @@ def initialize_scheduler(logger: structlog.stdlib.BoundLogger, settings: Setting
     scheduler = AsyncIOScheduler(
         executors=executors,
         job_defaults=job_defaults,
-        timezone=settings.scheduler.timezone,
+        timezone=str(settings.scheduler.timezone),
     )
 
     logger.info("Scheduler initialized successfully")

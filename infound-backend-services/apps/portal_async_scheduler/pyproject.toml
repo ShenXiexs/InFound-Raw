@@ -4,9 +4,11 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
 dependencies = [
+    "aio-pika>=9.6.1",
     "apscheduler>=3.11.2",
     "core-base",
     "core-redis",
+    "core-web",
     "shared-application-services",
     "shared-domain",
     "shared-infrastructure",
@@ -15,6 +17,7 @@ dependencies = [
 [tool.uv.sources]
 core-base = { workspace = true }
 core-redis = { workspace = true }
+core-web = { workspace = true }
 shared-application-services = { workspace = true }
 shared-domain = { workspace = true }
 shared-infrastructure = { workspace = true }

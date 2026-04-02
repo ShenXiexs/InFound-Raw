@@ -6,7 +6,9 @@ from pathlib import Path
 
 from apps.portal_async_scheduler.core.config import Settings
 from apps.portal_async_scheduler.services.scheduler import initialize_scheduler, register_tasks
+from apps.portal_seller_open_api.core.rabbitmq_producer import RabbitMQProducer
 from core_base import SettingsFactory, get_logger
+from core_redis import RedisClientManager
 from shared_domain import DatabaseManager
 
 
@@ -38,14 +40,15 @@ async def main() -> None:
     )
 
     DatabaseManager.initialize(settings.mysql)
+    RedisClientManager.initialize(settings.redis)
+
+    # 创建事件
+    shutdown_event = Event()
+
+    # 注册信号处理（只传 event，不传 logger）
+    handle_signals(shutdown_event)
 
     try:
-        # 创建事件
-        shutdown_event = Event()
-
-        # 注册信号处理（只传 event，不传 logger）
-        handle_signals(shutdown_event)
-
         # 启动消费者
         scheduler = initialize_scheduler(logger, settings)
 
@@ -59,7 +62,6 @@ async def main() -> None:
             # 主循环
             while not shutdown_event.is_set():
                 try:
-                    # 做你的工作...
                     await asyncio.wait_for(
                         shutdown_event.wait(),
                         timeout=1.0
@@ -69,27 +71,24 @@ async def main() -> None:
 
             # 收到信号，执行清理逻辑
             logger.info("Shutdown signal received, cleaning up...")
-            # 在这里执行清理操作、关闭连接等
 
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
             raise
-        finally:
-            logger.info("Scheduler stopped")
 
     except Exception as e:
-        # 任何启动阶段的异常都会被捕获并记录
         logger.critical("Application startup failed", exc_info=e)
-        # 确保进程以错误状态退出
         sys.exit(1)
     finally:
+        logger.info("Scheduler stopped")
+        await RabbitMQProducer.close()
+        RedisClientManager.close()
+        await DatabaseManager.close()
         logger.info("All resources cleaned up, application exited.")
 
 
 if __name__ == "__main__":
     try:
-        # 如果在 asyncio.run 之外发生异常，也会被顶层 except 捕获
         asyncio.run(main())
     except Exception:
-        # 顶层异常处理已经交给 main() 内部的 try/except
         pass
