@@ -1,0 +1,3 @@
+provider: generic
+url: https://download.stg.xunda.club/
+updaterCacheDirName: xunda-updater

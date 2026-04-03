@@ -40,8 +40,7 @@
     "radash": "^12.1.1",
     "reflect-metadata": "^0.2.2",
     "vfonts": "^0.0.3",
-    "ws": "^8.19.0",
-    "xlsx": "^0.18.5"
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
