@@ -32,7 +32,7 @@ const handleTabsUpdated = (data: { activeId: string; tabs: Tab[] }): void => {
   activeId.value = data.activeId || (data.tabs.length > 0 ? data.tabs[0].id : '')
   const active = data.tabs.find((t) => t.id === activeId.value)
 
-  address.value = '寻达内部处理页' //暂定
+  address.value = ''
 
   if (active && active.type != TAB_TYPES.XUNDA) {
     address.value = active.url
@@ -71,6 +71,26 @@ const handleClose = async (id: string): Promise<void> => {
 const goBack = async (): Promise<void> => await window.ipc.invoke(IPC_CHANNELS.TABS_NAVIGATE_BACK)
 const goForward = async (): Promise<void> => await window.ipc.invoke(IPC_CHANNELS.TABS_NAVIGATE_FORWARD)
 const reload = async (): Promise<void> => await window.ipc.invoke(IPC_CHANNELS.TABS_NAVIGATE_RELOAD)
+const openOutreach = async (): Promise<void> => {
+  try {
+    const result = await window.ipc.invoke(IPC_CHANNELS.TABS_OPEN_OUTREACH)
+    if (!result?.success) {
+      window.logger.error('打开一键建联页面失败', result?.error)
+    }
+  } catch (error) {
+    window.logger.error('打开一键建联页面失败', error)
+  }
+}
+const openFulfillment = async (): Promise<void> => {
+  try {
+    const result = await window.ipc.invoke(IPC_CHANNELS.TABS_OPEN_FULFILLMENT)
+    if (!result?.success) {
+      window.logger.error('打开履约管理页面失败', result?.error)
+    }
+  } catch (error) {
+    window.logger.error('打开履约管理页面失败', error)
+  }
+}
 
 // 下拉菜单
 // const showTabsMenu = async (event: MouseEvent): Promise<void> => {
@@ -197,7 +217,7 @@ onMounted(async () => {
       const duration = 100 // 动画时长（毫秒）
       const startTime = performance.now()
 
-      const animateScroll = (now: number) => {
+      const animateScroll = (now: number): void => {
         const elapsed = now - startTime
         const progress = Math.min(1, elapsed / duration)
         const newScroll = start + (end - start) * progress
@@ -223,10 +243,10 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateScrollButtons)
 })
 
-const onDropdownClick = async (event: MouseEvent) => {
+const onDropdownClick = (event: MouseEvent): void => {
   const x = event.screenX
   const y = event.screenY
-  await window.ipc.send(IPC_CHANNELS.TABS_CREATE_TAB_MENU, x, y)
+  window.ipc.send(IPC_CHANNELS.TABS_CREATE_TAB_MENU, x, y)
 }
 </script>
 
@@ -325,13 +345,13 @@ const onDropdownClick = async (event: MouseEvent) => {
             <n-input id="urlAddress" v-model:value="address" disabled placeholder="" />
           </div>
           <div class="nav-right">
-            <n-button text>
+            <n-button text @click="openOutreach">
               <div class="icon-text-btn">
                 <n-icon><i-hugeicons-connect /></n-icon>
                 <span class="btn-text">一键建联</span>
               </div>
             </n-button>
-            <n-button text>
+            <n-button text @click="openFulfillment">
               <div class="icon-text-btn">
                 <n-icon><i-hugeicons-target-01 /></n-icon>
                 <span class="btn-text">履约管理</span>
@@ -362,6 +382,7 @@ const onDropdownClick = async (event: MouseEvent) => {
 .app-container {
   height: 100vh;
 }
+
 /* 第一行TabBar */
 .header {
   .header-center {
@@ -419,8 +440,8 @@ const onDropdownClick = async (event: MouseEvent) => {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  height: 32px;
-  margin-top: 8px;
+  height: 36px;
+  margin-top: 4px;
   align-items: center;
   justify-content: center;
   margin-right: 2px;
@@ -432,8 +453,8 @@ const onDropdownClick = async (event: MouseEvent) => {
     right: -6px;
     top: 50%;
     transform: translateY(-50%);
-    color: #ccc;
-    font-size: 12px;
+    color: #aaa;
+    font-size: 16px;
   }
 
   /* 隐藏分隔线的条件 */
@@ -452,20 +473,15 @@ const onDropdownClick = async (event: MouseEvent) => {
     border-radius: 12px;
     transition: background 0.1s;
     background: transparent;
-    padding-left: 8px;
-    padding-right: 8px;
-    padding-top: 6px;
-    padding-bottom: 4px;
+    padding: 4px 8px;
   }
 
   &:hover .tab-inner {
-    //background: rgba(0, 0, 0, 0.04);
     background: rgba(0, 0, 0, 0.08);
   }
 
   &.active {
-    background-color: #ffffff !important;
-    border-color: #ccc !important;
+    background: #f9f9f9;
     border: 1px solid #ccc;
     border-bottom: none;
     border-radius: 6px 6px 0 0;
@@ -486,10 +502,7 @@ const onDropdownClick = async (event: MouseEvent) => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
-    font-weight: 500;
-    color: #333;
-    line-height: 1.2;
+    font-size: 14px;
   }
 
   .close {
@@ -532,7 +545,7 @@ const onDropdownClick = async (event: MouseEvent) => {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  background: #fff;
+  background: #f9f9f9;
   border-bottom: 1px solid #aaa;
   flex-shrink: 0;
 

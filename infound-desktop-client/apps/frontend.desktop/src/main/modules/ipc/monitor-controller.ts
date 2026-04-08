@@ -1,6 +1,7 @@
-import { IPC_CHANNELS } from '@common/types/ipc-type'
-import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
+import { IPCHandle } from './base/ipc-decorator'
 import { TkShopTabItemSetting } from '@common/types/tk-type'
+import { Tab } from '@common/types/tab-type'
 import WebContents = Electron.WebContents
 
 export class MonitorController {
@@ -40,7 +41,7 @@ export class MonitorController {
   }
 
   @IPCHandle(IPCGateway.MONITOR, IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED, IPCType.ON)
-  syncTabsUpdated(_webContents: WebContents, _payload: { activeId: string; tabs: any[] }): void {
+  syncTabsUpdated(_webContents: WebContents, _payload: { activeId: string; tabs: Tab[] }): void {
     // 这个方法在 register 之后会被自动替换为 webContents.send 逻辑
   }
 

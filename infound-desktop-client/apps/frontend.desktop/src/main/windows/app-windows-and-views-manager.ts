@@ -45,7 +45,7 @@ class AppWindowsAndViewsManager {
   }
 
   public async initMainWindow(): Promise<void> {
-    await this._mainWindow?.initWindow()
+    this._mainWindow?.initWindow()
   }
 
   public mainWindowResize(): void {

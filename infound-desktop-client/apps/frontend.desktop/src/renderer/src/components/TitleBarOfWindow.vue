@@ -57,6 +57,30 @@ const onSelectUserMenu = async (key: string | number): Promise<void> => {
     return
   }
 
+  if (key === 'profile') {
+    try {
+      const result = await window.ipc.invoke(IPC_CHANNELS.APP_OPEN_EMBED_MODAL, '/settings?tab=profile')
+      if (!result?.success) {
+        message.warning(result?.error || '打开设置失败')
+      }
+    } catch {
+      message.error('打开设置失败')
+    }
+    return
+  }
+
+  if (key === 'membership') {
+    try {
+      const result = await window.ipc.invoke(IPC_CHANNELS.APP_OPEN_EMBED_MODAL, '/settings?tab=permissions')
+      if (!result?.success) {
+        message.warning(result?.error || '打开设置失败')
+      }
+    } catch {
+      message.error('打开设置失败')
+    }
+    return
+  }
+
   message.info('功能开发中')
 }
 </script>

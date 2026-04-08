@@ -11,10 +11,7 @@
       "@desktop-rpa/*": ["../../packages/frontend.desktop.rpa/src/*"],
       "@infound/desktop-base": ["../../packages/frontend.desktop.base/src/index.ts"],
       "@infound/desktop-electron": ["../../packages/frontend.desktop.electron/src/index.ts"],
-      "naive-ui": ["node_modules/naive-ui"],
-      "pino-roll": ["../../packages/frontend.desktop.electron/src/types/pino-roll.d.ts"],
-      "playwright-core": ["node_modules/playwright-core"],
-      "xlsx": ["../../packages/frontend.desktop.rpa/src/types/xlsx.d.ts"]
+      "pino-roll": ["../../packages/frontend.desktop.electron/src/types/pino-roll.d.ts"]
     },
     "module": "ESNext",
     "target": "ESNext",

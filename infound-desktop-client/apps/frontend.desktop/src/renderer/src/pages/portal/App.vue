@@ -21,14 +21,7 @@ const hasValidLocalSession = (): boolean => {
   const username = currentUser?.username?.trim()
   const tokenName = currentUser?.tokenName?.trim()
   const tokenValue = currentUser?.tokenValue?.trim()
-  return Boolean(
-    rendererStore.currentState.isLogin &&
-      userId &&
-      userId !== PLACEHOLDER_USER_ID &&
-      username &&
-      tokenName &&
-      tokenValue
-  )
+  return Boolean(rendererStore.currentState.isLogin && userId && userId !== PLACEHOLDER_USER_ID && username && tokenName && tokenValue)
 }
 
 const forceBackToLogin = async (): Promise<void> => {

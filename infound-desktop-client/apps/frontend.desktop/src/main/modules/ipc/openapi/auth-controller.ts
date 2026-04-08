@@ -1,6 +1,6 @@
 import { CurrentUserInfo } from '@infound/desktop-base'
-import { IPC_CHANNELS } from '@common/types/ipc-type'
-import { IPCGateway, IPCHandle, IPCType } from '../base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
+import { IPCHandle } from '../base/ipc-decorator'
 import { checkTokenAsync, getCurrentUserAsync, loginAsync } from '../../../services/user-service'
 import { logger } from '../../../utils/logger'
 import { globalState } from '../../state/global-state'

@@ -3,6 +3,23 @@ import { LoggerLevel } from '@infound/desktop-electron'
 import { TkShopOpenWindowPayload, TkShopSetting } from '@common/types/tk-type'
 import { Tab } from '@common/types/tab-type'
 
+export enum IPCGateway {
+  APP = 'gateway:app',
+  MONITOR = 'gateway:monitor',
+  TK = 'gateway:tk',
+  TAB = 'gateway:tab',
+  RPA = 'gateway:rpa',
+  API = 'gateway:api',
+  WS = 'gateway:ws'
+}
+
+export enum IPCType {
+  INVOKE = 'invoke', // 渲染进程通过 invoke 调用主进程 (双向)
+  ON = 'on', // 渲染进程通过 on 持续监听主进程 (由主进程发送)
+  SEND = 'send', // 渲染进程通过 send 发送消息，主进程不需要返回值 (单向)
+  ONCE = 'once' // 渲染进程只监听一次，由主进程发送
+}
+
 export const IPC_CHANNELS = {
   APP_LOGGER: 'app-logger',
   APP_MINIMIZED: 'app-minimized',
@@ -16,6 +33,10 @@ export const IPC_CHANNELS = {
   APP_OPEN_WINDOW_DEV_TOOLS: 'app-open-window-dev-tools',
   APP_OPEN_SUB_WINDOW_DEV_TOOLS: 'app-open-sub-window-dev-tools',
   APP_OPEN_EXTERNAL_LINK: 'app-open-external-link',
+  /** 模态 BrowserWindow 打开独立部署的 embed 页（如设置），挂靠在调用方窗口下 */
+  APP_OPEN_EMBED_MODAL: 'app-open-embed-modal',
+  /** 关闭由 APP_OPEN_EMBED_MODAL 打开的模态 embed 窗口（由 embed 页内「关闭」调用） */
+  APP_CLOSE_EMBED_MODAL: 'app-close-embed-modal',
 
   APP_UPDATE_INFO: 'app-update-info',
   APP_UPDATE_CHECK: 'app-update-check',
@@ -43,6 +64,10 @@ export const IPC_CHANNELS = {
   TABS_NAVIGATE_BACK: 'tabs-navigate-back',
   TABS_NAVIGATE_FORWARD: 'tabs-navigate-forward',
   TABS_NAVIGATE_RELOAD: 'tabs-navigate-reload',
+  TABS_OPEN_OUTREACH: 'tabs-open-outreach',
+  TABS_OPEN_FULFILLMENT: 'tabs-open-fulfillment',
+  /** 在 embed 标签中打开指定 hash 路径，如 `/settings?tab=profile`；主窗口调用时会落到已打开的店铺窗口 */
+  TABS_OPEN_EMBED: 'tabs-open-embed',
   TABS_SHOW_ITEMS_MENU: 'tabs-show-items-menu',
   TABS_REORDER_ITEMS: 'tabs-reorder-items',
 
@@ -61,6 +86,7 @@ export const IPC_CHANNELS = {
   RENDERER_MONITOR_TK_SHOP_ALL_TAB_ITEM_SETTINGS_SYNC: 'renderer-monitor-tk-shop-all-tab-item-settings-sync',
   RENDERER_MONITOR_TABS_UPDATED: 'renderer-monitor-tabs-updated',
   RENDERER_MONITOR_TABS_NAVIGATION_STATE: 'renderer-monitor-tabs-navigation-state'
+  //RENDERER_MONITOR_TABS_MENU_INIT: 'renderer-monitor-tabs-menu-init'
 } as const
 
 export type IPCChannelKey = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -78,6 +104,8 @@ export interface AppProtocol {
   [IPC_CHANNELS.APP_OPEN_WINDOW_DEV_TOOLS]: { params: [number, 'left' | 'right' | 'bottom' | 'undocked' | 'detach']; return: void }
   [IPC_CHANNELS.APP_OPEN_SUB_WINDOW_DEV_TOOLS]: { params: [number, 'left' | 'right' | 'bottom' | 'undocked' | 'detach']; return: void }
   [IPC_CHANNELS.APP_OPEN_EXTERNAL_LINK]: { params: [string]; return: void }
+  [IPC_CHANNELS.APP_OPEN_EMBED_MODAL]: { params: [hashPath: string]; return: { success: boolean; error?: string } }
+  [IPC_CHANNELS.APP_CLOSE_EMBED_MODAL]: { params: []; return: { success: boolean } }
 
   [IPC_CHANNELS.APP_UPDATE_INFO]: { params: []; return: { success: boolean; data?: AppReleaseInfo; error?: string } }
   [IPC_CHANNELS.APP_UPDATE_CHECK]: { params: []; return: { success: boolean; data?: AppReleaseInfo; error?: string } }
@@ -116,6 +144,7 @@ export interface AppProtocol {
         regionName: string
         shopType: 'LOCAL' | 'CROSS_BORDER'
         loginUrl: string
+        homeUrl: string
       }[]
       error?: string
     }
@@ -138,6 +167,7 @@ export interface AppProtocol {
         regionName: string
         shopType: 'LOCAL' | 'CROSS_BORDER'
         loginUrl: string
+        homeUrl: string
       }[]
       error?: string
     }
@@ -160,6 +190,9 @@ export interface AppProtocol {
   [IPC_CHANNELS.TABS_NAVIGATE_BACK]: { params: []; return: void }
   [IPC_CHANNELS.TABS_NAVIGATE_FORWARD]: { params: []; return: void }
   [IPC_CHANNELS.TABS_NAVIGATE_RELOAD]: { params: []; return: void }
+  [IPC_CHANNELS.TABS_OPEN_OUTREACH]: { params: []; return: { success: boolean; error?: string } }
+  [IPC_CHANNELS.TABS_OPEN_FULFILLMENT]: { params: []; return: { success: boolean; error?: string } }
+  [IPC_CHANNELS.TABS_OPEN_EMBED]: { params: [hashPath: string]; return: { success: boolean; error?: string } }
   [IPC_CHANNELS.TABS_SHOW_ITEMS_MENU]: { params: [x: number, y: number]; return: void }
   [IPC_CHANNELS.TABS_REORDER_ITEMS]: { params: [orderedIds: string[]]; return: void }
 
@@ -184,6 +217,8 @@ export interface IPCAPI {
   invoke<K extends keyof AppProtocol>(channel: K, ...args: AppProtocol[K]['params']): Promise<AppProtocol[K]['return']>
 
   send<K extends keyof AppProtocol>(channel: K, ...args: AppProtocol[K]['params']): void
+
+  sendDirect<K extends keyof AppProtocol>(channel: K, ...args: AppProtocol[K]['params']): void
 
   on<K extends keyof AppProtocol>(channel: K, callback: (...args: AppProtocol[K]['params']) => void): () => void
 

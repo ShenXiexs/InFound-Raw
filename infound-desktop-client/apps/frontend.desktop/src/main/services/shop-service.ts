@@ -10,6 +10,7 @@ export interface ShopEntryInfo {
   regionName: string
   shopType: ShopTypeCode
   loginUrl: string
+  homeUrl: string
 }
 
 export interface ShopListInfo {
@@ -22,6 +23,7 @@ export interface ShopListInfo {
   regionName: string
   shopType: ShopTypeCode
   loginUrl: string
+  homeUrl: string
 }
 
 export interface AddShopPayload {

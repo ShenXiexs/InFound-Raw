@@ -4,9 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "dev": "vite --mode dev --host 127.0.0.1 --port 3000 --strictPort",
+    "dev:stg": "vite --mode stg --host 127.0.0.1 --port 3000 --strictPort",
+    "dev:pro": "vite --mode pro --host 127.0.0.1 --port 3000 --strictPort",
+    "build": "vue-tsc -b && vite build --mode dev",
+    "build:stg": "vue-tsc -b && vite build --mode stg",
+    "build:pro": "vue-tsc -b && vite build --mode pro",
+    "preview": "vite preview --mode dev",
+    "preview:stg": "vite preview --mode stg",
+    "preview:pro": "vite preview --mode pro"
   },
   "dependencies": {
     "axios": "^1.13.6",

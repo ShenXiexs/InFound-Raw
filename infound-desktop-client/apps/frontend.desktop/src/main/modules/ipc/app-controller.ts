@@ -1,6 +1,7 @@
-import { IPC_CHANNELS } from '@common/types/ipc-type'
-import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
+import { IPCHandle } from './base/ipc-decorator'
 import { BrowserWindow, shell } from 'electron'
+import { embedModalWindowManager } from '../../windows/embed-modal-window'
 
 export class AppController {
   @IPCHandle(IPCGateway.APP, IPC_CHANNELS.APP_MINIMIZED, IPCType.SEND)
@@ -44,6 +45,24 @@ export class AppController {
   async onOpenExternalLink(_event: any, url: string): Promise<void> {
     if (!url?.trim()) return
     await shell.openExternal(url)
+  }
+
+  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.APP_OPEN_EMBED_MODAL, IPCType.INVOKE)
+  async openEmbedModal(
+    event: Electron.IpcMainInvokeEvent,
+    hashPath: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const parent = BrowserWindow.fromWebContents(event.sender)
+    if (!parent || parent.isDestroyed()) {
+      return { success: false, error: '未找到父窗口' }
+    }
+    return await embedModalWindowManager.open(parent, hashPath)
+  }
+
+  @IPCHandle(IPCGateway.APP, IPC_CHANNELS.APP_CLOSE_EMBED_MODAL, IPCType.INVOKE)
+  async closeEmbedModal(event: Electron.IpcMainInvokeEvent): Promise<{ success: boolean }> {
+    embedModalWindowManager.closeFromWebContents(event.sender)
+    return { success: true }
   }
 
   @IPCHandle(IPCGateway.APP, IPC_CHANNELS.APP_GET_WINDOW_ID, IPCType.INVOKE)

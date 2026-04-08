@@ -1,4 +1,5 @@
 import { TkShopSetting } from '@common/types/tk-type'
+import { TAB_TYPES } from '@common/app-constants'
 import { TkShopWindow } from './tk-shop-window'
 import { logger } from '../utils/logger'
 
@@ -36,5 +37,35 @@ export class TkShopWindowManager {
       return null
     }
     return this.tkShopSettings[tkShopSettingId]
+  }
+
+  /**
+   * 在任意已打开的店铺窗口中打开 embed 标签（用于主窗口无 TkTabItemManager 时的回退）
+   */
+  public async openEmbedTab(buildUrl: (shopId: string) => Promise<string>): Promise<{ success: boolean; error?: string }> {
+    const ids = Object.keys(this.tkShopWindows)
+    if (ids.length === 0) {
+      return { success: false, error: '请先打开店铺窗口' }
+    }
+
+    for (const id of ids) {
+      const tkWin = this.tkShopWindows[id]
+      const shopId = this.tkShopSettings[id]?.id
+      if (!tkWin?.tabItemManager || !shopId) {
+        continue
+      }
+
+      try {
+        const url = await buildUrl(shopId)
+        await tkWin.tabItemManager.openTabItem(url, TAB_TYPES.XUNDA)
+        tkWin.showWindow()
+        return { success: true }
+      } catch (error: any) {
+        logger.error(`[EmbedTab] 打开 embed 失败 shop=${id}`, error)
+        return { success: false, error: error?.message || '打开页面失败' }
+      }
+    }
+
+    return { success: false, error: '店铺窗口未就绪' }
   }
 }

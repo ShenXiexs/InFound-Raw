@@ -33,7 +33,6 @@ export class TkShopWindow {
       show: false,
       frame: false,
       autoHideMenuBar: true,
-      backgroundColor: '#FCFCFC',
       maximizable: true,
       minimizable: true,
       resizable: true,
@@ -88,9 +87,9 @@ export class TkShopWindow {
     this.baseWindow.setMenu(null)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      await this.baseWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/tkshop.html`)
+      this.baseWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/tkshop.html`).then(() => {})
     } else {
-      await this.baseWindow.loadFile(path.join(getFilePath(), '../renderer/tkshop.html'))
+      this.baseWindow.loadFile(path.join(getFilePath(), '../renderer/tkshop.html')).then(() => {})
     }
 
     if (this.baseWindow.isVisible()) {

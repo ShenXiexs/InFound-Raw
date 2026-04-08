@@ -3,6 +3,7 @@ export interface TkShopSetting {
   name: string
   region: string
   loginUrl: string
+  homeUrl: string
   windowId: number
   osWinAppId: string
   loginHeaders: string
@@ -28,4 +29,5 @@ export interface TkShopOpenWindowPayload {
   name: string
   region: string
   loginUrl: string
+  homeUrl: string
 }

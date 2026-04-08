@@ -1,5 +1,5 @@
-import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
-import { IPC_CHANNELS } from '@common/types/ipc-type'
+import { IPCHandle } from './base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
 import { appWindowsAndViewsManager } from '../../windows/app-windows-and-views-manager'
 import { logger } from '../../utils/logger'
 import type { TkShopOpenWindowPayload, TkShopSetting } from '@common/types/tk-type'
@@ -19,7 +19,8 @@ export class TkShopController {
       id: payload.id,
       name: payload.name,
       region: payload.region,
-      loginUrl: payload.loginUrl
+      loginUrl: payload.loginUrl,
+      homeUrl: payload.homeUrl
     } as TkShopSetting
     await appWindowsAndViewsManager.tkShopWindowManager.openWindow(tkShopSetting)
   }

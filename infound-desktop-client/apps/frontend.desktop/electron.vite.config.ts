@@ -25,8 +25,7 @@ export default defineConfig({
     resolve: {
       alias: {
         '@main': resolve(__dirname, 'src/main'),
-        '@common': resolve(__dirname, 'src/common'),
-        '@desktop-rpa': resolve(__dirname, '../../packages/frontend.desktop.rpa/src')
+        '@common': resolve(__dirname, 'src/common')
       }
     }
   },
@@ -37,7 +36,6 @@ export default defineConfig({
           index: resolve(__dirname, 'src/preload/index.ts'),
           tabMenu: resolve(__dirname, 'src/preload/tab-menu-preload.ts') // 新增入口
         },
-        // external: [],
         output: {
           format: 'cjs',
           entryFileNames: (chunkInfo) => {
@@ -46,11 +44,14 @@ export default defineConfig({
             return '[name].cjs'
           }
         }
-      }
+      },
+      isolatedEntries: true,
+      externalizeDeps: false
     },
     resolve: {
       alias: {
-        '@common': resolve(__dirname, 'src/common')
+        '@common': resolve(__dirname, 'src/common'),
+        '@infound/desktop-electron': resolve(__dirname, '../../packages/frontend.desktop.electron/src/index.ts')
       }
     }
   },
@@ -58,7 +59,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@common': resolve(__dirname, 'src/common'),
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
+        '@infound/desktop-electron': resolve(__dirname, '../../packages/frontend.desktop.electron/src/index.ts')
       }
     },
     build: {
@@ -70,12 +72,13 @@ export default defineConfig({
           index: resolve(__dirname, 'src/renderer/index.html'),
           tkshop: resolve(__dirname, 'src/renderer/tkshop.html'),
           universal: resolve(__dirname, 'src/renderer/universal.html'),
+          tabMenu: resolve(__dirname, 'src/renderer/tab-menu.html'),
           tabMenuTemplate: resolve(__dirname, 'src/renderer/tab-menu-template.html'),
-          tabMenuPreload: resolve(__dirname, 'src/renderer/universal.html'),
           updater: resolve(__dirname, 'src/renderer/updater.html')
           //login: resolve(__dirname, 'src/renderer/login.html')
         }
-      }
+      },
+      isolatedEntries: true
     },
     plugins: [
       vue(),
@@ -94,7 +97,7 @@ export default defineConfig({
             // 指定图标集前缀，hugeicons 对应的前缀是 hi
             prefix: 'i',
             // 预设图标集，这里指定 hugeicons
-            enabledCollections: ['hugeicons']
+            enabledCollections: ['hugeicons', 'circle-flags']
           }),
           NaiveUiResolver()
         ]

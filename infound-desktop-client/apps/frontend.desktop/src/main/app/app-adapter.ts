@@ -82,7 +82,7 @@ export class AppAdapter {
         logger.info('有新版本可用')
         globalState.currentState.isUpdating = true
         appWindowsAndViewsManager.splashWindow.closeWindow()
-        await appWindowsAndViewsManager.updaterWindow.initWindow()
+        appWindowsAndViewsManager.updaterWindow.initWindow()
       }
     } catch (err) {
       logger.error('更新检查失败:', err)

@@ -34,8 +34,7 @@
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "reflect-metadata": "^0.2.2",
-    "vfonts": "^0.0.3",
-    "xlsx": "^0.18.5"
+    "vfonts": "^0.0.3"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",

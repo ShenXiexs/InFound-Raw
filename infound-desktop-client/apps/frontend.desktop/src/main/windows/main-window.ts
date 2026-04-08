@@ -14,7 +14,7 @@ export class MainWindow {
     this.baseWindow = null
   }
 
-  public async initWindow(): Promise<BrowserWindow> {
+  public initWindow(): BrowserWindow {
     const primaryDisplay = screen.getPrimaryDisplay()
     const { workArea } = primaryDisplay
 
@@ -86,9 +86,9 @@ export class MainWindow {
     this.baseWindow.setMenu(null)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      await this.baseWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      this.baseWindow.loadURL(process.env['ELECTRON_RENDERER_URL']).then(() => {})
     } else {
-      await this.baseWindow.loadFile(path.join(getFilePath(), '../renderer/index.html'))
+      this.baseWindow.loadFile(path.join(getFilePath(), '../renderer/index.html')).then(() => {})
     }
 
     if (this.baseWindow.isVisible()) {

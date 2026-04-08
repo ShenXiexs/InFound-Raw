@@ -4,16 +4,18 @@
 // 1.通用标签页管理器，不依赖任何业务模块
 // 2.负责 WebContentsView 的创建、切换、关闭、导航、状态通知等
 // 3.提供的标签页生命周期管理，与 UI 层通过 IPC 通信
-import { BrowserWindow, dialog, Menu, MenuItemConstructorOptions, Rectangle, WebContentsView } from 'electron'
 import * as path from 'path'
-import { AppConfig } from '@common/app-config'
-import { randomUUID } from 'crypto'
-import { logger } from '../utils/logger'
-import { TAB_MAX_COUNT, TAB_TYPES } from '@common/app-constants'
-import { MonitorController } from '../modules/ipc/monitor-controller'
-import { getFilePath } from '../utils/path-helper'
-import { Tab } from '@common/types/tab-type'
 import * as fs from 'fs'
+import { randomUUID } from 'crypto'
+import { BrowserWindow, dialog, Rectangle, WebContentsView, WebPreferences } from 'electron'
+import { AppConfig } from '@common/app-config'
+import { TAB_MAX_COUNT, TAB_TYPES } from '@common/app-constants'
+import { Tab } from '@common/types/tab-type'
+import { logger } from '../utils/logger'
+import { MonitorController } from '../modules/ipc/monitor-controller'
+import { globalState } from '../modules/state/global-state'
+import { getFilePath } from '../utils/path-helper'
+import { is } from '@electron-toolkit/utils'
 
 export class TabManager {
   private views: Map<string, WebContentsView> = new Map()
@@ -33,6 +35,19 @@ export class TabManager {
     this.setupListeners()
   }
 
+  private getDefaultTabFavicon(type: string): string | undefined {
+    if (type !== TAB_TYPES.XUNDA) {
+      return undefined
+    }
+
+    const resourcesPath = globalState.currentState.appSetting?.resourcesPath?.trim() || ''
+    if (resourcesPath) {
+      return `file://${path.join(resourcesPath, 'icons', 'common', 'icon.png').replace(/\\/g, '/')}`
+    }
+
+    return undefined
+  }
+
   // 创建新标签页，返回生成的 id，失败返回 null
   public createTab(
     id: string | null = null,
@@ -42,7 +57,7 @@ export class TabManager {
       insertAfterActive?: boolean
       hideAddress?: boolean
       activate?: boolean
-      webPreferences?: Partial<Electron.WebPreferences> // 外部可传入 partition
+      webPreferences?: Partial<WebPreferences> // 外部可传入 partition
     }
   ): string | null {
     const { insertAfterActive = true, hideAddress = false, activate = false, webPreferences } = options || {}
@@ -50,12 +65,14 @@ export class TabManager {
     // 后期可以根据跟踪标签页的创建时间或最后访问时间，当达到上限时，自动关闭最早创建或最久未访问的标签页
     if (this.tabs.length >= TAB_MAX_COUNT) {
       // 弹出提示对话框（主进程中使用 dialog 模块）
-      dialog.showMessageBox(this.mainWindow, {
-        type: 'warning',
-        title: '标签页数量已达上限',
-        message: `最多只能打开 ${TAB_MAX_COUNT} 个标签页。请关闭一些标签页后再试。`,
-        buttons: ['确定']
-      })
+      dialog
+        .showMessageBox(this.mainWindow, {
+          type: 'warning',
+          title: '标签页数量已达上限',
+          message: `最多只能打开 ${TAB_MAX_COUNT} 个标签页。请关闭一些标签页后再试。`,
+          buttons: ['确定']
+        })
+        .then(() => {})
 
       return null // 返回null表示创建失败
     }
@@ -65,24 +82,25 @@ export class TabManager {
     logger.info('创建tab:' + newId + ':' + url)
 
     // 基础配置，与外部传入的合并
-    const baseWebPreferences: Electron.WebPreferences = {
-      nodeIntegration: false,
-      contextIsolation: true, // 强制开启，防止网页 JS 访问主进程模块
-      sandbox: true, // 开启沙盒，这是防止调用系统底层 Shell 的最强防线
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      plugins: false, // 严禁插件，防止插件触发系统调用
-      webviewTag: false, // 禁用 webview 标签
-      safeDialogs: true,
+    const baseWebPreferences: WebPreferences = {
+      /*preload: path.join(getFilePath(), '../preload/index.cjs'),
+      webSecurity: false,
+      sandbox: false,*/
       devTools: !AppConfig.IS_PRO,
-      preload: path.join(getFilePath(), '../renderer/preload.js'),
       ...webPreferences // 合并外部传入（如 partition）
+    }
+
+    if (type == TAB_TYPES.XUNDA) {
+      baseWebPreferences.preload = path.join(getFilePath(), '../preload/index.cjs')
     }
 
     const view = new WebContentsView({ webPreferences: baseWebPreferences })
 
     // view.setVisible(false)
-    view.webContents.setUserAgent(AppConfig.USER_AGENT) //todo: well done! I missed 【Phoenix】
+    // const userAgent = getCleanUserAgent() || AppConfig.USER_AGENT
+    const userAgent = AppConfig.USER_AGENT
+    logger.debug('设置UA:' + userAgent)
+    view.webContents.setUserAgent(userAgent)
 
     // 监听页面标题更新
     view.webContents.on('page-title-updated', (_, title) => {
@@ -104,7 +122,8 @@ export class TabManager {
         activate: true,
         hideAddress: inheritHideAddress,
         webPreferences: {
-          partition: currentWebPrefs.partition
+          partition: currentWebPrefs.partition,
+          session: currentWebPrefs.session
         }
       })
 
@@ -147,7 +166,11 @@ export class TabManager {
     })
 
     // 加载 URL
-    view.webContents.loadURL(url)
+    view.webContents.loadURL(url).then(() => {})
+
+    /*if (!AppConfig.IS_PRO) {
+      view.webContents.openDevTools({ mode: 'undocked' })
+    }*/
 
     // 保存视图和标签信息（但不添加到窗口）
     this.views.set(newId, view)
@@ -158,6 +181,7 @@ export class TabManager {
       url,
       type,
       title: '新标签页',
+      favicon: this.getDefaultTabFavicon(type),
       lastAccessed: currentTime,
       createdAt: currentTime,
       hideAddress //：options?.hideAddress
@@ -227,11 +251,13 @@ export class TabManager {
 
     if (!notReservedOne && this.tabs.length === 1) {
       // 可以提示用户，或者直接返回
-      dialog.showMessageBox(this.mainWindow, {
-        type: 'info',
-        title: '提示',
-        message: '至少保留一个标签页，无法关闭。'
-      })
+      dialog
+        .showMessageBox(this.mainWindow, {
+          type: 'info',
+          title: '提示',
+          message: '至少保留一个标签页，无法关闭。'
+        })
+        .then(() => {})
       return false
     }
 
@@ -300,7 +326,7 @@ export class TabManager {
   public navigateTo(url: string): void {
     const view = this.getCurrentView()
     if (view) {
-      view.webContents.loadURL(url)
+      view.webContents.loadURL(url).then(() => {})
       // 可选：更新标签的url属性
       const tab = this.tabs.find((t) => t.id === this.activeTabId)
       if (tab) {
@@ -337,7 +363,7 @@ export class TabManager {
     return this.views.get(id)
   }
 
-  public showTabsMenu(x: number, y: number): void {
+  /*public showTabsMenu(x: number, y: number): void {
     const menuTemplate: MenuItemConstructorOptions[] = this.tabs.map((tab) => ({
       label: tab.title.length > 30 ? tab.title.substring(0, 30) + '…' : tab.title,
       type: 'checkbox',
@@ -350,7 +376,7 @@ export class TabManager {
       x: Math.round(x),
       y: Math.round(y)
     })
-  }
+  }*/
 
   public updateTabTitle(id: string, title: string): void {
     const tab = this.tabs.find((t) => t.id === id)
@@ -366,11 +392,8 @@ export class TabManager {
       const dir = path.dirname(filePath)
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(filePath, content)
-
-      console.info(`导出Cookie文件成功: ${filePath}`)
       logger.debug(`导出Cookie文件成功: :${filePath}`)
     } catch (err) {
-      console.info('导出Cookie文件失败', err)
       logger.error('导出Cookie文件失败', err)
     }
   }
@@ -391,35 +414,39 @@ export class TabManager {
     const windowY = Math.round(y)
 
     this.menuWindow = new BrowserWindow({
+      parent: this.mainWindow,
       width: windowWidth,
       height: windowHeight,
       x: windowX,
       y: windowY,
+      modal: false,
       frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
+      autoHideMenuBar: true,
+      minimizable: false,
+      maximizable: false,
+      resizable: false,
       show: false,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, '../preload/tab-menu-preload.cjs')
+        //preload: path.join(getFilePath(), '../preload/tab-menu-preload.cjs')
+        devTools: !AppConfig.IS_PRO,
+        preload: path.join(getFilePath(), '../preload/index.cjs')
       }
     })
 
-    // 加载模板文件
-    const templatePath = path.join(__dirname, '../renderer/tab-menu-template.html')
-    this.menuWindow.loadFile(templatePath)
-    ;(this.menuWindow as any).tabManager = this
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      this.menuWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/tab-menu.html`).then(() => {})
+    } else {
+      this.menuWindow.loadFile(path.join(getFilePath(), '../renderer/tab-menu.html')).then(() => {})
+    }
 
-    this.menuWindow.webContents.openDevTools({ mode: 'detach' })
+    ;(this.menuWindow as any).tabManager = this
 
     // 注入数据
     this.menuWindow.webContents.once('dom-ready', () => {
       this.menuWindow?.webContents.executeJavaScript(`
-        allTabs = ${JSON.stringify(tabs)};
-        currentActiveId = '${activeId || ''}';
-        if (typeof renderTabs === 'function') renderTabs(allTabs);
+        if (typeof initTabs === 'function') initTabs('${activeId || ''}', ${JSON.stringify(tabs)});
       `)
     })
 
@@ -432,6 +459,8 @@ export class TabManager {
       this.menuWindow = null
     })
 
+    this.menuWindow.setMenuBarVisibility(false)
+    this.menuWindow.setMenu(null)
     this.menuWindow.show()
     this.menuWindow.focus()
   }
@@ -448,7 +477,7 @@ export class TabManager {
     const activeId = this.getActiveTabId()
     const newHeight = Math.min(updatedTabs.length * this.ITEM_HEIGHT + this.SEARCH_BOX_HEIGHT, 500) + this.BOTTOM_SHADOW_SPACE
     this.menuWindow.setSize(this.MENU_WIDTH + this.SHADOW_SPACE * 2, newHeight)
-    this.menuWindow.webContents.send('refresh-tabs', updatedTabs, activeId)
+    MonitorController.getInstance().syncTabsUpdated(this.menuWindow.webContents, { activeId: activeId || '', tabs: updatedTabs })
   }
 
   public dispose(): void {

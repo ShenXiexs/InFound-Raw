@@ -1,5 +1,5 @@
-import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
-import { IPC_CHANNELS } from '@common/types/ipc-type'
+import { IPCHandle } from './base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
 import { logger } from '../../utils/logger'
 import { LoggerLevel } from '@infound/desktop-electron'
 

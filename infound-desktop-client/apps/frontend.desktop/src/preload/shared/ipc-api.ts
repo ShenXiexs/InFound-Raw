@@ -1,6 +1,6 @@
 import { ipcRenderer } from 'electron'
-import { AppProtocol, IPC_CHANNELS, IPCAPI } from '@common/types/ipc-type'
-import { IPCGateway } from '../../main/modules/ipc/base/ipc-decorator'
+import { AppProtocol, IPC_CHANNELS, IPCAPI, IPCGateway } from '@common/types/ipc-type'
+import { loggerAPI } from './logger-api'
 
 /**
  * 辅助函数：根据逻辑通道找到对应的物理网关
@@ -33,6 +33,10 @@ const ipcAPI: IPCAPI = {
     const gateway = getGatewayByChannel(channel)
     //loggerAPI.info(`[IPC] 发送请求: ${gateway} ${channel}`)
     ipcRenderer.send(gateway, { channel, args })
+  },
+  sendDirect: (channel, ...args) => {
+    loggerAPI.info(`[IPC] 直连发送请求: ${channel}`)
+    ipcRenderer.send(channel, args)
   },
   on: <K extends keyof AppProtocol>(channel: K, callback: (...args: AppProtocol[K]['params']) => void) => {
     const subscription = (_event: any, ...args: AppProtocol[K]['params']): void => callback(...args)

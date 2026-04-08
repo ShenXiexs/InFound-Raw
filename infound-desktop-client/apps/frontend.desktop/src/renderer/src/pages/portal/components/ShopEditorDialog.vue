@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
+import { getFlagComponent } from '@renderer/utils/icon-helper'
 
 type ShopType = 'cross-border' | 'local' | null
 type ApiShopType = 'LOCAL' | 'CROSS_BORDER'
@@ -444,7 +445,11 @@ watch(
                 class="country-btn"
                 @click="onSelectCountry(country.regionCode)"
               >
-                <span class="flag">{{ country.flag }}</span>
+                <template #icon>
+                  <n-icon size="20">
+                    <component :is="getFlagComponent(country.regionCode)" />
+                  </n-icon>
+                </template>
                 <span>{{ country.regionName }}</span>
               </n-button>
             </n-space>
@@ -477,7 +482,6 @@ watch(
 <style lang="scss" scoped>
 .shop-form-card {
   width: min(860px, calc(100vw - 32px));
-  height: 80vh;
   max-height: 80vh;
   border-radius: 14px;
   display: flex;

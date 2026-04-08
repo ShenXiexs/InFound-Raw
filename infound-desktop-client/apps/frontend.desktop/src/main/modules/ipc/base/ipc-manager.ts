@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
-import { IPC_GATEWAY_KEY, IPC_METHOD_KEY, IPC_TYPE_KEY, IPCType } from './ipc-decorator'
+import { IPC_GATEWAY_KEY, IPC_METHOD_KEY, IPC_TYPE_KEY } from './ipc-decorator'
 import { logger } from '../../../utils/logger'
+import { IPCType } from '@common/types/ipc-type'
 
 export class IPCManager {
   private static gatewayHandlers = new Map<string, Map<string, (...args: any[]) => any>>()

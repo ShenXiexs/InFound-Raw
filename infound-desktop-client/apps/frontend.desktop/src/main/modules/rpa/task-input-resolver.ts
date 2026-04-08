@@ -11,7 +11,7 @@ import type {
   SellerChatbotPayloadInput,
   SellerCreatorDetailPayloadInput,
   SellerRpaReportConfigInput
-} from '@desktop-rpa'
+} from '@infound/desktop-rpa'
 import { TaskInfo, TaskType } from '../../services/task-service'
 import { globalState } from '../state/global-state'
 import { logger } from '../../utils/logger'

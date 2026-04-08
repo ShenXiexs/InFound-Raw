@@ -13,7 +13,7 @@ export class UpdaterWindow {
     this.updaterWindow = null
   }
 
-  public async initWindow(): Promise<void> {
+  public initWindow(): void {
     this.updaterWindow = new BrowserWindow({
       width: 600,
       height: 450,
@@ -43,9 +43,9 @@ export class UpdaterWindow {
     this.updaterWindow.setMenu(null)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      await this.updaterWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/updater.html`)
+      this.updaterWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/updater.html`).then(() => {})
     } else {
-      await this.updaterWindow.loadFile(path.join(getFilePath(), '../renderer/updater.html'))
+      this.updaterWindow.loadFile(path.join(getFilePath(), '../renderer/updater.html')).then(() => {})
     }
 
     logger.info('UpdaterWindow 初始化成功')

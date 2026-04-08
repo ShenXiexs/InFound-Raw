@@ -1,5 +1,7 @@
+import * as fs from 'fs'
+import * as path from 'path'
 import { randomUUID } from 'crypto'
-import { BrowserWindow, WebContentsView } from 'electron'
+import { app, BrowserWindow, session, WebContentsView } from 'electron'
 import { PageLoadStatus, TkShopSetting, TkShopTabItemSetting } from '@common/types/tk-type'
 import { logger } from '../utils/logger'
 import { globalState } from '../modules/state/global-state'
@@ -9,9 +11,6 @@ import { TransitionWcv } from './transition-wcv'
 import { appStore } from '../modules/store/app-store'
 import { TabManager } from './tab-manager'
 import { TAB_TYPES, TK_CONTENTS } from '@common/app-constants'
-import * as fs from 'fs'
-import * as path from 'path'
-import { app } from 'electron'
 
 export class TkTabItemManager {
   private readonly baseWindow: BrowserWindow
@@ -36,7 +35,7 @@ export class TkTabItemManager {
     this.tabManager = new TabManager(baseWindow)
     ;(baseWindow as any).tabManager = this.tabManager
     ;(baseWindow as any).tkTabItemManager = this
-    this.tabPersistKey = `persist:${this.currentState.currentUser?.userId}:${shopSetting.id}`
+    this.tabPersistKey = `persist:${shopSetting.id}`
     this.transitionWcv = new TransitionWcv(baseWindow)
     // this.backgroundLoadingCount = TAB_MAX_COUNT //暂定...
   }
@@ -70,24 +69,6 @@ export class TkTabItemManager {
       // 如果没有焦点标签，激活第一个
       this.showTabItemView(entries[0][0])
     }
-
-    // 找出焦点标签
-    // let focusedTabItemId = Object.keys(this.tabItemSettings).find((id) => this.tabItemSettings[id].focused)
-    // if (!focusedTabItemId) focusedTabItemId = Object.keys(this.tabItemSettings)[0]
-    //
-    // if (focusedTabItemId) {
-    //   const setting = this.tabItemSettings[focusedTabItemId]
-    //
-    //   // 确保标签页已创建（可能存储中的标签页尚未创建）
-    //   if (!this.tabManager.getView(focusedTabItemId)) {
-    //     focusedTabItemId = await this.createTabView(focusedTabItemId, setting.url, setting.type, true, true)
-    //   }
-    //
-    //   this.showTabItemView(focusedTabItemId)
-    //}
-
-    // 优化其他标签页的加载策略
-    //await this.scheduleBackgroundTabLoading(focusedTabItemId)
   }
 
   public showTabItemView(id: string | undefined): void {
@@ -123,6 +104,15 @@ export class TkTabItemManager {
     this.businessData.delete(id)
   }
 
+  public async openTabItem(url: string, type: string = TAB_TYPES.XUNDA): Promise<string | undefined> {
+    const id = randomUUID()
+    return await this.createTabView(id, url, type, true, true)
+  }
+
+  public getShopId(): string {
+    return this.shopSetting.id
+  }
+
   public resizeTabItemView(): void {
     const activeId = this.tabManager.getActiveTabId()
     if (activeId) {
@@ -135,33 +125,6 @@ export class TkTabItemManager {
       this.transitionWcv.showTransitionLoadingWCV()
     }
   }
-
-  //todo:暂时不需要延时加载
-  // private async scheduleBackgroundTabLoading(excludedId: string | undefined): Promise<void> {
-  //   let loadIndex = 0
-  //   const tabItemSettings = Object.values(this.tabItemSettings)
-  //   const loadNextTab = async (): Promise<void> => {
-  //     const tabItemSetting = tabItemSettings[loadIndex++]
-  //     if (tabItemSetting == null || tabItemSetting.id === excludedId || !tabItemSetting.enabled || loadIndex >= this.backgroundLoadingCount) return
-  //
-  //     if (!this.tabManager.getView(tabItemSetting.id)) {
-  //       // 后台创建标签页（不激活）
-  //       await this.createTabView(tabItemSetting.id, tabItemSetting.url, tabItemSetting.type, false, false)
-  //       const delay = 800 + Math.random() * 800
-  //       setTimeout(loadNextTab, delay)
-  //     } else {
-  //       await loadNextTab()
-  //     }
-  //   }
-  //
-  //   if (typeof requestIdleCallback === 'function') {
-  //     requestIdleCallback(async () => {
-  //       setTimeout(loadNextTab, 500)
-  //     })
-  //   } else {
-  //     setTimeout(loadNextTab, 800)
-  //   }
-  // }
 
   public saveTabItemSettings(): void {
     const tabs = this.tabManager.getTabs()
@@ -201,13 +164,29 @@ export class TkTabItemManager {
   }
 
   private async createTabView(id: string, url: string, type: string, activate: boolean, insertAfterActive: boolean): Promise<string | undefined> {
+    const sess = session.fromPartition(this.tabPersistKey)
+    sess.webRequest.onHeadersReceived({ urls: ['https://*.tiktok.com/*'] }, (details, callback) => {
+      const responseHeaders = { ...details.responseHeaders }
+
+      // 删除导致拦截的两个关键头
+      delete responseHeaders['x-frame-options']
+      delete responseHeaders['X-Frame-Options']
+
+      // 有时还需要处理 Content-Security-Policy (CSP)
+      if (responseHeaders['content-security-policy']) {
+        delete responseHeaders['content-security-policy']
+      }
+
+      callback({ cancel: false, responseHeaders })
+    })
+
     const newId = this.tabManager.createTab(id, url, type, {
       hideAddress: type === TAB_TYPES.XUNDA,
       activate: activate,
       insertAfterActive: insertAfterActive,
       webPreferences: {
-        partition: this.tabPersistKey
-        // 其他安全设置已在 TabManager 内部设置，无需重复
+        partition: this.tabPersistKey,
+        session: sess
       }
     })
 
@@ -308,7 +287,7 @@ export class TkTabItemManager {
       tabItemSettings[key] = {
         id: key,
         type: TAB_TYPES.TIKTOK,
-        url: this.shopSetting.loginUrl,
+        url: this.shopSetting.homeUrl,
         icon: '',
         focused: true,
         enabled: true

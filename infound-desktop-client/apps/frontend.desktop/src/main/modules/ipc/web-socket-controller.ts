@@ -1,5 +1,5 @@
-import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
-import { IPC_CHANNELS } from '@common/types/ipc-type'
+import { IPCHandle } from './base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
 import { webSocketService } from '../../services/base/web-socket-service'
 import { logger } from '../../utils/logger'
 

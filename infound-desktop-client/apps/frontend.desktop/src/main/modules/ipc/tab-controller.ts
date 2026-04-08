@@ -1,14 +1,17 @@
-import { IPCGateway, IPCHandle, IPCType } from './base/ipc-decorator'
-import { IPC_CHANNELS } from '@common/types/ipc-type'
-import { BrowserWindow, ipcMain } from 'electron'
+import { IPCHandle } from './base/ipc-decorator'
+import { IPC_CHANNELS, IPCGateway, IPCType } from '@common/types/ipc-type'
+import { TAB_TYPES } from '@common/app-constants'
+import { BrowserWindow } from 'electron'
 import { logger } from '../../utils/logger'
 import { TabManager } from '../../windows/tab-manager'
 import { TkTabItemManager } from '../../windows/tk-tab-item-manager'
+import { buildEmbedPageUrl } from '../../services/embed-page-url'
+import { appWindowsAndViewsManager } from '../../windows/app-windows-and-views-manager'
 
 export class TabController {
   constructor() {
     // 处理菜单窗口的切换标签请求
-    ipcMain.handle('tabs-menu-switch-tab', async (event, tabId: string) => {
+    /*ipcMain.handle('tabs-menu-switch-tab', async (event, tabId: string) => {
       console.log('收到菜单切换标签请求:', tabId)
       const win = BrowserWindow.fromWebContents(event.sender)
       if (!win) return
@@ -41,7 +44,7 @@ export class TabController {
         tabManager.reorderTabs(orderedIds)
         tabManager.refreshMenuWindow()
       }
-    })
+    })*/
   }
 
   @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_ACTIVATE_ITEM, IPCType.INVOKE)
@@ -101,9 +104,93 @@ export class TabController {
     }
   }
 
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_OPEN_OUTREACH, IPCType.INVOKE)
+  async openOutreachTab(event: Electron.IpcMainInvokeEvent): Promise<{ success: boolean; error?: string }> {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win) {
+        return { success: false, error: '未找到窗口' }
+      }
+
+      const tkManager = (win as any).tkTabItemManager as TkTabItemManager | undefined
+      if (!tkManager) {
+        logger.error('窗口未关联 TkTabItemManager')
+        return { success: false, error: '窗口未关联 TkTabItemManager' }
+      }
+
+      const tabId = await tkManager.openTabItem(await buildEmbedPageUrl('/outreach', tkManager.getShopId()), TAB_TYPES.XUNDA)
+      if (!tabId) {
+        return { success: false, error: '创建标签页失败' }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      logger.error('[EmbedTab] 打开建联页失败', error)
+      return { success: false, error: error?.message || '打开建联页失败' }
+    }
+  }
+
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_OPEN_FULFILLMENT, IPCType.INVOKE)
+  async openFulfillmentTab(event: Electron.IpcMainInvokeEvent): Promise<{ success: boolean; error?: string }> {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win) {
+        return { success: false, error: '未找到窗口' }
+      }
+
+      const tkManager = (win as any).tkTabItemManager as TkTabItemManager | undefined
+      if (!tkManager) {
+        logger.error('窗口未关联 TkTabItemManager')
+        return { success: false, error: '窗口未关联 TkTabItemManager' }
+      }
+
+      const tabId = await tkManager.openTabItem(await buildEmbedPageUrl('/fulfillment', tkManager.getShopId()), TAB_TYPES.XUNDA)
+      if (!tabId) {
+        return { success: false, error: '创建标签页失败' }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      logger.error('[EmbedTab] 打开履约页失败', error)
+      return { success: false, error: error?.message || '打开履约页失败' }
+    }
+  }
+
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_OPEN_EMBED, IPCType.INVOKE)
+  async openEmbedTab(
+    event: Electron.IpcMainInvokeEvent,
+    hashPath: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const raw = typeof hashPath === 'string' ? hashPath.trim() : ''
+    const normalized = raw.startsWith('/') ? raw : `/${raw || 'outreach'}`
+
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win) {
+        return { success: false, error: '未找到窗口' }
+      }
+
+      const tkManager = (win as any).tkTabItemManager as TkTabItemManager | undefined
+      if (tkManager) {
+        const tabId = await tkManager.openTabItem(await buildEmbedPageUrl(normalized, tkManager.getShopId()), TAB_TYPES.XUNDA)
+        if (!tabId) {
+          return { success: false, error: '创建标签页失败' }
+        }
+        return { success: true }
+      }
+
+      return await appWindowsAndViewsManager.tkShopWindowManager.openEmbedTab(async (shopId) => {
+        return await buildEmbedPageUrl(normalized, shopId)
+      })
+    } catch (error: any) {
+      logger.error('[EmbedTab] 打开 embed 页失败', error)
+      return { success: false, error: error?.message || '打开页面失败' }
+    }
+  }
+
   @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_SHOW_ITEMS_MENU, IPCType.INVOKE)
-  async showTabsMenu(event: Electron.IpcMainInvokeEvent, x: number, y: number): Promise<void> {
-    const win = BrowserWindow.fromWebContents(event.sender)
+  async showTabsMenu(_event: Electron.IpcMainInvokeEvent, _x: number, _y: number): Promise<void> {
+    /*const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) {
       logger.error('未找到窗口')
       return
@@ -115,7 +202,7 @@ export class TabController {
       tabManager.showTabsMenu(x, y)
     } else {
       logger.error('TabManager 未实现 showTabsMenu 方法')
-    }
+    }*/
   }
 
   @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_REORDER_ITEMS, IPCType.INVOKE)
@@ -143,43 +230,40 @@ export class TabController {
     }
   }
 
-  //=================================todo:请@Thomas查看为什么这三个用IPC装饰器方法不起作用.......目前只能用原生的写在构造函数里了====================
   // 菜单窗口切换标签
-  // @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_MENU_SWITCH_TAB, IPCType.INVOKE)
-  // async menuSwitchTab(event: Electron.IpcMainInvokeEvent, tabId: string): Promise<void> {
-  //   console.log('收到切换tab页命令' + tabId)
-  //   const win = BrowserWindow.fromWebContents(event.sender)
-  //   if (!win) return
-  //   const tabManager = (win as any).tabManager as TabManager | undefined
-  //   if (tabManager) {
-  //     console.log('即将切换tab页' + tabId)
-  //     tabManager.activateTab(tabId)
-  //     tabManager.closeMenuWindow()
-  //   }
-  // }
-  //
-  // // 菜单窗口关闭标签
-  // @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_MENU_CLOSE_TAB, IPCType.INVOKE)
-  // async menuCloseTab(event: Electron.IpcMainInvokeEvent, tabId: string): Promise<void> {
-  //   console.log('收到关闭tab页命令' + tabId)
-  //   const win = BrowserWindow.fromWebContents(event.sender)
-  //   if (!win) return
-  //   const tabManager = (win as any).tabManager as TabManager | undefined
-  //   if (tabManager) {
-  //     tabManager.closeTab(tabId)
-  //     tabManager.refreshMenuWindow()
-  //   }
-  // }
-  //
-  // // 菜单窗口拖拽排序
-  // @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_REORDER_FROM_MENU, IPCType.INVOKE)
-  // async menuReorderTabs(event: Electron.IpcMainInvokeEvent, orderedIds: string[]): Promise<void> {
-  //   const win = BrowserWindow.fromWebContents(event.sender)
-  //   if (!win) return
-  //   const tabManager = (win as any).tabManager as TabManager | undefined
-  //   if (tabManager) {
-  //     tabManager.reorderTabs(orderedIds)
-  //     tabManager.refreshMenuWindow()
-  //   }
-  // }
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_MENU_SWITCH_TAB, IPCType.INVOKE)
+  async menuSwitchTab(event: Electron.IpcMainInvokeEvent, tabId: string): Promise<void> {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    const tabManager = (win as any).tabManager as TabManager | undefined
+    if (tabManager) {
+      tabManager.activateTab(tabId)
+      tabManager.closeMenuWindow()
+    }
+  }
+
+  // 菜单窗口关闭标签
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_MENU_CLOSE_TAB, IPCType.INVOKE)
+  async menuCloseTab(event: Electron.IpcMainInvokeEvent, tabId: string): Promise<void> {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    const tabManager = (win as any).tabManager as TabManager | undefined
+    if (tabManager) {
+      tabManager.closeTab(tabId)
+      tabManager.refreshMenuWindow()
+    }
+  }
+
+  // 菜单窗口拖拽排序
+  @IPCHandle(IPCGateway.TAB, IPC_CHANNELS.TABS_REORDER_FROM_MENU, IPCType.INVOKE)
+  async menuReorderTabs(event: Electron.IpcMainInvokeEvent, orderedIds: string[]): Promise<void> {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    const tabManager = (win as any).tabManager as TabManager | undefined
+    if (tabManager) {
+      tabManager.reorderTabs(orderedIds)
+      tabManager.refreshMenuWindow()
+    }
+  }
+
 }

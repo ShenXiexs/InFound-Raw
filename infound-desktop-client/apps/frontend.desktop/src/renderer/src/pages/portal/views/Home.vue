@@ -6,6 +6,8 @@ import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { rendererStore } from '@renderer/store/renderer-store'
 import ShopEditorDialog from '@renderer/pages/portal/components/ShopEditorDialog.vue'
 import { formatBackendDateTime } from '@renderer/utils/date-time'
+import { TkShopOpenWindowPayload } from '@common/types/tk-type'
+import { getFlagComponent } from '@renderer/utils/icon-helper'
 
 const TOKEN_INVALID_CODE = 1251
 type ShopType = 'CROSS_BORDER' | 'LOCAL'
@@ -20,6 +22,7 @@ interface ShopRow {
   regionName: string
   shopType: 'LOCAL' | 'CROSS_BORDER'
   loginUrl: string
+  homeUrl: string
   lastOpenTime: string
 }
 
@@ -32,7 +35,7 @@ const currentPage = ref(1)
 const remarkModalVisible = ref(false)
 const deleteModalVisible = ref(false)
 const editingShopId = ref<string | null>(null)
-const editingRemark = ref('')
+const editingRemark = ref<string | undefined>(undefined)
 const deletingShop = ref<ShopRow | null>(null)
 const isLoadingShops = ref(false)
 const isSavingRemark = ref(false)
@@ -80,6 +83,7 @@ const ensureEntryIdMap = async (): Promise<boolean> => {
           regionName: string
           shopType: 'LOCAL' | 'CROSS_BORDER'
           loginUrl: string
+          homeUrl: string
         },
         index: number
       ) => {
@@ -144,6 +148,7 @@ const loadShopList = async (): Promise<void> => {
   if (isLoadingShops.value) return
 
   isLoadingShops.value = true
+
   try {
     const result = await window.ipc.invoke(IPC_CHANNELS.TK_SHOP_LIST)
     if (!result.success) {
@@ -151,14 +156,13 @@ const loadShopList = async (): Promise<void> => {
       return
     }
 
-    const list = (result.data || []).map((item) => ({
+    shopList.value = (result.data || []).map((item) => ({
       ...item,
       remark: item.remark || '',
       entryId: item.entryId,
       lastOpenTime: formatBackendDateTime(item.shopLastOpen || (item as any).lastOpenTime)
     }))
 
-    shopList.value = list
     if (currentPage.value > totalPages.value) {
       currentPage.value = totalPages.value
     }
@@ -197,7 +201,7 @@ const saveRemark = async (): Promise<void> => {
 
   isSavingRemark.value = true
   try {
-    const remark = editingRemark.value.trim()
+    const remark = editingRemark.value!.trim()
     const result = await window.ipc.invoke(IPC_CHANNELS.TK_SHOP_UPDATE, {
       id: target.id,
       name: target.name,
@@ -237,8 +241,10 @@ const onOpenShop = async (row: ShopRow): Promise<void> => {
     id: settingId,
     name: row.name,
     region: row.regionCode,
-    loginUrl: row.loginUrl
-  }
+    loginUrl: row.loginUrl,
+    homeUrl: row.homeUrl
+  } as TkShopOpenWindowPayload
+
   window.logger.info('打开店铺参数', payload)
   window.ipc.send(IPC_CHANNELS.TK_SHOP_OPEN_WINDOW, payload)
   message.success(`已打开店铺：${row.name}`)
@@ -333,8 +339,8 @@ onUnmounted(async () => {
             <td class="td-index">{{ (currentPage - 1) * PAGE_SIZE + idx + 1 }}</td>
             <td class="td-name">
               <div class="name-cell">
-                <n-icon class="name-icon" size="16">
-                  <i-hugeicons-map-pin />
+                <n-icon size="24">
+                  <component :is="getFlagComponent(row.regionCode)" />
                 </n-icon>
                 <span>{{ row.name }}</span>
               </div>
@@ -347,8 +353,8 @@ onUnmounted(async () => {
                 </n-ellipsis>
                 <n-button class="remark-edit-btn" size="small" text @click="openRemarkModal(row)">
                   <template #icon>
-                    <n-icon size="16">
-                      <i-hugeicons-pencil />
+                    <n-icon>
+                      <i-hugeicons-note-edit />
                     </n-icon>
                   </template>
                 </n-button>
@@ -368,7 +374,7 @@ onUnmounted(async () => {
                 <n-button secondary size="small" @click="onEditShop(row)">
                   <template #icon>
                     <n-icon>
-                      <i-hugeicons-pencil />
+                      <i-hugeicons-pen-01 />
                     </n-icon>
                   </template>
                   编辑
@@ -478,15 +484,14 @@ onUnmounted(async () => {
 }
 
 .col-name {
-  width: 240px;
 }
 
 .col-type {
-  width: 130px;
+  width: 120px;
 }
 
 .col-remark {
-  width: 280px;
+  width: 350px;
 }
 
 .col-time {
@@ -498,37 +503,27 @@ onUnmounted(async () => {
 }
 
 .td-index {
-  width: 70px;
 }
 
 .td-name {
-  width: 240px;
 }
 
 .td-type {
-  width: 130px;
 }
 
 .td-remark {
-  width: 280px;
 }
 
 .td-time {
-  width: 190px;
 }
 
 .td-actions {
-  width: 260px;
 }
 
 .name-cell {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.name-icon {
-  color: #8142f6;
 }
 
 .remark-cell {
@@ -607,18 +602,56 @@ onUnmounted(async () => {
   font-size: 13px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .shop-manage-page {
     padding: 12px;
   }
 
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .pagination-wrap {
     justify-content: flex-start;
+  }
+
+  .col-index {
+    width: 30px;
+  }
+
+  .col-name {
+  }
+
+  .col-type {
+    width: 120px;
+  }
+
+  .col-remark {
+    display: none;
+  }
+
+  .col-time {
+    display: none;
+  }
+
+  .col-actions {
+    width: 260px;
+  }
+
+  .td-index {
+  }
+
+  .td-name {
+  }
+
+  .td-type {
+  }
+
+  .td-remark {
+    display: none;
+  }
+
+  .td-time {
+    display: none;
+  }
+
+  .td-actions {
   }
 }
 </style>
