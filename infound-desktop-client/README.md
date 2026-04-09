@@ -1,15 +1,9 @@
-# 迅达桌面客户端项目说明文档
+# 寻达桌面客户端项目说明文档
 
 ## 项目概述
 
-这是一个基于 Electron + Vue 3 + TypeScript 构建的桌面应用程序，主要用于 TikTok 达人营销业务。项目采用 monorepo 结构，包含主应用和
-RPA 模拟器两个主要部分。
-
-当前仓库中的公开版本已经完成脱敏处理：
-
-- 所有环境地址、注册链接、自动更新地址统一替换为占位符或 `example.com`
-- 文档中的账号、应用密码、Creator ID 等示例数据已替换为演示值
-- 嵌套仓库的 `.git` 元数据已移除，避免泄露内部远端地址
+这是一个基于 Electron + Vue 3 + TypeScript 构建的桌面应用程序，主要用于 TikTok 达人营销业务。项目采用 monorepo
+结构，包含主应用、RPA 模拟器，以及共享的 RPA/桌面基础库。
 
 ## 技术栈
 
@@ -28,11 +22,15 @@ RPA 模拟器两个主要部分。
 ```
 infound-desktop-client/
 ├── apps/
-│   ├── frontend.desktop/           # 主桌面应用
-│   └── frontend.rpa.simulation/    # RPA 模拟器
+│   ├── frontend.desktop/              # 主桌面应用（生产宿主）
+│   ├── frontend.embed/                # 嵌入式前端应用
+│   └── frontend.rpa.simulation/       # RPA 模拟器（调试壳）
 ├── packages/
-│   └── frontend.desktop.shared/    # 共享包
+│   ├── frontend.desktop.base/         # 桌面应用基础包
+│   ├── frontend.desktop.electron/     # Electron 共享包（日志、工具等）
+│   └── frontend.desktop.rpa/          # RPA 核心共享包
 ├── package.json
+├── pnpm-lock.yaml
 └── pnpm-workspace.yaml
 ```
 
@@ -139,10 +137,6 @@ src/
 ```bash
 pnpm install
 ```
-
-### 2.1 环境变量
-
-`apps/frontend.desktop/.env.stg` 与 `apps/frontend.desktop/.env.pro` 仅保留演示占位值，接入真实环境前请改为本地私有配置，不要直接提交真实域名、盐值、Token 或账号信息。
 
 ### 3. 开发启动
 
@@ -260,23 +254,40 @@ pnpm run build
 
 ## 部署发布
 
-### 1. 构建命令
+### 1. chrome-headless-shell 压缩包下载
+
+存放在 `apps/frontend.desktop/build/` 目录下
+
+| 平台 (Platform) | 下载地址                                                                                                                  |
+|---------------|-----------------------------------------------------------------------------------------------------------------------|
+| linux64       | https://storage.googleapis.com/chrome-for-testing-public/146.0.7680.153/linux64/chrome-headless-shell-linux64.zip     |
+| mac-arm64     | https://storage.googleapis.com/chrome-for-testing-public/146.0.7680.153/mac-arm64/chrome-headless-shell-mac-arm64.zip |
+| mac-x64       | https://storage.googleapis.com/chrome-for-testing-public/146.0.7680.153/mac-x64/chrome-headless-shell-mac-x64.zip     |
+| win32         | https://storage.googleapis.com/chrome-for-testing-public/146.0.7680.153/win32/chrome-headless-shell-win32.zip         |
+| win64         | https://storage.googleapis.com/chrome-for-testing-public/146.0.7680.153/win64/chrome-headless-shell-win64.zip         |
+
+**版本信息**：Chrome Headless Shell v146.0.7680.153
+
+### 2. 构建命令
+
+#### 如果 packages 共享包有变动，要主动执行发布命令
 
 ```bash
-# Windows
-pnpm run build:win
-
-# macOS
-pnpm run build:mac
-
-# Linux
-pnpm run build:linux
+# 项目根目录执行
+npm run publish:infound
 ```
 
-### 2. 自动更新配置
+#### 构建命令
+
+```bash
+# 项目根目录执行
+npm run pack:win:stg
+```
+
+### 3. 自动更新配置
 
 - 使用 electron-updater
-- 配置你自己的更新服务器地址
+- 配置更新服务器地址
 - 版本号管理
 
 ## 最佳实践
