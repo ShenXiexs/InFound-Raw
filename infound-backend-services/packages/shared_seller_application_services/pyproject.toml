@@ -1,0 +1,30 @@
+[project]
+name = "shared-seller-application-services"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Thomas", email = "tanher@qq.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "bcrypt>=5.0.0",
+    "core-base",
+    "core-redis",
+    "core-web",
+    "shared-application-services",
+    "shared-domain",
+    "shared-infrastructure",
+    "pyjwt>=2.12.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+core-base = { workspace = true }
+core-web = { workspace = true }
+core-redis = { workspace = true }
+shared-application-services = { workspace = true }
+shared-domain = { workspace = true }
+shared-infrastructure = { workspace = true }

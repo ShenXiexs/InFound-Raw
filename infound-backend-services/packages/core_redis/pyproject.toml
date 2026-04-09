@@ -1,0 +1,20 @@
+[project]
+name = "core-redis"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Thomas", email = "tanher@qq.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "core-base",
+    "redis>=7.2.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+shared-infrastructure = { workspace = true }
+core-base = { workspace = true }

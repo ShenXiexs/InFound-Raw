@@ -1,0 +1,26 @@
+[project]
+name = "shared-domain"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Thomas", email = "tanher@qq.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "aiomysql>=0.3.2",
+    "core-base",
+    "greenlet>=3.0.3",
+    "sqlalchemy>=2.0.47",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "sqlacodegen>=4.0.2",
+]
+
+[tool.uv.sources]
+core-base = { workspace = true }

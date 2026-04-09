@@ -1,0 +1,125 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# 1. 导入项目通用依赖
+from common.core.database import get_db_session
+from common.core.response import APIResponse, success_response
+# 注意：这里需要 Products 用于关联查询
+from common.models.infound import Samples, Products
+
+# 2. 导入 DTO 和 实体
+# SampleDetailResponse 专门用于这个接口
+from apps.portal_creator_open_api.models.dtos.sample import SampleDetailResponse
+from apps.portal_creator_open_api.models.entities import CurrentUserInfo
+
+# 定义路由，标签设为 "样品"
+router = APIRouter(tags=["样品"])
+
+@router.get(
+    "/sample/detail/{sampleId}",
+    response_model=APIResponse[SampleDetailResponse],
+    response_model_by_alias=True,
+)
+async def get_sample_detail(
+        sampleId: str,
+        request: Request,
+        db: Annotated[AsyncSession, Depends(get_db_session)]
+) -> APIResponse[SampleDetailResponse]:
+    """
+    查询指定样品的详情 (独立出来的接口)
+    """
+
+    # 1. 验证 Token (从 request.state 获取)
+    if not hasattr(request.state, "current_user_info"):
+        raise HTTPException(status_code=401, detail="Unverified")
+
+    user: CurrentUserInfo = request.state.current_user_info
+
+    # 2. 数据库查询：关联 Samples 和 Products
+    stmt = (
+        select(Samples, Products)
+        .join(Products, Samples.platform_product_id == Products.platform_product_id)
+        .where(
+            and_(
+                # 必须匹配 URL 里的 ID
+                Samples.id == sampleId,
+                # 必须匹配当前登录用户的用户名 (权限控制)
+                Samples.platform_creator_username == user.platform_creator_username
+            )
+        )
+    )
+
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Sample not found or access denied")
+
+    sample_record: Samples = row[0]
+    product_record: Products = row[1]
+
+    # 3. 组装返回数据
+    response_data = SampleDetailResponse(
+        id=sample_record.id,
+        status=sample_record.status,
+        content_summary=sample_record.content_summary,
+        ad_code=sample_record.ad_code,
+
+        platform_product_id=product_record.platform_product_id,
+        product_name=product_record.product_name,
+        thumbnail=product_record.thumbnail,
+        shooting_guide=product_record.shooting_guide,
+
+        platform_creator_username=user.platform_creator_username,
+        platform_creator_display_name=user.platform_creator_display_name,
+        email=user.email,
+        whatsapp=user.whatsapp
+    )
+
+    return success_response(data=response_data)
+
+# 接口废弃：提交 AD Code。
+# @router.post(
+#     "/creator/samples/{sample_id}/ad-codes",
+#     response_model=APIResponse[dict],
+#     response_model_by_alias=True,
+# )
+# async def submit_ad_code(
+#         sample_id: str,
+#         req: SubmitAdCodeRequest,
+#         request: Request,
+#         db: Annotated[AsyncSession, Depends(get_db_session)]
+# ) -> APIResponse[dict]:
+#     """达人提交 AD Code（已废弃）"""
+#
+#     if not hasattr(request.state, "current_user_info"):
+#         raise HTTPException(status_code=401, detail="Unverified")
+#
+#     current: CurrentUserInfo = request.state.current_user_info
+#
+#     # 1. 校验样品归属
+#     stmt = select(Samples).where(
+#         Samples.id == sample_id,
+#         Samples.platform_creator_username == current.platform_creator_username
+#     )
+#     sample = (await db.execute(stmt)).scalar_one_or_none()
+#
+#     if not sample:
+#         raise HTTPException(status_code=404, detail="Sample not found or unauthorized")
+#
+#     # 2. 判断 ad_codes 是否为 JSON 数组
+#     try:
+#         parsed = json.loads(req.ad_codes)
+#         if not isinstance(parsed, list):
+#             raise ValueError()
+#     except Exception:
+#         raise HTTPException(status_code=400, detail="ad_codes 必须是 JSON 数组字符串")
+#
+#     # 3. 覆盖写入数据库
+#     sample.ad_code = req.ad_codes
+#     await db.commit()
+#
+#     return success_response({"message": "AD Code 提交成功"})

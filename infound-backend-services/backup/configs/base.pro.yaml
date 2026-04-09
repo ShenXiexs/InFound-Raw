@@ -1,0 +1,29 @@
+# 全局基础配置（所有服务共用）
+DEBUG: false
+
+# MySQL 基础配置
+MYSQL:
+  HOST: "47.238.5.253"
+  PORT: 8801
+  DB: "infound.pro"
+  USER: "infound-pro"
+  PASSWORD: "J6B^tu)E~$HJBb"
+
+# Redis 基础配置
+REDIS:
+  PREFIX: "if.stg"
+
+# 通用 RabbitMQ 配置（可被消费端专属配置覆盖）
+RABBITMQ:
+  HOST: "47.238.5.253"
+  PORT: 8803
+  USERNAME: "infound.pro"
+  PASSWORD: "Fwur5r1R#%I9+2a"
+  VHOST: "/infound.pro"
+  PREFETCH_COUNT: 1
+  RECONNECT_DELAY: 5
+  MAX_RECONNECT_ATTEMPTS: 1
+  EXCHANGE_NAME: "chatbot.topic"
+  ROUTING_KEY: "chatbot.sample"
+  QUEUE_NAME: "chatbot.sample.queue.topic"
+
