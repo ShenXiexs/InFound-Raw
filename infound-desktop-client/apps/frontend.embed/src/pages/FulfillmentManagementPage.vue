@@ -1,6 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { createDiscreteApi, NButton, NCard, NInput, NModal, NSwitch } from 'naive-ui'
+import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import {
+  createDiscreteApi,
+  dateZhCN,
+  NButton,
+  NCard,
+  NDataTable,
+  NDescriptions,
+  NDescriptionsItem,
+  NFlex,
+  NInput,
+  NModal,
+  NPagination,
+  NSpace,
+  NSwitch,
+  zhCN,
+  type DataTableColumns
+} from 'naive-ui'
 import {
   getFulfillmentReminderLast24hCount,
   getFulfillmentReminderRecordList,
@@ -49,11 +65,14 @@ const props = defineProps<{
   shopId?: string
 }>()
 
-const { message } = createDiscreteApi(['message'])
+const { message } = createDiscreteApi(['message'], {
+  configProviderProps: {
+    locale: zhCN,
+    dateLocale: dateZhCN
+  }
+})
 
 const reminderCount = ref(0)
-const page = ref(1)
-const pageSize = 8
 const reminderPage = ref(1)
 const reminderPageSize = 4
 const isLoading = ref(false)
@@ -71,17 +90,9 @@ const configForm = reactive<RuleConfigFormState>({
   message: ''
 })
 
-const total = computed(() => ruleList.value.length)
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
-const pagedRules = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return ruleList.value.slice(start, start + pageSize)
-})
-const pageNumbers = computed(() => Array.from({ length: totalPages.value }, (_, index) => index + 1))
 const reminderTotal = ref(0)
 const reminderTotalPages = computed(() => Math.max(1, Math.ceil(reminderTotal.value / reminderPageSize)))
 const pagedReminders = computed(() => reminderList.value)
-const reminderPageNumbers = computed(() => Array.from({ length: reminderTotalPages.value }, (_, index) => index + 1))
 const activeRule = computed(() => ruleList.value.find((item) => item.id === activeRuleId.value) || null)
 const configRuleName = computed(() => activeRule.value?.ruleName || activeRule.value?.ruleCode || '-')
 const configRuleDescription = computed(() => activeRule.value?.ruleDescription || '-')
@@ -91,12 +102,98 @@ const isRuleMessageTooLong = computed(() => ruleMessageLength.value > RULE_MESSA
 const isConfigModalVisible = computed(() => currentView.value === 'config')
 const isReminderModalVisible = computed(() => currentView.value === 'reminders')
 const isRuleToggling = (ruleId: string): boolean => togglingRuleIds.value.includes(ruleId)
+const ruleTableEmptyText = computed(() => errorMessage.value || '暂无履约规则')
+const reminderTableEmptyText = computed(() => reminderErrorMessage.value || '暂无提醒记录')
 
-watch(totalPages, (value) => {
-  if (page.value > value) {
-    page.value = value
+const ruleColumns: DataTableColumns<FulfillmentRuleItem> = [
+  {
+    title: '规则名称',
+    key: 'ruleName',
+    minWidth: 180,
+    render: (row) => h('span', { class: 'rule-name' }, row.ruleName)
+  },
+  {
+    title: '规则说明',
+    key: 'ruleDescription',
+    minWidth: 220
+  },
+  {
+    title: '规则事件',
+    key: 'ruleEvent',
+    minWidth: 220
+  },
+  {
+    title: '是否启用',
+    key: 'enabled',
+    width: 150,
+    render: (row) =>
+      h(
+        NSpace,
+        {
+          align: 'center',
+          size: 8
+        },
+        {
+          default: () => [
+            h('span', row.enabled ? '已启用' : '未启用'),
+            h(NSwitch, {
+              value: row.enabled,
+              loading: isRuleToggling(row.id),
+              disabled: isRuleToggling(row.id),
+              'onUpdate:value': () => {
+                void toggleRule(row.id)
+              }
+            })
+          ]
+        }
+      )
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 120,
+    render: (row) =>
+      h(
+        NButton,
+        {
+          text: true,
+          type: 'primary',
+          onClick: () => configureRule(row.id)
+        },
+        {
+          default: () => (row.configured ? '配置' : '待配置')
+        }
+      )
   }
-})
+]
+
+const reminderColumns: DataTableColumns<FulfillmentReminderItem> = [
+  {
+    title: '达人',
+    key: 'creatorName',
+    minWidth: 150
+  },
+  {
+    title: '粉丝数量',
+    key: 'followerCount',
+    width: 120
+  },
+  {
+    title: 'GMV',
+    key: 'gmv',
+    width: 120
+  },
+  {
+    title: '命中规则',
+    key: 'matchedRule',
+    minWidth: 160
+  },
+  {
+    title: '发送提醒时间',
+    key: 'sentAt',
+    minWidth: 180
+  }
+]
 
 watch(reminderTotalPages, (value) => {
   if (reminderPage.value > value) {
@@ -347,11 +444,6 @@ const openReminderView = (): void => {
   navigate({ view: 'reminders' })
 }
 
-const changePage = (nextPage: number): void => {
-  if (nextPage < 1 || nextPage > totalPages.value) return
-  page.value = nextPage
-}
-
 const cancelConfig = (): void => {
   navigate({ view: 'list' })
 }
@@ -450,7 +542,6 @@ const changeReminderPage = (nextPage: number): void => {
 watch(
   () => props.shopId,
   () => {
-    page.value = 1
     reminderPage.value = 1
     void fetchRuleList()
     void fetchReminderCount()
@@ -477,92 +568,36 @@ onUnmounted(() => {
       <h1>履约管理-履约规则</h1>
     </header>
 
-    <section class="summary-box">
-      <div class="summary-left">过去24小时内</div>
-      <div class="summary-right">
-        <button class="summary-number-btn" type="button" @click="openReminderView">
-          <span class="summary-number">{{ reminderCount }}</span>
-        </button>
-        <div class="summary-label">提醒达人</div>
-      </div>
-    </section>
+    <NCard class="summary-box" :bordered="false" size="small">
+      <NFlex class="summary-content" justify="space-between" align="center">
+        <div class="summary-left">过去24小时内</div>
+        <NFlex class="summary-right" vertical align="center">
+          <NButton quaternary type="primary" class="summary-number-btn" @click="openReminderView">
+            <span class="summary-number">{{ reminderCount }}</span>
+          </NButton>
+          <div class="summary-label">提醒达人</div>
+        </NFlex>
+      </NFlex>
+    </NCard>
 
-    <section class="table-panel">
+    <NCard class="table-panel" :bordered="false" size="small">
       <div class="table-wrap">
-        <table class="rule-table">
-          <thead>
-            <tr>
-              <th>规则名称</th>
-              <th>规则说明</th>
-              <th>规则事件</th>
-              <th class="nowrap-column">是否启用</th>
-              <th class="nowrap-column">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isLoading">
-              <td class="empty-row" colspan="5">加载中...</td>
-            </tr>
-            <tr v-else-if="errorMessage">
-              <td class="empty-row" colspan="5">{{ errorMessage }}</td>
-            </tr>
-            <tr v-for="item in pagedRules" :key="item.id">
-              <td class="rule-name">{{ item.ruleName }}</td>
-              <td>{{ item.ruleDescription }}</td>
-              <td>{{ item.ruleEvent }}</td>
-              <td class="nowrap-column">
-                <div class="switch-cell">
-                  <span>{{ item.enabled ? '已启用' : '未启用' }}</span>
-                  <button
-                    :class="['switch-btn', { on: item.enabled }]"
-                    :disabled="isRuleToggling(item.id)"
-                    :title="
-                      isRuleToggling(item.id)
-                        ? '请求中...'
-                        : item.enabled
-                          ? '关闭规则'
-                          : item.canEnable
-                            ? '启用规则'
-                            : '当前不可启用'
-                    "
-                    type="button"
-                    @click="toggleRule(item.id)"
-                  >
-                    <span class="switch-thumb" />
-                  </button>
-                </div>
-              </td>
-              <td class="nowrap-column">
-                <button class="config-btn" :title="item.configured ? '配置' : '未配置'" type="button" @click="configureRule(item.id)">
-                  <span aria-hidden="true">✎</span>
-                  <span>{{ item.configured ? '配置' : '待配置' }}</span>
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!isLoading && !errorMessage && pagedRules.length === 0">
-              <td class="empty-row" colspan="5">暂无履约规则</td>
-            </tr>
-          </tbody>
-        </table>
+        <NDataTable
+          class="rule-data-table"
+          :columns="ruleColumns"
+          :data="isLoading ? [] : ruleList"
+          :loading="isLoading"
+          :bordered="false"
+          :single-line="false"
+          :row-key="(row) => row.id"
+          :scroll-x="980"
+        >
+          <template #empty>
+            <div class="table-empty">{{ ruleTableEmptyText }}</div>
+          </template>
+        </NDataTable>
       </div>
-
-      <footer class="pagination-row">
-        <span class="total-text">共 {{ total }} 条</span>
-        <div class="pager">
-          <button :disabled="page <= 1" type="button" @click="changePage(page - 1)">上一页</button>
-          <button
-            v-for="item in pageNumbers"
-            :key="item"
-            :class="{ active: item === page }"
-            type="button"
-            @click="changePage(item)"
-          >
-            {{ item }}
-          </button>
-          <button :disabled="page >= totalPages" type="button" @click="changePage(page + 1)">下一页</button>
-        </div>
-      </footer>
-    </section>
+    </NCard>
 
     <NModal
       :show="isConfigModalVisible"
@@ -579,59 +614,49 @@ onUnmounted(() => {
         role="dialog"
         size="small"
       >
-        <header class="config-header">
-          <div class="config-title-wrap">
-            <span class="config-breadcrumb">履约管理 &gt; 配置履约规则</span>
-          </div>
-          <button class="modal-close-btn" type="button" @click="cancelConfig">×</button>
-        </header>
+        <NFlex class="config-header" justify="space-between" align="center">
+          <h2 class="config-title">配置履约规则</h2>
+          <NButton quaternary circle class="modal-close-btn" @click="cancelConfig">
+            <span class="close-symbol">×</span>
+          </NButton>
+        </NFlex>
 
         <div class="config-panel">
           <div class="config-form">
-            <div class="config-row">
-              <span class="config-label">规则名称:</span>
-              <span class="config-text">{{ configRuleName }}</span>
-            </div>
+            <section class="config-section">
+              <NDescriptions class="config-descriptions" label-placement="left" :column="1" size="small">
+                <NDescriptionsItem label="规则名称">{{ configRuleName }}</NDescriptionsItem>
+                <NDescriptionsItem label="是否启用">
+                  <NSwitch v-model:value="configForm.enabled" size="small" />
+                </NDescriptionsItem>
+                <NDescriptionsItem label="规则说明">{{ configRuleDescription }}</NDescriptionsItem>
+                <NDescriptionsItem label="执行事件">{{ configRuleEvent }}</NDescriptionsItem>
+              </NDescriptions>
+            </section>
 
-            <div class="config-row">
-              <span class="config-label">是否启用</span>
-              <NSwitch v-model:value="configForm.enabled" size="small" />
-            </div>
-
-            <div class="config-row">
-              <span class="config-label">规则说明:</span>
-              <span class="config-text">{{ configRuleDescription }}</span>
-            </div>
-
-            <div class="config-field">
-              <span class="config-label">执行事件:</span>
-              <span class="config-text">{{ configRuleEvent }}</span>
-            </div>
-
-            <div class="config-field">
-              <label class="config-label" for="fulfillment-rule-message">提醒消息:</label>
-              <div class="config-input-wrap">
-                <NInput
-                  id="fulfillment-rule-message"
-                  v-model:value="configForm.message"
-                  type="textarea"
-                  :autosize="{ minRows: 3, maxRows: 4 }"
-                  :maxlength="RULE_MESSAGE_MAX_LENGTH"
-                  show-count
-                  placeholder="填写需要发送给达人的 message"
-                />
-                <div class="config-input-hint" :class="{ error: isRuleMessageTooLong }">
-                  最多 {{ RULE_MESSAGE_MAX_LENGTH }} 字，当前 {{ ruleMessageLength }} 字
-                </div>
+            <section class="config-section">
+              <label class="config-field-label" for="fulfillment-rule-message">提醒消息</label>
+              <NInput
+                id="fulfillment-rule-message"
+                v-model:value="configForm.message"
+                class="config-textarea"
+                type="textarea"
+                :autosize="{ minRows: 4, maxRows: 8 }"
+                :maxlength="RULE_MESSAGE_MAX_LENGTH"
+                show-count
+                placeholder="填写需要发送给达人的 message"
+              />
+              <div class="config-input-hint" :class="{ error: isRuleMessageTooLong }">
+                最多 {{ RULE_MESSAGE_MAX_LENGTH }} 字，当前 {{ ruleMessageLength }} 字
               </div>
-            </div>
-
-            <div class="config-actions">
-              <NButton type="primary" :loading="isConfigSaving" :disabled="isRuleMessageTooLong" @click="saveRuleConfig">确定</NButton>
-              <NButton tertiary :disabled="isConfigSaving" @click="cancelConfig">取消</NButton>
-            </div>
+            </section>
           </div>
         </div>
+
+        <footer class="config-footer">
+          <NButton tertiary :disabled="isConfigSaving" @click="cancelConfig">取消</NButton>
+          <NButton type="primary" :loading="isConfigSaving" :disabled="isRuleMessageTooLong" @click="saveRuleConfig">确定</NButton>
+        </footer>
       </NCard>
     </NModal>
 
@@ -650,62 +675,37 @@ onUnmounted(() => {
         role="dialog"
         size="small"
       >
-        <header class="reminder-header">
-          <div class="reminder-title-wrap">
+        <NFlex class="reminder-header" justify="space-between" align="center">
+          <NFlex class="reminder-title-wrap" align="baseline" :size="18">
             <span class="reminder-main-title">履约管理</span>
             <span class="reminder-sub-title">提醒记录</span>
-          </div>
-          <button class="modal-close-btn" type="button" @click="backToRuleList">×</button>
-        </header>
+          </NFlex>
+          <NButton quaternary circle class="modal-close-btn" @click="backToRuleList">
+            <span class="close-symbol">×</span>
+          </NButton>
+        </NFlex>
 
         <div class="reminder-panel">
           <div class="table-wrap">
-            <table class="rule-table reminder-table">
-              <thead>
-                <tr>
-                  <th>达人</th>
-                  <th>粉丝数量</th>
-                  <th>GMV</th>
-                  <th>命中规则</th>
-                  <th>发送提醒时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="isReminderLoading">
-                  <td class="empty-row" colspan="5">加载中...</td>
-                </tr>
-                <tr v-else-if="reminderErrorMessage">
-                  <td class="empty-row" colspan="5">{{ reminderErrorMessage }}</td>
-                </tr>
-                <tr v-for="item in pagedReminders" :key="item.id">
-                  <td>{{ item.creatorName }}</td>
-                  <td>{{ item.followerCount }}</td>
-                  <td>{{ item.gmv }}</td>
-                  <td>{{ item.matchedRule }}</td>
-                  <td>{{ item.sentAt }}</td>
-                </tr>
-                <tr v-if="!isReminderLoading && !reminderErrorMessage && pagedReminders.length === 0">
-                  <td class="empty-row" colspan="5">暂无提醒记录</td>
-                </tr>
-              </tbody>
-            </table>
+            <NDataTable
+              class="rule-data-table reminder-data-table"
+              :columns="reminderColumns"
+              :data="isReminderLoading ? [] : pagedReminders"
+              :loading="isReminderLoading"
+              :bordered="false"
+              :single-line="false"
+              :row-key="(row) => row.id"
+              :scroll-x="760"
+            >
+              <template #empty>
+                <div class="table-empty">{{ reminderTableEmptyText }}</div>
+              </template>
+            </NDataTable>
           </div>
 
           <footer class="pagination-row">
             <span class="total-text">共 {{ reminderTotal }} 条</span>
-            <div class="pager">
-              <button :disabled="reminderPage <= 1" type="button" @click="changeReminderPage(reminderPage - 1)">上一页</button>
-              <button
-                v-for="item in reminderPageNumbers"
-                :key="item"
-                :class="{ active: item === reminderPage }"
-                type="button"
-                @click="changeReminderPage(item)"
-              >
-                {{ item }}
-              </button>
-              <button :disabled="reminderPage >= reminderTotalPages" type="button" @click="changeReminderPage(reminderPage + 1)">下一页</button>
-            </div>
+            <NPagination :page="reminderPage" :page-size="reminderPageSize" :item-count="reminderTotal" @update:page="changeReminderPage" />
           </footer>
         </div>
       </NCard>
@@ -742,18 +742,24 @@ onUnmounted(() => {
 }
 
 .summary-box {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
+  overflow: hidden;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
   background: #fff;
-  padding: 16px 32px;
   margin-bottom: 14px;
+}
+
+.summary-box :deep(.n-card__content) {
+  padding: 16px 32px !important;
+}
+
+.summary-content {
+  width: 100%;
 }
 
 .summary-left {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
   color: #3a4a5f;
@@ -762,10 +768,7 @@ onUnmounted(() => {
 }
 
 .summary-right {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  flex: 1;
   text-align: center;
 }
 
@@ -777,10 +780,8 @@ onUnmounted(() => {
 }
 
 .summary-number-btn {
-  border: 0;
-  background: transparent;
+  height: auto;
   padding: 0;
-  cursor: pointer;
 }
 
 .summary-number-btn:hover .summary-number {
@@ -801,104 +802,55 @@ onUnmounted(() => {
   background: #fff;
 }
 
+.table-panel {
+  overflow: hidden;
+}
+
+.table-panel :deep(.n-card__content) {
+  padding: 0 !important;
+}
+
 .table-wrap {
   width: 100%;
   overflow-x: auto;
-}
-
-.rule-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 980px;
-}
-
-.rule-table th,
-.rule-table td {
-  text-align: left;
-  padding: 12px 14px;
-  border-bottom: 1px solid #ecf1f7;
-  font-size: 14px;
-  color: #2b3a4a;
-}
-
-.rule-table th {
-  font-weight: 600;
-  color: #4a5868;
-  background: #f8fafc;
 }
 
 .rule-name {
   font-weight: 600;
 }
 
-.nowrap-column {
-  white-space: nowrap;
-  width: 1%;
-}
-
-.switch-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.switch-btn {
-  width: 42px;
-  height: 24px;
-  border: 1px solid #d0d9e6;
-  border-radius: 999px;
-  background: #e7edf8;
-  cursor: pointer;
-  padding: 1px;
-  display: inline-flex;
-  align-items: center;
-  transition: all 0.2s ease;
-}
-
-.switch-btn.on {
-  background: #0f67ff;
-  border-color: #0f67ff;
-  justify-content: flex-end;
-}
-
-.switch-btn:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.switch-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(18, 29, 46, 0.25);
-}
-
-.config-btn,
-.config-back {
-  border: 0;
-  background: transparent;
-  color: #0f67ff;
-  cursor: pointer;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 14px;
-}
-
 .modal-close-btn {
-  border: 0;
-  background: transparent;
-  font-size: 22px;
-  line-height: 1;
   color: #6b7b90;
-  cursor: pointer;
+  font-size: 20px;
+  --n-color-focus: transparent !important;
 }
 
-.empty-row {
-  text-align: center !important;
-  color: #7d8da1 !important;
+.modal-close-btn:deep(.n-button__content) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-symbol {
+  display: block;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.rule-data-table:deep(.n-data-table-th) {
+  background: #f8fafc;
+  color: #4a5868;
+  font-weight: 600;
+}
+
+.rule-data-table:deep(.n-data-table-td) {
+  color: #2b3a4a;
+}
+
+.table-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #7d8da1;
 }
 
 .pagination-row {
@@ -913,32 +865,8 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pager button {
-  min-width: 30px;
-  height: 30px;
-  border: 1px solid #d0d9e6;
-  border-radius: 6px;
-  background: #fff;
-  color: #2b3a4a;
-  cursor: pointer;
-  padding: 0 8px;
-}
-
-.pager button.active {
-  border-color: #0f67ff;
-  color: #0f67ff;
-  background: #eef5ff;
-}
-
-.pager button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.pagination-row :deep(.n-pagination) {
+  margin-left: auto;
 }
 
 .config-panel {
@@ -947,8 +875,8 @@ onUnmounted(() => {
   overflow: auto;
   border: 0;
   border-radius: 0;
-  background: transparent;
-  padding: 12px 16px 24px;
+  background: #f4f7fb;
+  padding: 16px 18px;
 }
 
 .reminder-panel {
@@ -988,7 +916,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  border-bottom: 1px solid #dbe3ef;
+  border-bottom: 1px solid #ecf1f7;
   background: #fff;
 }
 
@@ -1001,14 +929,11 @@ onUnmounted(() => {
   background: #fff;
 }
 
-.config-breadcrumb {
-  color: #2b3a4a;
-  font-size: 14px;
-}
-
-.config-title-wrap {
-  display: flex;
-  align-items: center;
+.config-title {
+  margin: 0;
+  color: #1f2d3d;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .reminder-title-wrap {
@@ -1029,38 +954,58 @@ onUnmounted(() => {
 }
 
 .config-form {
-  padding: 16px 8px 0;
+  padding: 0;
 }
 
-.config-row,
-.config-field {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
+.config-section {
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 14px;
+  margin-bottom: 12px;
 }
 
-.config-label {
-  width: 72px;
-  flex: 0 0 72px;
+.config-descriptions {
+  margin-bottom: 0;
+}
+
+.config-descriptions :deep(.n-descriptions-table) {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.config-descriptions :deep(.n-descriptions-table-header),
+.config-descriptions :deep(.n-descriptions-table-content) {
+  font-size: 14px;
   color: #2b3a4a;
-  font-size: 13px;
-  line-height: 32px;
+  line-height: 1.7;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
-.config-text {
-  color: #2b3a4a;
-  font-size: 13px;
-  line-height: 32px;
+.config-field-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #1f2d3d;
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.config-field :deep(.n-input) {
-  max-width: 520px;
-}
-
-.config-input-wrap {
+.config-textarea {
   width: 100%;
-  max-width: 520px;
+  color: #1f2d3d;
+  font-size: 14px;
+}
+
+.config-textarea:deep(.n-input-wrapper) {
+  border-radius: 8px;
+}
+
+.config-textarea:deep(textarea) {
+  min-height: 112px;
+  color: #1f2d3d;
+  font-size: 14px;
+  resize: vertical;
 }
 
 .config-input-hint {
@@ -1093,10 +1038,22 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.config-actions {
+.config-footer {
   display: flex;
-  justify-content: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #ecf1f7;
+  padding: 12px 18px;
+  background: #fff;
+}
+
+.config-footer :deep(.n-button) {
+  min-width: 88px;
+  border-radius: 8px;
+}
+
+.config-footer :deep(.n-button__content) {
+  font-size: 14px;
 }
 
 .reminder-table {
@@ -1120,9 +1077,7 @@ onUnmounted(() => {
     padding: 12px;
   }
 
-  .pagination-row,
-  .config-row,
-  .config-field {
+  .pagination-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
@@ -1138,10 +1093,9 @@ onUnmounted(() => {
     gap: 10px;
   }
 
-  .config-label {
-    width: auto;
-    flex-basis: auto;
-    line-height: 1.5;
+  .config-footer {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 </style>

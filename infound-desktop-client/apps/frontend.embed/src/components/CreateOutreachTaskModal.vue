@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { NButton, NCard, NCheckbox, NInput, NModal, NRadioButton, NRadioGroup, NSelect, NTabPane, NTabs, type SelectOption } from 'naive-ui'
+import { NButton, NCard, NCheckbox, NDatePicker, NInput, NModal, NSelect, NTabPane, NTabs, NTag, type SelectOption } from 'naive-ui'
+import { type OutreachCreatorType } from '../constants/outreach-task-display'
 import FilterFieldLabel from './FilterFieldLabel.vue'
-
-export type OutreachCreatorType = 'ALL' | 'NEW_ONLY' | 'NEW_AND_NOT_REPLIED'
 export interface SelectOptionItem<T = string | number> {
   label: string
   value: T
@@ -202,14 +201,12 @@ const FOLLOWER_GENDER_SELECT_OPTIONS = toSelectOptions(FOLLOWER_GENDER_OPTIONS)
 const PERFORMANCE_GMV_SELECT_OPTIONS = toSelectOptions(PERFORMANCE_GMV_OPTIONS)
 const PERFORMANCE_ITEMS_SOLD_SELECT_OPTIONS = toSelectOptions(PERFORMANCE_ITEMS_SOLD_OPTIONS)
 const PERFORMANCE_EST_POST_RATE_SELECT_OPTIONS = toSelectOptions(PERFORMANCE_EST_POST_RATE_OPTIONS)
-
 const SORT_OPTIONS: Array<{ label: string; value: string }> = [
   { label: '官方默认值', value: 'OFFICIAL_DEFAULT' },
   { label: '达人GMV降序', value: 'GMV_DESC' },
   { label: '达人粉丝数降序', value: 'FOLLOWERS_DESC' },
   { label: '达人佣金率降序', value: 'COMMISSION_DESC' }
 ]
-
 const OUTREACH_CREATOR_OPTIONS: Array<{ label: string; value: OutreachCreatorType }> = [
   { label: '建联所有达人', value: 'ALL' },
   { label: '只建联新达人', value: 'NEW_ONLY' },
@@ -357,7 +354,6 @@ const FILTER_TIPS = {
 /** 为 false 时隐藏「Spotlight 达人」勾选项；表单字段、中英文 label 与问号提示已接好，需要展示时改为 true。 */
 const SHOW_SPOTLIGHT_CREATOR_FILTER = false
 
-const minStartTime = ref('')
 const initialSnapshot = ref('')
 const formContainerRef = ref<HTMLElement | null>(null)
 
@@ -452,16 +448,49 @@ const clearErrors = (): void => {
   }
 }
 
+const getCurrentMinute = (): Date => {
+  const current = new Date()
+  current.setSeconds(0, 0)
+  return current
+}
+
 const pad2 = (value: number): string => String(value).padStart(2, '0')
 
 const formatDateTimeLocal = (date: Date): string => {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
-const getCurrentMinute = (): Date => {
-  const current = new Date()
-  current.setSeconds(0, 0)
-  return current
+const toTimestamp = (value: string): number | null => {
+  const normalized = toDateTimeLocal(value)
+  if (!normalized) return null
+  const parsed = new Date(normalized)
+  const timestamp = parsed.getTime()
+  return Number.isNaN(timestamp) ? null : timestamp
+}
+
+const fromTimestamp = (value: number | null): string => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
+  return formatDateTimeLocal(new Date(value))
+}
+
+const startTimeValue = computed<number | null>(() => toTimestamp(form.value.startTime))
+
+const isStartDateDisabled = (timestamp: number): boolean => {
+  const candidate = new Date(timestamp)
+  candidate.setHours(0, 0, 0, 0)
+  const today = getCurrentMinute()
+  today.setHours(0, 0, 0, 0)
+  return candidate.getTime() < today.getTime()
+}
+
+const handleStartTimeChange = (value: number | null): void => {
+  form.value.startTime = fromTimestamp(value)
+  if (!form.value.startTime || validateStartTime(form.value.startTime)) {
+    clearError('startTime')
+    return
+  }
+
+  setError('startTime', '启动时间已过期，请重新设置启动时间')
 }
 
 const normalizeDateTimeForSubmit = (value: string): string => {
@@ -629,7 +658,6 @@ const initializeForm = (): void => {
   }
   activeCreatorFilterTab.value = 'creator'
   activeMessageTab.value = 'first'
-  minStartTime.value = formatDateTimeLocal(getCurrentMinute())
   clearErrors()
   initialSnapshot.value = JSON.stringify(form.value)
   emit('dirty-change', false)
@@ -639,7 +667,6 @@ const resetForm = (): void => {
   form.value = createDefaultFormState()
   activeCreatorFilterTab.value = 'creator'
   activeMessageTab.value = 'first'
-  minStartTime.value = formatDateTimeLocal(getCurrentMinute())
   clearErrors()
   initialSnapshot.value = JSON.stringify(form.value)
   emit('dirty-change', false)
@@ -651,7 +678,7 @@ const closeModal = (): void => {
 }
 
 const handleModalShowChange = (value: boolean): void => {
-  if (!value) {
+  if (!value && props.visible) {
     closeModal()
   }
 }
@@ -881,7 +908,9 @@ watch(
     >
       <header class="modal-header">
         <h2>{{ title }}</h2>
-        <button v-if="showClose" class="close-btn" type="button" :disabled="saving" @click="closeModal">×</button>
+        <NButton v-if="showClose" quaternary circle class="close-btn" :disabled="saving" @click="closeModal">
+          <span class="close-symbol">×</span>
+        </NButton>
       </header>
 
       <div ref="formContainerRef" class="modal-body">
@@ -907,7 +936,18 @@ watch(
 
         <section class="form-block" data-error-key="startTime">
           <label class="field-label" for="create-task-start-time">2. 启动时间</label>
-          <input id="create-task-start-time" v-model="form.startTime" class="field-input native-field-input" :min="minStartTime" type="datetime-local" />
+          <NDatePicker
+            id="create-task-start-time"
+            :value="startTimeValue"
+            :is-date-disabled="isStartDateDisabled"
+            class="field-input"
+            format="yyyy-MM-dd HH:mm"
+            time-picker-format="HH:mm"
+            type="datetime"
+            clearable
+            value-format="timestamp"
+            @update:value="handleStartTimeChange"
+          />
           <p class="field-helper">选填，必须大于当前时间，精确到分钟</p>
           <p v-if="errors.startTime" class="field-error">{{ errors.startTime }}</p>
         </section>
@@ -931,7 +971,7 @@ watch(
                 <NTabPane v-for="item in CREATOR_FILTER_TAB_OPTIONS" :key="item.value" :name="item.value" :tab="item.label">
                   <template v-if="item.value === 'creator'">
                     <div class="form-grid three-col">
-                      <label class="field-item">
+                      <div class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('productCategory')" :tip-text="FILTER_TIPS.productCategory" />
                         <NSelect
                           v-model:value="form.creatorFilters.productCategorySelections"
@@ -942,8 +982,8 @@ watch(
                           filterable
                           multiple
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('avgCommissionRate')" :tip-text="FILTER_TIPS.avgCommissionRate" />
                         <NSelect
                           v-model:value="form.creatorFilters.avgCommissionRate"
@@ -951,8 +991,8 @@ watch(
                           :placeholder="getFilterPlaceholder('selectDefault')"
                           class="field-input"
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('contentType')" :tip-text="FILTER_TIPS.contentType" />
                         <NSelect
                           v-model:value="form.creatorFilters.contentType"
@@ -960,8 +1000,8 @@ watch(
                           :placeholder="getFilterPlaceholder('selectDefault')"
                           class="field-input"
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <span>{{ getFilterLabel('creatorAgency') }}</span>
                         <NSelect
                           v-model:value="form.creatorFilters.creatorAgency"
@@ -969,7 +1009,7 @@ watch(
                           :placeholder="getFilterPlaceholder('selectDefault')"
                           class="field-input"
                         />
-                      </label>
+                      </div>
                     </div>
 
                     <div class="checkbox-row creator-filter-checkbox-row">
@@ -994,7 +1034,7 @@ watch(
 
                   <template v-else-if="item.value === 'followers'">
                     <div class="form-grid three-col">
-                      <label class="field-item">
+                      <div class="field-item">
                         <span>{{ getFilterLabel('followerAge') }}</span>
                         <NSelect
                           v-model:value="form.followerFilters.followerAgeSelections"
@@ -1005,8 +1045,8 @@ watch(
                           filterable
                           multiple
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <span>{{ getFilterLabel('followerGender') }}</span>
                         <NSelect
                           v-model:value="form.followerFilters.followerGender"
@@ -1014,8 +1054,8 @@ watch(
                           :placeholder="getFilterPlaceholder('selectDefault')"
                           class="field-input"
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <span>{{ getFilterLabel('followerCountMin') }}</span>
                         <NInput v-model:value="form.followerFilters.followerCountMin" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1030,8 +1070,8 @@ watch(
                             {{ option.label }}
                           </NButton>
                         </div>
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <span>{{ getFilterLabel('followerCountMax') }}</span>
                         <NInput v-model:value="form.followerFilters.followerCountMax" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1046,13 +1086,13 @@ watch(
                             {{ option.label }}
                           </NButton>
                         </div>
-                      </label>
+                      </div>
                     </div>
                   </template>
 
                   <template v-else>
                     <div class="form-grid three-col">
-                      <label class="field-item">
+                      <div class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('gmv')" :tip-text="FILTER_TIPS.gmv" />
                         <NSelect
                           v-model:value="form.performanceFilters.gmvSelections"
@@ -1063,8 +1103,8 @@ watch(
                           filterable
                           multiple
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('itemsSold')" :tip-text="FILTER_TIPS.itemsSold" />
                         <NSelect
                           v-model:value="form.performanceFilters.itemsSoldSelections"
@@ -1075,8 +1115,8 @@ watch(
                           filterable
                           multiple
                         />
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <span>{{ getFilterLabel('averageViewsPerVideoMin') }}</span>
                         <NInput v-model:value="form.performanceFilters.averageViewsPerVideoMin" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1091,8 +1131,8 @@ watch(
                             {{ option.label }}
                           </NButton>
                         </div>
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <span>{{ getFilterLabel('averageViewersPerLiveMin') }}</span>
                         <NInput v-model:value="form.performanceFilters.averageViewersPerLiveMin" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1107,8 +1147,8 @@ watch(
                             {{ option.label }}
                           </NButton>
                         </div>
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <FilterFieldLabel
                           :label="getFilterLabel('engagementRateMinPercent')"
                           :tip-text="FILTER_TIPS.engagementRateMinPercent"
@@ -1126,8 +1166,8 @@ watch(
                             {{ option.label }}
                           </NButton>
                         </div>
-                      </label>
-                      <label class="field-item">
+                      </div>
+                      <div class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('estPostRate')" :tip-text="FILTER_TIPS.estPostRate" />
                         <NSelect
                           v-model:value="form.performanceFilters.estPostRate"
@@ -1135,8 +1175,8 @@ watch(
                           :placeholder="getFilterPlaceholder('selectDefault')"
                           class="field-input"
                         />
-                      </label>
-                      <label class="field-item full-span">
+                      </div>
+                      <div class="field-item full-span">
                         <FilterFieldLabel
                           :label="getFilterLabel('brandCollaborations')"
                           :tip-text="FILTER_TIPS.brandCollaborations"
@@ -1147,7 +1187,7 @@ watch(
                           :placeholder="getFilterPlaceholder('brandCollaborations')"
                           type="text"
                         />
-                      </label>
+                      </div>
                     </div>
 
                     <!-- 暂未接入后端字段，先隐藏保留
@@ -1201,14 +1241,9 @@ watch(
           <p class="field-helper">{{ messageTip }}</p>
 
           <div v-if="isAllCreatorMode" class="message-tab-row">
-            <NRadioGroup v-model:value="activeMessageTab" class="message-tab-group" size="small">
-              <NRadioButton
-                v-for="item in MESSAGE_TAB_OPTIONS"
-                :key="item.value"
-                :value="item.value"
-                :label="item.label"
-              />
-            </NRadioGroup>
+            <NTabs v-model:value="activeMessageTab" animated type="line" class="message-tabs">
+              <NTabPane v-for="item in MESSAGE_TAB_OPTIONS" :key="item.value" :name="item.value" :tab="item.label" />
+            </NTabs>
           </div>
 
           <div v-show="activeMessageTab === 'first'" class="message-panel" data-error-key="firstMessageContent">
@@ -1234,10 +1269,15 @@ watch(
             </NCheckbox>
             <div v-if="form.firstMessage.enableProductMessage" class="product-message-wrap" data-error-key="firstProductIds">
               <div class="id-tags">
-                <span v-for="item in form.firstMessage.productIds" :key="item" class="id-tag">
+                <NTag
+                  v-for="item in form.firstMessage.productIds"
+                  :key="item"
+                  closable
+                  class="id-tag"
+                  @close="removeMessageProductId('first', item)"
+                >
                   {{ item }}
-                  <button type="button" @click="removeMessageProductId('first', item)">×</button>
-                </span>
+                </NTag>
               </div>
               <NInput
                 v-model:value="form.firstMessage.productInput"
@@ -1274,10 +1314,15 @@ watch(
             </NCheckbox>
             <div v-if="form.replyMessage.enableProductMessage" class="product-message-wrap" data-error-key="replyProductIds">
               <div class="id-tags">
-                <span v-for="item in form.replyMessage.productIds" :key="item" class="id-tag">
+                <NTag
+                  v-for="item in form.replyMessage.productIds"
+                  :key="item"
+                  closable
+                  class="id-tag"
+                  @close="removeMessageProductId('reply', item)"
+                >
                   {{ item }}
-                  <button type="button" @click="removeMessageProductId('reply', item)">×</button>
-                </span>
+                </NTag>
               </div>
               <NInput
                 v-model:value="form.replyMessage.productInput"
@@ -1342,12 +1387,21 @@ watch(
 }
 
 .close-btn {
-  border: 0;
-  background: transparent;
-  font-size: 22px;
-  line-height: 1;
   color: #6b7b90;
-  cursor: pointer;
+  font-size: 20px;
+  --n-color-focus: transparent !important;
+}
+
+.close-btn:deep(.n-button__content) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-symbol {
+  display: block;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 .modal-body {
@@ -1401,29 +1455,9 @@ watch(
   font-size: 14px;
 }
 
-.native-field-input {
-  height: 36px;
-  border: 1px solid #d0d9e6;
-  border-radius: 8px;
-  padding: 0 10px;
-  background: #fff;
-  color: #1f2d3d;
-  outline: none;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.native-field-input:focus,
-.native-field-input:focus-visible,
-.native-field-input:active {
-  border-color: #0f67ff;
-  box-shadow: 0 0 0 2px rgba(15, 103, 255, 0.12);
-  outline: none;
-}
-
 .field-input:deep(.n-input-wrapper),
-.field-input:deep(.n-base-selection) {
+.field-input:deep(.n-base-selection),
+.field-input:deep(.n-date-picker) .n-input-wrapper {
   border-radius: 8px;
   font-size: 14px;
 }
@@ -1631,33 +1665,12 @@ watch(
   margin: 8px 0;
 }
 
-.message-tab-group {
+.message-tabs {
   width: fit-content;
 }
 
-.message-tab-group:deep(.n-radio-group) {
-  background: #eef5ff;
-  border-radius: 999px;
-  padding: 4px;
-}
-
-.message-tab-group:deep(.n-radio-button) {
-  border-radius: 999px;
-}
-
-.message-tab-group:deep(.n-radio-button__state-border),
-.message-tab-group:deep(.n-radio-button__state-dot) {
+.message-tabs:deep(.n-tabs-pane-wrapper) {
   display: none;
-}
-
-.message-tab-group:deep(.n-radio-button__label) {
-  min-width: 108px;
-  font-size: 12px;
-  text-align: center;
-}
-
-.message-tab-group:deep(.n-radio-button.n-radio-button--checked) {
-  color: #0f67ff;
 }
 
 .message-panel {
@@ -1683,24 +1696,11 @@ watch(
 }
 
 .id-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 999px;
-  border: 1px solid #cce2ff;
-  padding: 3px 8px;
-  font-size: 12px;
-  color: #1f63d8;
-  background: #eef5ff;
-}
-
-.id-tag button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
+  --n-border: 1px solid #cce2ff !important;
+  --n-color: #eef5ff !important;
+  --n-text-color: #1f63d8 !important;
+  --n-close-color: #1f63d8 !important;
+  --n-close-color-hover: #0f67ff !important;
 }
 
 .description-text {

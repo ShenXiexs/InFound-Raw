@@ -1,6 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { createDiscreteApi, NCard, NModal } from 'naive-ui'
+import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  createDiscreteApi,
+  dateZhCN,
+  NButton,
+  NCard,
+  NDataTable,
+  NIcon,
+  NInput,
+  NModal,
+  NPagination,
+  NSelect,
+  NSpace,
+  NTag,
+  zhCN,
+  type DataTableColumns
+} from 'naive-ui'
 import CreateOutreachTaskModal, {
   type CreateOutreachTaskFilterOptions,
   type CreateOutreachTaskFormPayload,
@@ -50,7 +65,12 @@ const props = defineProps<{
   shopId?: string
 }>()
 
-const { dialog, message } = createDiscreteApi(['dialog', 'message'])
+const { dialog, message } = createDiscreteApi(['dialog', 'message'], {
+  configProviderProps: {
+    locale: zhCN,
+    dateLocale: dateZhCN
+  }
+})
 
 const keywordInput = ref('')
 const statusInput = ref<FilterTaskStatus>('')
@@ -61,6 +81,7 @@ const pageSize = ref(10)
 const pageSizeOptions = [10, 20, 50]
 const durationNow = ref(Date.now())
 let durationTimer: ReturnType<typeof window.setInterval> | null = null
+let taskListPollTimer: ReturnType<typeof window.setInterval> | null = null
 
 const taskList = ref<OutreachTaskItem[]>([])
 const total = ref(0)
@@ -86,6 +107,10 @@ const isLeaveDialogOpen = ref(false)
 const TASK_CACHE_PREFIX = 'embed-outreach-task:'
 
 const statusOptions: FilterTaskStatus[] = ['', '运行中', '已完成', '已取消', '未启动']
+const statusSelectOptions = [
+  { label: '全部', value: '' },
+  ...statusOptions.filter((item) => item).map((item) => ({ label: item, value: item }))
+]
 
 const FILTER_UI_TO_API_STATUS: Record<Exclude<FilterTaskStatus, ''>, string> = {
   运行中: 'RUNNING',
@@ -97,15 +122,82 @@ const FILTER_UI_TO_API_STATUS: Record<Exclude<FilterTaskStatus, ''>, string> = {
 const PERFORMANCE_EST_POST_RATE_OPTIONS = ['All', 'OK', 'Good', 'Better']
 const SORT_OPTION_VALUES = ['OFFICIAL_DEFAULT', 'GMV_DESC', 'FOLLOWERS_DESC', 'COMMISSION_DESC']
 
-const ACTION_META: Record<TaskAction, { icon: string; title: string }> = {
-  view: { icon: '👁', title: '查看' },
-  start: { icon: '▶', title: '启动' },
-  end: { icon: '⏸', title: '结束' },
-  copy: { icon: '⧉', title: '复制' },
-  edit: { icon: '✎', title: '编辑' }
+interface ActionIconNode {
+  tag: string
+  attrs: Record<string, string | number>
+}
+
+const renderActionIcon = (nodes: ActionIconNode[]) => {
+  return h(
+    NIcon,
+    {
+      size: 14,
+      class: 'action-btn-icon'
+    },
+    {
+      default: () =>
+        h(
+          'svg',
+          {
+            xmlns: 'http://www.w3.org/2000/svg',
+            viewBox: '0 0 24 24',
+            fill: 'none',
+            stroke: 'currentColor',
+            'stroke-width': '2',
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round'
+          },
+          nodes.map((node, index) => h(node.tag, { key: `${node.tag}-${index}`, ...node.attrs }))
+        )
+    }
+  )
+}
+
+const ACTION_META: Record<TaskAction, { title: string; icon: () => ReturnType<typeof renderActionIcon> }> = {
+  view: {
+    title: '查看',
+    icon: () =>
+      renderActionIcon([
+        { tag: 'path', attrs: { d: 'M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z' } },
+        { tag: 'circle', attrs: { cx: '12', cy: '12', r: '3' } }
+      ])
+  },
+  start: {
+    title: '启动',
+    icon: () =>
+      renderActionIcon([
+        { tag: 'polygon', attrs: { points: '8 5 19 12 8 19 8 5' } }
+      ])
+  },
+  end: {
+    title: '结束',
+    icon: () =>
+      renderActionIcon([
+        { tag: 'rect', attrs: { x: '6', y: '6', width: '12', height: '12', rx: '2', fill: 'currentColor', stroke: 'currentColor' } }
+      ])
+  },
+  copy: {
+    title: '复制',
+    icon: () =>
+      renderActionIcon([
+        { tag: 'rect', attrs: { x: '9', y: '9', width: '13', height: '13', rx: '2', ry: '2' } },
+        { tag: 'path', attrs: { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' } }
+      ])
+  },
+  edit: {
+    title: '编辑',
+    icon: () =>
+      renderActionIcon([
+        { tag: 'path', attrs: { d: 'M12 20h9' } },
+        { tag: 'path', attrs: { d: 'M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z' } }
+      ])
+  }
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
+const taskTableEmptyText = computed(() => errorMessage.value || emptyMessage.value)
+const hasRunningTasks = computed(() => taskList.value.some((task) => task.status === '运行中'))
+const shouldPollTaskList = computed(() => Boolean(props.shopId?.trim()) && hasRunningTasks.value)
 const activeTask = computed<OutreachTaskItem | null>(() => {
   if (!activeTaskId.value) return null
   return resolveTaskById(activeTaskId.value) || null
@@ -193,12 +285,11 @@ const getRowIndex = (index: number): number => {
   return (page.value - 1) * pageSize.value + index + 1
 }
 
-const getStatusClass = (status: TaskStatus): string => {
-  if (status === '运行中') return 'is-running'
-  if (status === '未启动') return 'is-pending'
-  if (status === '已完成') return 'is-completed'
-  if (status === '已取消' || status === '已结束') return 'is-ended'
-  return 'is-pending'
+const getStatusTagType = (status: TaskStatus): 'success' | 'info' | 'error' | 'default' => {
+  if (status === '运行中') return 'info'
+  if (status === '已完成') return 'success'
+  if (status === '已取消' || status === '已结束') return 'error'
+  return 'default'
 }
 
 const getTaskActions = (status: TaskStatus): TaskAction[] => {
@@ -206,6 +297,111 @@ const getTaskActions = (status: TaskStatus): TaskAction[] => {
   if (status === '运行中') return ['end', 'view', 'copy']
   return ['view', 'copy']
 }
+
+const taskColumns: DataTableColumns<OutreachTaskItem> = [
+  {
+    title: '序号',
+    key: 'index',
+    width: 72,
+    render: (_row, index) => getRowIndex(index)
+  },
+  {
+    title: '任务名称',
+    key: 'taskName',
+    minWidth: 180,
+    render: (row) =>
+      h(
+        NButton,
+        {
+          text: true,
+          type: 'primary',
+          onClick: () => goToTaskDetail(row)
+        },
+        {
+          default: () => row.taskName
+        }
+      )
+  },
+  {
+    title: '启动时间',
+    key: 'startTime',
+    minWidth: 180
+  },
+  {
+    title: '建联进度',
+    key: 'progress',
+    width: 120,
+    render: (row) =>
+      h(
+        NButton,
+        {
+          text: true,
+          type: 'primary',
+          onClick: () => goToTaskDetail(row)
+        },
+        {
+          default: () => `${row.linkedCount} / ${row.planCount}`
+        }
+      )
+  },
+  {
+    title: '运行时长',
+    key: 'duration',
+    width: 130,
+    render: (row) => getTaskDurationText(row)
+  },
+  {
+    title: '任务状态',
+    key: 'status',
+    width: 110,
+    render: (row) =>
+      h(
+        NTag,
+        {
+          bordered: false,
+          round: true,
+          size: 'small',
+          type: getStatusTagType(row.status)
+        },
+        {
+          default: () => row.status
+        }
+      )
+  },
+  {
+    title: '任务管理',
+    key: 'actions',
+    minWidth: 240,
+    render: (row) =>
+      h(
+        NSpace,
+        {
+          size: 4
+        },
+        {
+          default: () =>
+            getTaskActions(row.status).map((action) =>
+              h(
+                NButton,
+                {
+                  key: action,
+                  text: true,
+                  size: 'small',
+                  type: action === 'end' ? 'error' : 'primary',
+                  onClick: () => {
+                    void handleTaskAction(row, action)
+                  }
+                },
+                {
+                  icon: ACTION_META[action].icon,
+                  default: () => ACTION_META[action].title
+                }
+              )
+            )
+        }
+      )
+  }
+]
 
 const matchesKeyword = (task: OutreachTaskItem, keyword: string): boolean => {
   if (!keyword) return true
@@ -721,7 +917,12 @@ const syncRouteFromHash = (): void => {
 
 const navigate = (route: HashRoute): void => {
   const currentRoute = parseHashRoute()
-  if (isSameRoute(currentRoute, route)) return
+  if (isSameRoute(currentRoute, route)) {
+    if (currentView.value !== route.view) {
+      applyRoute(route)
+    }
+    return
+  }
 
   if (hasUnsavedTaskFormChanges.value) {
     pendingLeaveRoute.value = route
@@ -732,7 +933,7 @@ const navigate = (route: HashRoute): void => {
   commitNavigation(route)
 }
 
-const fetchTaskList = async (): Promise<void> => {
+const fetchTaskList = async (showLoading: boolean = true): Promise<void> => {
   const shopId = props.shopId?.trim() || ''
   if (!shopId) {
     taskList.value = []
@@ -742,7 +943,9 @@ const fetchTaskList = async (): Promise<void> => {
     return
   }
 
-  isLoading.value = true
+  if (showLoading) {
+    isLoading.value = true
+  }
   try {
     const apiStatus = statusQuery.value ? FILTER_UI_TO_API_STATUS[statusQuery.value] : undefined
     const result = await getOutreachTaskList(
@@ -769,8 +972,24 @@ const fetchTaskList = async (): Promise<void> => {
     errorMessage.value = error?.message || '任务列表加载失败'
     emptyMessage.value = '暂无建联任务，点击右上角新增任务'
   } finally {
-    isLoading.value = false
+    if (showLoading) {
+      isLoading.value = false
+    }
   }
+}
+
+const stopTaskListPolling = (): void => {
+  if (!taskListPollTimer) return
+  window.clearInterval(taskListPollTimer)
+  taskListPollTimer = null
+}
+
+const startTaskListPolling = (): void => {
+  if (taskListPollTimer) return
+  taskListPollTimer = window.setInterval(() => {
+    if (isLoading.value || !shouldPollTaskList.value) return
+    void fetchTaskList(false)
+  }, 5000)
 }
 
 const fetchTaskFilterOptions = async (): Promise<void> => {
@@ -804,9 +1023,9 @@ const changePage = (nextPage: number): void => {
   page.value = nextPage
 }
 
-const handlePageSizeChange = (): void => {
+const handlePageSizeChange = (nextPageSize: number): void => {
+  pageSize.value = nextPageSize
   page.value = 1
-  void fetchTaskList()
 }
 
 const showActionMessage = (content: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
@@ -832,13 +1051,6 @@ const openConfirmDialog = (title: string, content: string): Promise<boolean> => 
       negativeText: '取消',
       closable: false,
       maskClosable: false,
-      positiveButtonProps: {
-        color: '#0f67ff'
-      },
-      negativeButtonProps: {
-        color: '#0f67ff',
-        ghost: true
-      },
       onPositiveClick: () => {
         settle(true)
       },
@@ -958,7 +1170,16 @@ const handleTaskAction = async (task: OutreachTaskItem, action: TaskAction): Pro
 }
 
 const goToCreateTaskInCurrentTab = (): void => {
-  navigate({ view: 'create' })
+  const route: HashRoute = { view: 'create' }
+
+  if (hasUnsavedTaskFormChanges.value) {
+    pendingLeaveRoute.value = route
+    openLeaveConfirmDialog()
+    return
+  }
+
+  applyRoute(route)
+  commitNavigation(route)
 }
 
 const goBackToList = (): void => {
@@ -1011,6 +1232,10 @@ const handleDetailEnd = async (): Promise<void> => {
   } catch (error: any) {
     showActionMessage(error?.message || '结束任务失败', 'error')
   }
+}
+
+const handleTaskFormDirtyChange = (dirty: boolean): void => {
+  isTaskFormDirty.value = dirty
 }
 
 const onTaskFormSubmit = async (payload: CreateOutreachTaskFormPayload): Promise<void> => {
@@ -1106,6 +1331,7 @@ onUnmounted(() => {
     window.clearInterval(durationTimer)
     durationTimer = null
   }
+  stopTaskListPolling()
   window.removeEventListener('hashchange', onHashChange)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
@@ -1116,11 +1342,25 @@ watch([page, pageSize], () => {
 
 watch(
   () => props.shopId,
-  () => {
-    page.value = 1
-    void fetchTaskList()
-    void fetchTaskFilterOptions()
+  (newShopId, oldShopId) => {
+    if (newShopId !== oldShopId) {
+      page.value = 1
+      void fetchTaskList()
+      void fetchTaskFilterOptions()
+    }
   }
+)
+
+watch(
+  shouldPollTaskList,
+  (value) => {
+    if (value) {
+      startTaskListPolling()
+      return
+    }
+    stopTaskListPolling()
+  },
+  { immediate: true }
 )
 
 watch(totalPages, (value) => {
@@ -1134,105 +1374,56 @@ watch(totalPages, (value) => {
   <div class="task-page">
     <header class="page-header">
       <h1>一键建联-任务管理</h1>
-      <button class="add-btn" type="button" @click="goToCreateTaskInCurrentTab">新增任务</button>
+      <NButton type="primary" @click="goToCreateTaskInCurrentTab">新增任务</NButton>
     </header>
 
     <section class="filter-panel">
       <div class="field-item">
         <label for="task-name">任务名称：</label>
-        <input
+        <NInput
           id="task-name"
-          v-model="keywordInput"
+          v-model:value="keywordInput"
           maxlength="20"
           placeholder="请输入关键词"
-          type="text"
           @keydown.enter.prevent="handleSearch"
         />
       </div>
       <div class="field-item">
         <label for="task-status">任务状态：</label>
-        <select id="task-status" v-model="statusInput">
-          <option value="">全部</option>
-          <option v-for="option in statusOptions.filter((item) => item)" :key="option" :value="option">{{ option }}</option>
-        </select>
+        <NSelect id="task-status" v-model:value="statusInput" :options="statusSelectOptions" />
       </div>
-      <button class="search-btn" type="button" @click="handleSearch">搜索</button>
+      <NButton type="primary" @click="handleSearch">搜索</NButton>
     </section>
 
     <section class="table-panel">
       <div class="table-wrap">
-        <table class="task-table">
-          <thead>
-            <tr>
-              <th>序号</th>
-              <th>任务名称</th>
-              <th>启动时间</th>
-              <th>建联进度</th>
-              <th>运行时长</th>
-              <th>任务状态</th>
-              <th>任务管理</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isLoading">
-              <td class="empty-row" colspan="7">加载中...</td>
-            </tr>
-            <tr v-else-if="errorMessage">
-              <td class="empty-row" colspan="7">{{ errorMessage }}</td>
-            </tr>
-            <tr v-else-if="taskList.length === 0">
-              <td class="empty-row" colspan="7">{{ emptyMessage }}</td>
-            </tr>
-            <template v-else>
-              <tr v-for="(item, index) in taskList" :key="item.id">
-                <td>{{ getRowIndex(index) }}</td>
-                <td>
-                  <button class="name-link" type="button" @click="goToTaskDetail(item)">{{ item.taskName }}</button>
-                </td>
-                <td>{{ item.startTime }}</td>
-                <td>
-                  <button class="progress-link" type="button" @click="goToTaskDetail(item)">
-                    {{ item.linkedCount }} / {{ item.planCount }}
-                  </button>
-                </td>
-                <td>{{ getTaskDurationText(item) }}</td>
-                <td>
-                  <span :class="['status-pill', getStatusClass(item.status)]">{{ item.status }}</span>
-                </td>
-                <td>
-                  <div class="icon-actions">
-                    <button
-                      v-for="action in getTaskActions(item.status)"
-                      :key="action"
-                      class="icon-action-btn"
-                      :title="ACTION_META[action].title"
-                      type="button"
-                      @click="handleTaskAction(item, action)"
-                    >
-                      <span aria-hidden="true">{{ ACTION_META[action].icon }}</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
+        <NDataTable
+          class="task-data-table"
+          :columns="taskColumns"
+          :data="isLoading ? [] : taskList"
+          :loading="isLoading"
+          :bordered="false"
+          :single-line="false"
+          :row-key="(row) => row.id"
+          :scroll-x="980"
+        >
+          <template #empty>
+            <div class="table-empty">{{ taskTableEmptyText }}</div>
+          </template>
+        </NDataTable>
       </div>
 
       <footer class="pagination-row">
         <span class="total-text">共 {{ total }} 条</span>
-        <div class="pager">
-          <label class="page-size-label">
-            每页
-            <select v-model.number="pageSize" @change="handlePageSizeChange">
-              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
-            </select>
-            条
-          </label>
-          <button :disabled="page <= 1" type="button" @click="changePage(page - 1)">上一页</button>
-          <span class="page-index">{{ page }} / {{ totalPages }}</span>
-          <button :disabled="page >= totalPages" type="button" @click="changePage(page + 1)">下一页</button>
-        </div>
+        <NPagination
+          :page="page"
+          :page-size="pageSize"
+          :item-count="total"
+          :page-sizes="pageSizeOptions"
+          show-size-picker
+          @update:page="changePage"
+          @update:page-size="handlePageSizeChange"
+        />
       </footer>
     </section>
 
@@ -1247,19 +1438,23 @@ watch(totalPages, (value) => {
         v-if="isDetailModalVisible"
         class="detail-modal-card"
         :bordered="false"
+        content-style="padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden;"
         role="dialog"
         title="查看任务"
       >
         <template #header-extra>
-          <button class="detail-modal-close-btn" type="button" @click="goBackToList">×</button>
+          <NButton quaternary circle class="detail-modal-close-btn" @click="goBackToList">
+            <span class="detail-close-symbol">×</span>
+          </NButton>
         </template>
 
-        <OutreachTaskDetailView :task="activeTask" :task-id="activeTaskId" @edit="handleDetailEdit" @end="handleDetailEnd" />
+        <div class="detail-modal-body">
+          <OutreachTaskDetailView :task="activeTask" :task-id="activeTaskId" @edit="handleDetailEdit" @end="handleDetailEnd" />
+        </div>
       </NCard>
     </NModal>
 
     <CreateOutreachTaskModal
-      v-if="isTaskFormModalVisible"
       :visible="isTaskFormModalVisible"
       mode="modal"
       :title="formTitle"
@@ -1271,7 +1466,7 @@ watch(totalPages, (value) => {
       :submit-error="formErrorMessage"
       @submit="onTaskFormSubmit"
       @cancel="goBackToList"
-      @dirty-change="(dirty) => (isTaskFormDirty = dirty)"
+      @dirty-change="handleTaskFormDirtyChange"
     />
   </div>
 </template>
@@ -1307,17 +1502,6 @@ watch(totalPages, (value) => {
   font-weight: 700;
 }
 
-.add-btn,
-.search-btn {
-  border: 0;
-  border-radius: 8px;
-  background: #0f67ff;
-  color: #fff;
-  padding: 9px 14px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
 .filter-panel {
   display: flex;
   gap: 12px;
@@ -1334,23 +1518,18 @@ watch(totalPages, (value) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: fit-content;
 }
 
 .field-item label {
   color: #3c4a5b;
   font-size: 14px;
+  white-space: nowrap;
 }
 
-.field-item input,
-.field-item select {
-  height: 34px;
-  border: 1px solid #c9d3e2;
-  border-radius: 6px;
-  padding: 0 10px;
+.field-item :deep(.n-input),
+.field-item :deep(.n-base-selection) {
   min-width: 220px;
-  font-size: 14px;
-  color: #1f2d3d;
-  background: #fff;
 }
 
 .table-panel,
@@ -1365,96 +1544,30 @@ watch(totalPages, (value) => {
   overflow-x: auto;
 }
 
-.task-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 920px;
+.task-data-table:deep(.n-data-table-th) {
+  background: #f8fafc;
+  color: #4a5868;
+  font-weight: 600;
 }
 
-.task-table th,
-.task-table td {
-  text-align: left;
-  padding: 12px 14px;
-  border-bottom: 1px solid #ecf1f7;
-  font-size: 14px;
+.task-data-table:deep(.n-data-table-td) {
   color: #2b3a4a;
 }
 
-.task-table th {
-  font-weight: 600;
-  color: #4a5868;
-  background: #f8fafc;
-}
-
-.name-link,
-.progress-link {
-  border: 0;
-  background: transparent;
-  color: #0f67ff;
-  cursor: pointer;
-  padding: 0;
-  font-size: 14px;
-}
-
-.status-pill {
+.task-action-btn:deep(.n-button__content) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
 }
 
-.status-pill.is-running {
-  background: #e8f3ff;
-  color: #0f67ff;
+.action-btn-icon {
+  flex-shrink: 0;
 }
 
-.status-pill.is-pending {
-  background: #f5f7fb;
-  color: #607287;
-}
-
-.status-pill.is-ended {
-  background: #fff1ef;
-  color: #d4380d;
-}
-
-.status-pill.is-completed {
-  background: #edf8f2;
-  color: #1f8f50;
-}
-
-.icon-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.icon-action-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #d0d9e6;
-  border-radius: 6px;
-  background: #fff;
-  color: #2f4056;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-
-.icon-action-btn:hover {
-  border-color: #0f67ff;
-  color: #0f67ff;
-  background: #eef5ff;
-}
-
-.empty-row {
-  text-align: center !important;
-  color: #7d8da1 !important;
+.table-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #7d8da1;
 }
 
 .pagination-row {
@@ -1469,46 +1582,8 @@ watch(totalPages, (value) => {
   font-size: 13px;
 }
 
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.page-size-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #5b6a7a;
-}
-
-.page-size-label select {
-  height: 28px;
-  border: 1px solid #d0d9e6;
-  border-radius: 6px;
-  padding: 0 8px;
-}
-
-.pager button {
-  min-width: 64px;
-  height: 30px;
-  border: 1px solid #d0d9e6;
-  border-radius: 6px;
-  background: #fff;
-  color: #2b3a4a;
-  cursor: pointer;
-  padding: 0 8px;
-}
-
-.pager button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.page-index {
-  color: #5b6a7a;
-  font-size: 13px;
+.pagination-row :deep(.n-pagination) {
+  margin-left: auto;
 }
 
 .detail-panel {
@@ -1518,22 +1593,56 @@ watch(totalPages, (value) => {
 .detail-modal-card {
   width: 720px;
   max-width: calc(100vw - 32px);
+  height: min(760px, calc(100vh - 40px));
   max-height: calc(100vh - 40px);
   border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-modal-card:deep(.n-card-header) {
+  flex-shrink: 0;
+  border-bottom: 1px solid #ecf1f7;
+  background: #fff;
+}
+
+.detail-modal-card:deep(.n-card__content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-modal-body {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+  padding: 16px 18px;
+  background: #f4f7fb;
 }
 
 .detail-modal-close-btn {
-  border: 0;
-  background: transparent;
   color: #6b7b90;
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
+  font-size: 20px;
+  --n-color-focus: transparent !important;
+}
+
+.detail-modal-close-btn:deep(.n-button__content) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .detail-modal-close-btn:hover {
   color: #1f63d8;
+}
+
+.detail-close-symbol {
+  display: block;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 .detail-panel h2 {

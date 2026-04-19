@@ -1,52 +1,40 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { NConfigProvider, type GlobalThemeOverrides } from 'naive-ui'
+import { dateZhCN, NConfigProvider, zhCN } from 'naive-ui'
 import OutreachTaskManagementPage from './pages/OutreachTaskManagementPage.vue'
 import FulfillmentManagementPage from './pages/FulfillmentManagementPage.vue'
 import SettingsPage from './pages/SettingsPage.vue'
-import ChangePasswordPage from './pages/ChangePasswordPage.vue'
 import { type EmbedNetworkLogEntry, subscribeNetworkLog } from './debug/network-log'
 import { initEmbedModalShellFromUrl } from './utils/embed-modal-shell'
+import { commonThemeOverrides } from '@infound/desktop-base'
 
 /** 须在子页面挂载前执行（父 onMounted 晚于子组件挂载） */
 initEmbedModalShellFromUrl()
 
-type EmbedPage = 'outreach' | 'fulfillment' | 'settings' | 'changePassword'
+type EmbedPage = 'outreach' | 'fulfillment' | 'settings'
 const SHOP_ID_QUERY_PARAM = 'shopId'
 const SHOP_ID_STORAGE_KEY = 'xunda-shop-id'
 const PAGE_TITLES: Record<EmbedPage, string> = {
   outreach: '一键建联',
   fulfillment: '履约管理',
-  settings: '设置',
-  changePassword: '修改密码'
+  settings: '设置'
 }
 const DOCUMENT_TITLE_SUFFIX = ' - 寻达'
+const EMBED_FAVICON_URL = `${import.meta.env.BASE_URL}embed-tab-icon.png`
 
 const currentPage = ref<EmbedPage>('outreach')
 const shopId = ref('')
 /** 仅本地 dev 构建（`vite --mode dev`）；stg/pro 构建与 `dev:stg` 等均不展示 */
 const isNetworkPanelEnabled = import.meta.env.MODE === 'dev'
+const isNetworkPanelVisible = ref(isNetworkPanelEnabled)
 const isNetworkPanelCollapsed = ref(false)
 const networkLogs = ref<EmbedNetworkLogEntry[]>([])
 let unsubscribeNetworkLog: (() => void) | undefined
 
-const embedThemeOverrides: GlobalThemeOverrides = {
-  common: {
-    primaryColor: '#0f67ff',
-    primaryColorHover: '#2a78ff',
-    primaryColorPressed: '#0d5ce3',
-    primaryColorSuppl: '#0f67ff',
-    infoColor: '#0f67ff',
-    infoColorHover: '#2a78ff',
-    infoColorPressed: '#0d5ce3',
-    infoColorSuppl: '#0f67ff'
-  }
-}
-
 const resolvePageByHash = (): EmbedPage => {
   const hash = window.location.hash.toLowerCase()
   if (hash.includes('/change-password')) {
-    return 'changePassword'
+    return 'settings'
   }
   if (hash.includes('/settings')) {
     return 'settings'
@@ -63,6 +51,22 @@ const syncPageByHash = (): void => {
 
 const syncDocumentTitle = (): void => {
   document.title = `${PAGE_TITLES[currentPage.value]}${DOCUMENT_TITLE_SUFFIX}`
+}
+
+const setEmbedFavicon = (href: string): void => {
+  if (!href) return
+
+  let faviconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+  if (!faviconLink) {
+    faviconLink = document.createElement('link')
+    faviconLink.rel = 'icon'
+    document.head.appendChild(faviconLink)
+  }
+  faviconLink.href = href
+}
+
+const syncEmbedFaviconFromAsset = (): void => {
+  setEmbedFavicon(EMBED_FAVICON_URL)
 }
 
 const getStoredShopId = (): string => {
@@ -118,14 +122,12 @@ const currentComponent = computed(() => {
       return FulfillmentManagementPage
     case 'settings':
       return SettingsPage
-    case 'changePassword':
-      return ChangePasswordPage
     default:
       return OutreachTaskManagementPage
   }
 })
 
-const isPlainWhitePage = computed(() => currentPage.value === 'settings' || currentPage.value === 'changePassword')
+const isPlainWhitePage = computed(() => currentPage.value === 'settings')
 
 const embedChildProps = computed((): Record<string, string> => {
   if (currentPage.value === 'outreach' || currentPage.value === 'fulfillment') {
@@ -146,6 +148,10 @@ const toggleNetworkPanel = (): void => {
   isNetworkPanelCollapsed.value = !isNetworkPanelCollapsed.value
 }
 
+const closeNetworkPanel = (): void => {
+  isNetworkPanelVisible.value = false
+}
+
 const formatPayload = (payload: Record<string, any>): string => {
   try {
     return JSON.stringify(payload, null, 2)
@@ -159,6 +165,7 @@ onMounted(() => {
   syncDocumentTitle()
   syncShopId()
   void syncShopIdFromDesktop()
+  syncEmbedFaviconFromAsset()
   if (isNetworkPanelEnabled) {
     unsubscribeNetworkLog = subscribeNetworkLog(appendNetworkLog)
   }
@@ -176,36 +183,39 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div :class="['embed-shell', { 'is-plain-white': isPlainWhitePage }]">
-    <div :class="['embed-frame', { 'is-plain-white': isPlainWhitePage }]">
-      <NConfigProvider :theme="null" :theme-overrides="embedThemeOverrides">
-        <component :is="currentComponent" v-bind="embedChildProps" />
-      </NConfigProvider>
-    </div>
-
-    <aside v-if="isNetworkPanelEnabled" :class="['network-debug-panel', { collapsed: isNetworkPanelCollapsed }]">
-      <header class="panel-header">
-        <span class="panel-title">网络日志 ({{ networkLogs.length }})</span>
-        <div class="panel-actions">
-          <button class="panel-btn" type="button" @click="toggleNetworkPanel">
-            {{ isNetworkPanelCollapsed ? '展开' : '收起' }}
-          </button>
-          <button class="panel-btn danger" type="button" @click="clearNetworkLogs">清空</button>
+  <NConfigProvider :date-locale="dateZhCN" :locale="zhCN" :theme="null" :theme-overrides="commonThemeOverrides">
+    <n-global-style />
+    <n-message-provider>
+      <div :class="['embed-shell', { 'is-plain-white': isPlainWhitePage }]">
+        <div :class="['embed-frame', { 'is-plain-white': isPlainWhitePage }]">
+          <component :is="currentComponent" v-bind="embedChildProps" />
         </div>
-      </header>
-      <div v-if="!isNetworkPanelCollapsed" class="panel-body">
-        <div v-if="networkLogs.length === 0" class="panel-empty">暂无日志</div>
-        <article v-for="item in networkLogs" :key="item.id" :class="['log-item', item.level]">
-          <div class="log-head">
-            <span class="log-time">{{ item.time }}</span>
-            <span class="log-level">{{ item.level.toUpperCase() }}</span>
-            <span class="log-message">{{ item.message }}</span>
+        <aside v-if="isNetworkPanelEnabled && isNetworkPanelVisible" :class="['network-debug-panel', { collapsed: isNetworkPanelCollapsed }]">
+          <header class="panel-header">
+            <span class="panel-title">网络日志 ({{ networkLogs.length }})</span>
+            <div class="panel-actions">
+              <button class="panel-btn" type="button" @click="toggleNetworkPanel">
+                {{ isNetworkPanelCollapsed ? '展开' : '收起' }}
+              </button>
+              <button class="panel-btn" type="button" @click="closeNetworkPanel">关闭</button>
+              <button class="panel-btn danger" type="button" @click="clearNetworkLogs">清空</button>
+            </div>
+          </header>
+          <div v-if="!isNetworkPanelCollapsed" class="panel-body">
+            <div v-if="networkLogs.length === 0" class="panel-empty">暂无日志</div>
+            <article v-for="item in networkLogs" :key="item.id" :class="['log-item', item.level]">
+              <div class="log-head">
+                <span class="log-time">{{ item.time }}</span>
+                <span class="log-level">{{ item.level.toUpperCase() }}</span>
+                <span class="log-message">{{ item.message }}</span>
+              </div>
+              <pre class="log-payload">{{ formatPayload(item.payload) }}</pre>
+            </article>
           </div>
-          <pre class="log-payload">{{ formatPayload(item.payload) }}</pre>
-        </article>
+        </aside>
       </div>
-    </aside>
-  </div>
+    </n-message-provider>
+  </NConfigProvider>
 </template>
 
 <style scoped>
