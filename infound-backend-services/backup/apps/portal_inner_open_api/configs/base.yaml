@@ -1,3 +1,0 @@
-AUTH:
-  REQUIRED_HEADER: "X-INFound-Inner-Service-Token"  # 自定义 Header 名（区分其他服务）
-  VALID_TOKENS: [ "844a22c4c6d47231bb4fc89c3e8a64ca5b09ec5de8f6d4bf65dacd7d" ]  # 合法 Token 列表

@@ -143,9 +143,9 @@ class SellerRpaTaskNotificationService:
         task_plan: SellerTkRpaTaskPlans,
         override_payload: dict[str, Any],
     ) -> dict[str, Any]:
-        task_payload = self._coerce_payload(task_plan.task_payload)
-        task_node = self._ensure_record(task_payload.get("task"))
-        input_node = self._ensure_record(task_payload.get("input"))
+        task_playload = self._coerce_payload(task_plan.task_playload)
+        task_node = self._ensure_record(task_playload.get("task"))
+        input_node = self._ensure_record(task_playload.get("input"))
         input_payload_node = self._ensure_record(input_node.get("payload"))
 
         trigger_payload: dict[str, Any] = {

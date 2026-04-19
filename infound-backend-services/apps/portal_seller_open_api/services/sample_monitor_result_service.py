@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -22,7 +22,6 @@ from apps.portal_seller_open_api.services.normalization import (
     normalize_identifier,
     normalize_int,
     normalize_ratio_decimal,
-    normalize_region_code,
     normalize_utc_datetime,
 )
 from apps.portal_seller_open_api.services.task_orchestration_service import (
@@ -46,9 +45,9 @@ class SampleMonitorResultIngestionService:
         )
 
     async def ingest(
-        self,
-        current_user: CurrentUserInfo,
-        payload: SampleMonitorResultIngestionRequest,
+            self,
+            current_user: CurrentUserInfo,
+            payload: SampleMonitorResultIngestionRequest,
     ) -> SampleMonitorResultIngestionResult:
         task_id = normalize_identifier(payload.task_id)
         if not task_id:
@@ -58,7 +57,7 @@ class SampleMonitorResultIngestionService:
         if shop is None:
             raise ValueError("shop_id does not belong to current user")
 
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
         rows = self._flatten_rows(payload)
         if not rows:
             return SampleMonitorResultIngestionResult(
@@ -222,12 +221,12 @@ class SampleMonitorResultIngestionService:
         return result.scalar_one_or_none()
 
     async def _upsert_product(
-        self,
-        *,
-        current_user: CurrentUserInfo,
-        shop_id: str,
-        row: SampleMonitorRowItem,
-        utc_now: datetime,
+            self,
+            *,
+            current_user: CurrentUserInfo,
+            shop_id: str,
+            row: SampleMonitorRowItem,
+            utc_now: datetime,
     ) -> SellerTkProducts:
         platform_product_id = normalize_identifier(row.product_id)
         stmt = (
@@ -276,13 +275,13 @@ class SampleMonitorResultIngestionService:
         return existing
 
     async def _upsert_sample(
-        self,
-        *,
-        current_user: CurrentUserInfo,
-        shop_id: str,
-        shop_region_code: str,
-        row: SampleMonitorRowItem,
-        utc_now: datetime,
+            self,
+            *,
+            current_user: CurrentUserInfo,
+            shop_id: str,
+            shop_region_code: str,
+            row: SampleMonitorRowItem,
+            utc_now: datetime,
     ) -> SellerTkSamples:
         platform_product_id = normalize_identifier(row.product_id)
         platform_creator_id = normalize_identifier(row.creator_id)
@@ -339,13 +338,13 @@ class SampleMonitorResultIngestionService:
         return existing
 
     async def _upsert_sample_content(
-        self,
-        *,
-        current_user: CurrentUserInfo,
-        shop_id: str,
-        row: SampleMonitorRowItem,
-        item: dict[str, Any],
-        utc_now: datetime,
+            self,
+            *,
+            current_user: CurrentUserInfo,
+            shop_id: str,
+            row: SampleMonitorRowItem,
+            item: dict[str, Any],
+            utc_now: datetime,
     ) -> SellerTkSampleContents:
         platform_product_id = normalize_identifier(row.product_id)
         platform_creator_id = normalize_identifier(row.creator_id)
@@ -456,7 +455,8 @@ class SampleMonitorResultIngestionService:
         return text
 
     def _resolve_crawl_date(self, row: SampleMonitorRowItem, utc_now: datetime):
-        return normalize_utc_datetime(row.crawl_time).date() if normalize_utc_datetime(row.crawl_time) else utc_now.date()
+        return normalize_utc_datetime(row.crawl_time).date() if normalize_utc_datetime(
+            row.crawl_time) else utc_now.date()
 
     def _quantize_decimal(self, value: Decimal | None, scale: int) -> Decimal | None:
         if value is None:
@@ -465,11 +465,11 @@ class SampleMonitorResultIngestionService:
         return value.quantize(quant)
 
     def _assign_model_values(
-        self,
-        model: Any,
-        values: dict[str, Any],
-        *,
-        skip_fields: set[str],
+            self,
+            model: Any,
+            values: dict[str, Any],
+            *,
+            skip_fields: set[str],
     ) -> None:
         for key, value in values.items():
             if key in skip_fields:

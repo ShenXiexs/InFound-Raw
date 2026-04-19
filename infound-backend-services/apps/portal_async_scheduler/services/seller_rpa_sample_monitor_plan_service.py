@@ -85,7 +85,7 @@ class SellerRpaSampleMonitorPlanService:
                 if existing_plan is not None:
                     continue
 
-                task_payload = self._build_task_payload(
+                task_playload = self._build_task_playload(
                     task_id=task_id,
                     shop=shop,
                     local_date=local_now.date().isoformat(),
@@ -96,7 +96,7 @@ class SellerRpaSampleMonitorPlanService:
                     id=task_id,
                     user_id=shop.user_id,
                     task_type="SAMPLE_MONITOR",
-                    task_payload=task_payload,
+                    task_playload=task_playload,
                     status="PENDING",
                     scheduled_time=scheduled_time_utc,
                     start_time=None,
@@ -132,7 +132,7 @@ class SellerRpaSampleMonitorPlanService:
         return str(uuid5(NAMESPACE_URL, f"sample-monitor:{user_id}:{shop_id}:{local_date}")).upper()
 
     @staticmethod
-    def _build_task_payload(
+    def _build_task_playload(
         *,
         task_id: str,
         shop: SellerTkShops,

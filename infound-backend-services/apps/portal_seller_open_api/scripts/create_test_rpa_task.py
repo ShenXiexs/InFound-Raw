@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
 def _build_session_node(shop: SellerTkShops) -> dict:
     session_node = {
         "region": str(shop.shop_region_code or "").strip().upper(),
-        "headless": False,
+        "headless": True,
     }
     platform_shop_id = str(shop.platform_shop_code or "").strip()
     if platform_shop_id:
@@ -161,14 +161,14 @@ async def main() -> int:
                 }
                 task_name = default_name.get(task_type, f"本地任务测试-{task_type}")
 
-            task_payload = _build_base_payload(
+            task_playload = _build_base_payload(
                 task_id=task_id,
                 task_type=task_type,
                 task_name=task_name,
                 shop=shop,
                 scheduled_time=utc_now,
             )
-            input_payload = task_payload["input"]["payload"]
+            input_payload = task_playload["input"]["payload"]
 
             if task_type in {"CHAT", "URGE_CHAT"}:
                 creator_id = str(args.creator_id or "").strip()
@@ -240,7 +240,7 @@ async def main() -> int:
                 id=task_id,
                 user_id=user_id,
                 task_type=task_type,
-                task_payload=task_payload,
+                task_playload=task_playload,
                 status="PENDING",
                 scheduled_time=utc_now,
                 start_time=None,

@@ -93,6 +93,7 @@ async def list_shop_entries(
             regionName=entry.region_name,
             shopType=entry.shop_type,
             loginUrl=entry.login_url,
+            homeUrl=entry.home_url,
         )
         for entry in entries
     ]
@@ -120,6 +121,7 @@ async def list_shops(
             SellerTkShops.shop_last_open_at,
             SellerTkShopPlatformSettings.region_name,
             SellerTkShopPlatformSettings.login_url,
+            SellerTkShopPlatformSettings.home_url,
         )
         .select_from(SellerTkShops)
         .join(
@@ -147,6 +149,7 @@ async def list_shops(
             regionName=row.region_name or "",
             shopType=row.shop_type,
             loginUrl=row.login_url or "",
+            homeUrl=row.home_url or "",
             remark=row.shop_remark or "",
             shopLastOpen=row.shop_last_open_at,
         )

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.portal_seller_open_api.core.config import Settings
@@ -19,19 +19,19 @@ from apps.portal_seller_open_api.services.normalization import (
     normalize_bool_flag,
     normalize_identifier,
     normalize_int,
-    normalize_outreach_status,
     normalize_utc_datetime,
 )
 from apps.portal_seller_open_api.services.task_orchestration_service import (
     SellerRpaTaskOrchestrationService,
 )
 from shared_domain.models.infound import (
+    IfTkCreators,
     SellerTkOutreachCreatorCounts,
     SellerTkOutreachSettings,
     SellerTkOutreachTaskLogs,
     SellerTkShops,
 )
-
+from shared_domain.models.task_plan_extension import TaskStatus
 
 AVG_COMMISSION_RATE_MAPPING = {
     "less than 20%": 20,
@@ -66,9 +66,9 @@ class OutreachResultIngestionService:
         )
 
     async def ingest(
-        self,
-        current_user: CurrentUserInfo,
-        payload: OutreachResultIngestionRequest,
+            self,
+            current_user: CurrentUserInfo,
+            payload: OutreachResultIngestionRequest,
     ) -> OutreachResultIngestionResult:
         task_id = normalize_identifier(payload.task_id)
         if not task_id:
@@ -78,40 +78,72 @@ class OutreachResultIngestionService:
         if shop is None:
             raise ValueError("shop_id does not belong to current user")
 
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
         started_at = normalize_utc_datetime(payload.started_at)
         finished_at = normalize_utc_datetime(payload.finished_at)
         normalized_creators = self._normalize_creators(payload)
         existing_settings = await self._find_settings(task_id)
+        message_send_strategy = normalize_int(payload.message_send_strategy)
+        if message_send_strategy is None and existing_settings is not None:
+            message_send_strategy = normalize_int(existing_settings.message_send_strategy)
+        brand_names = self._resolve_shop_brand_names(shop)
+        normalized_creators = await self._apply_message_send_strategy(
+            normalized_creators,
+            strategy=message_send_strategy,
+            brand_names=brand_names,
+        )
 
-        real_count = normalize_int(payload.real_count)
-        if real_count is None:
-            real_count = len(normalized_creators)
+        expect_count = normalize_int(payload.expect_count)
+        if expect_count is None and existing_settings is not None:
+            expect_count = normalize_int(existing_settings.expect_count)
+        selected_creators = self._limit_creators_by_expect_count(
+            normalized_creators, expect_count
+        )
+        selected_creators_by_id = {
+            creator["platform_creator_id"]: creator for creator in selected_creators
+        }
+        selected_creator_count = len(selected_creators)
+
+        existing_real_count = 0
+        if existing_settings is not None and existing_settings.real_count is not None:
+            existing_real_count = max(0, int(existing_settings.real_count or 0))
+        real_count = min(existing_real_count, selected_creator_count)
 
         new_count = normalize_int(payload.new_count)
-        explicit_new_count = self._explicit_new_count(normalized_creators)
+        explicit_new_count = self._explicit_new_count(selected_creators_by_id)
         if new_count is None and explicit_new_count is not None:
             new_count = explicit_new_count
 
         spend_time = normalize_int(payload.spend_time)
+        effective_start_at = started_at
+        if effective_start_at is None and existing_settings is not None:
+            effective_start_at = existing_settings.real_start_at
+        has_selected_creators = selected_creator_count > 0
         if spend_time is None:
-            spend_time = duration_seconds(started_at, finished_at)
+            if has_selected_creators:
+                spend_time = int(existing_settings.spend_time or 0) if existing_settings else 0
+            else:
+                spend_time = duration_seconds(effective_start_at, finished_at or utc_now)
 
         settings_payload = {
             "id": task_id,
             "user_id": current_user.user_id,
             "shop_id": shop.id,
             "shop_region_code": clean_text(payload.shop_region_code)
-            or shop.shop_region_code,
+                                or shop.shop_region_code,
             "task_name": clean_text(payload.task_name) or f"OUTREACH-{task_id[:8]}",
             "task_type": clean_text(payload.task_type) or "OUTREACH",
-            "status": normalize_outreach_status(payload.status),
+            "status": TaskStatus.RUNNING.value
+            if has_selected_creators
+            else TaskStatus.COMPLETED.value,
             "creator_id": current_user.user_id,
             "creation_time": utc_now,
             "last_modifier_id": current_user.user_id,
             "last_modification_time": utc_now,
             "real_count": real_count,
             "new_count": new_count,
+            "real_start_at": effective_start_at,
+            "real_end_at": None if has_selected_creators else (finished_at or utc_now),
         }
 
         optional_values = {
@@ -124,10 +156,8 @@ class OutreachResultIngestionService:
             "second_message": clean_text(payload.second_message),
             "filter_sort_by": normalize_int(payload.filter_sort_by),
             "plan_execute_time": normalize_int(payload.plan_execute_time),
-            "expect_count": normalize_int(payload.expect_count),
+            "expect_count": expect_count,
             "spend_time": spend_time,
-            "real_start_at": started_at,
-            "real_end_at": finished_at,
         }
         settings_payload.update(
             {key: value for key, value in optional_values.items() if value is not None}
@@ -139,9 +169,11 @@ class OutreachResultIngestionService:
         inserted_logs = 0
         updated_creator_counts = 0
         inferred_new_count = 0
-        for creator in normalized_creators.values():
+        for creator in selected_creators:
             existing_log = await self._find_task_log(task_id, creator["platform_creator_id"])
             if existing_log is not None:
+                existing_log.last_modifier_id = current_user.user_id
+                existing_log.last_modification_time = utc_now
                 continue
 
             self.db_session.add(
@@ -193,17 +225,23 @@ class OutreachResultIngestionService:
             settings_payload["new_count"] = new_count
             await self._upsert_settings(settings_payload)
 
-        derived_task_plans = await self.task_orchestration_service.prepare_outreach_follow_up_tasks(
-            current_user,
-            task_id=task_id,
-            shop_id=shop.id,
-            shop_region_code=clean_text(payload.shop_region_code) or shop.shop_region_code,
-            search_keyword=payload.search_keyword,
-            message=payload.message,
-            first_message=payload.first_message,
-            second_message=payload.second_message,
-            creators=payload.creators,
-        )
+        derived_task_plans = []
+        if selected_creators:
+            derived_task_plans = (
+                await self.task_orchestration_service.prepare_outreach_follow_up_tasks_for_creator(
+                    current_user,
+                    task_id=task_id,
+                    shop_id=shop.id,
+                    shop_region_code=clean_text(payload.shop_region_code)
+                                     or shop.shop_region_code,
+                    brand_name=brand_names[0] if brand_names else None,
+                    search_keyword=payload.search_keyword,
+                    message=payload.message,
+                    first_message=payload.first_message,
+                    second_message=payload.second_message,
+                    creator=selected_creators[0],
+                )
+            )
         await self.db_session.commit()
         await self.task_orchestration_service.dispatch_task_plans(derived_task_plans)
 
@@ -214,6 +252,16 @@ class OutreachResultIngestionService:
             real_count=real_count,
             new_count=new_count,
         )
+
+    @staticmethod
+    def _limit_creators_by_expect_count(
+            creators: dict[str, dict],
+            expect_count: int | None,
+    ) -> list[dict]:
+        ordered_creators = list(creators.values())
+        if expect_count is None:
+            return ordered_creators
+        return ordered_creators[: max(0, expect_count)]
 
     def _normalize_creators(self, payload: OutreachResultIngestionRequest) -> dict[str, dict]:
         creators: dict[str, dict] = {}
@@ -262,8 +310,31 @@ class OutreachResultIngestionService:
             return None
         return sum(1 for item in creators.values() if item["is_new"])
 
+    async def _apply_message_send_strategy(
+            self,
+            creators: dict[str, dict],
+            *,
+            strategy: int | None,
+            brand_names: list[str],
+    ) -> dict[str, dict]:
+        if not creators or strategy != 1 or not brand_names:
+            return creators
+
+        existing_creator_ids = await self._find_existing_creator_ids_by_brand(
+            creators.keys(),
+            brand_names,
+        )
+        filtered: dict[str, dict] = {}
+        for platform_creator_id, creator in creators.items():
+            if platform_creator_id in existing_creator_ids:
+                continue
+            creator_copy = dict(creator)
+            creator_copy["is_new"] = True
+            filtered[platform_creator_id] = creator_copy
+        return filtered
+
     def _build_filter_settings(
-        self, payload: OutreachResultIngestionRequest
+            self, payload: OutreachResultIngestionRequest
     ) -> dict[str, Any]:
         normalized: dict[str, Any] = {}
 
@@ -396,8 +467,8 @@ class OutreachResultIngestionService:
 
     @staticmethod
     def _map_option_to_number(
-        value: Any,
-        mapping: dict[str, int],
+            value: Any,
+            mapping: dict[str, int],
     ) -> int | None:
         text = (clean_text(value) or "").lower()
         if not text or text == "all":
@@ -420,6 +491,21 @@ class OutreachResultIngestionService:
         normalized = normalize_int(value)
         if normalized is None or normalized <= 0:
             return None
+        return normalized
+
+    @staticmethod
+    def _resolve_shop_brand_names(shop: SellerTkShops) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for value in (shop.shop_name, shop.platform_shop_name):
+            text = clean_text(value)
+            if not text:
+                continue
+            dedupe_key = text.lower()
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            normalized.append(text)
         return normalized
 
     async def _get_shop(self, user_id: str, shop_id: str) -> SellerTkShops | None:
@@ -454,7 +540,7 @@ class OutreachResultIngestionService:
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
     async def _find_task_log(
-        self, task_id: str, platform_creator_id: str
+            self, task_id: str, platform_creator_id: str
     ) -> SellerTkOutreachTaskLogs | None:
         stmt = select(SellerTkOutreachTaskLogs).where(
             SellerTkOutreachTaskLogs.task_id == task_id,
@@ -463,10 +549,33 @@ class OutreachResultIngestionService:
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
     async def _find_creator_count(
-        self, shop_id: str, platform_creator_id: str
+            self, shop_id: str, platform_creator_id: str
     ) -> SellerTkOutreachCreatorCounts | None:
         stmt = select(SellerTkOutreachCreatorCounts).where(
             SellerTkOutreachCreatorCounts.shop_id == shop_id,
             SellerTkOutreachCreatorCounts.platform_creator_id == platform_creator_id,
         )
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
+
+    async def _find_existing_creator_ids_by_brand(
+            self,
+            platform_creator_ids: Iterable[str],
+            brand_names: Iterable[str],
+    ) -> set[str]:
+        creator_id_list = [item for item in platform_creator_ids if item]
+        brand_name_list = [
+            normalized
+            for item in brand_names
+            if (normalized := clean_text(item))
+        ]
+        if not creator_id_list or not brand_name_list:
+            return set()
+
+        stmt = select(IfTkCreators.platform_creator_id).where(
+            IfTkCreators.platform_creator_id.in_(creator_id_list),
+            IfTkCreators.brand_name.is_not(None),
+            func.trim(IfTkCreators.brand_name) != "",
+            IfTkCreators.brand_name.in_(brand_name_list),
+        )
+        rows = (await self.db_session.execute(stmt)).scalars().all()
+        return {str(item).strip() for item in rows if str(item).strip()}

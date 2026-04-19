@@ -42,6 +42,23 @@ PASSWORD_MIN_LEN = 8
 PASSWORD_MAX_LEN = 16
 
 
+def _validate_password_policy(value: str) -> str:
+    if len(value) < PASSWORD_MIN_LEN:
+        raise ValueError("密码不能少于8个字符")
+    if len(value) > PASSWORD_MAX_LEN:
+        raise ValueError("密码不可以超过16字符")
+    if " " in value:
+        raise ValueError("密码不可以包含空格")
+
+    has_letter = bool(re.search(r"[A-Za-z]", value))
+    has_digit = bool(re.search(r"\d", value))
+    has_special = bool(re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", value))
+    type_count = sum([has_letter, has_digit, has_special])
+    if type_count < 2:
+        raise ValueError("密码不可以使用纯数字或纯字母，必须包含字母、数字、特殊符号中的至少两种")
+    return value
+
+
 class SignUpRequest(BaseDTO):
     username: str = Field(
         validation_alias=AliasChoices("username"),
@@ -87,23 +104,7 @@ class SignUpRequest(BaseDTO):
     @field_validator("password")
     @classmethod
     def password_must_meet_requirements(cls, v: str) -> str:
-        if len(v) < PASSWORD_MIN_LEN:
-            raise ValueError("密码不能少于8个字符")
-        if len(v) > PASSWORD_MAX_LEN:
-            raise ValueError("密码不可以超过16字符")
-
-        if " " in v:
-            raise ValueError("密码不可以包含空格")
-
-        has_letter = bool(re.search(r"[A-Za-z]", v))
-        has_digit = bool(re.search(r"\d", v))
-        has_special = bool(re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v))
-
-        type_count = sum([has_letter, has_digit, has_special])
-        if type_count < 2:
-            raise ValueError("密码不可以使用纯数字或纯字母，必须包含字母、数字、特殊符号中的至少两种")
-
-        return v
+        return _validate_password_policy(v)
 
     @field_validator("verificationCode")
     @classmethod
@@ -139,3 +140,38 @@ class LoginRequest(BaseDTO):
         if not v or not v.strip():
             raise ValueError("用户名或手机号不能为空")
         return v.strip()
+
+
+class ChangePasswordRequest(BaseDTO):
+    oldPassword: str = Field(
+        validation_alias=AliasChoices("oldPassword"),
+        serialization_alias="oldPassword",
+        min_length=1,
+        max_length=PASSWORD_MAX_LEN,
+        description="原密码",
+    )
+    newPassword: str = Field(
+        validation_alias=AliasChoices("newPassword"),
+        serialization_alias="newPassword",
+        description="新密码：8-16位，字母、数字、特殊符号三选二，不允许中间有空格",
+    )
+    confirmPassword: str = Field(
+        validation_alias=AliasChoices("confirmPassword"),
+        serialization_alias="confirmPassword",
+        min_length=1,
+        max_length=PASSWORD_MAX_LEN,
+        description="确认新密码",
+    )
+
+    @field_validator("oldPassword", "confirmPassword")
+    @classmethod
+    def password_must_not_be_empty(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("密码不能为空")
+        return s
+
+    @field_validator("newPassword")
+    @classmethod
+    def new_password_must_meet_requirements(cls, v: str) -> str:
+        return _validate_password_policy(v)

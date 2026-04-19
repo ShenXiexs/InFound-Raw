@@ -16,8 +16,8 @@ from apps.portal_inner_open_api.models.campaign import (
     ProductIngestionRequest,
     ProductIngestionResult,
 )
-from shared_domain.models.infound import Campaigns, Products
 from core_base import get_logger
+from shared_domain.models.infound import Campaigns, Products
 
 PREFERRED_UUID_NODE = 0x2AA7A70856D4
 
@@ -129,7 +129,7 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
 
 
 def _normalize_price_range(
-    min_value: Any, max_value: Any
+        min_value: Any, max_value: Any
 ) -> Tuple[Optional[str], Optional[str]]:
     min_text = _clean_text(min_value)
     max_text = _clean_text(max_value)
@@ -140,11 +140,11 @@ def _normalize_price_range(
     if max_text and not min_text:
         return max_text, max_text
     if (
-        min_text
-        and max_text
-        and "." not in min_text
-        and "." in max_text
-        and max_text.startswith("0")
+            min_text
+            and max_text
+            and "." not in min_text
+            and "." in max_text
+            and max_text.startswith("0")
     ):
         joined = f"{min_text}{max_text}"
         return joined, joined
@@ -168,14 +168,14 @@ class CampaignIngestionService:
         ).upper()
 
     async def ingest_campaigns(
-        self, request: CampaignIngestionRequest
+            self, request: CampaignIngestionRequest
     ) -> CampaignIngestionResult:
         rows = [row.model_dump() for row in request.rows]
         if not rows:
             raise ValueError("rows cannot be empty")
 
         operator_id = request.operator_id or self.default_operator_id
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
 
         unique_campaigns: set[str] = set()
         for row in rows:
@@ -199,14 +199,14 @@ class CampaignIngestionService:
         )
 
     async def ingest_products(
-        self, request: ProductIngestionRequest
+            self, request: ProductIngestionRequest
     ) -> ProductIngestionResult:
         rows = [row.model_dump() for row in request.rows]
         if not rows:
             raise ValueError("rows cannot be empty")
 
         operator_id = request.operator_id or self.default_operator_id
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
 
         unique_products: set[str] = set()
         for row in rows:
@@ -228,10 +228,10 @@ class CampaignIngestionService:
         return ProductIngestionResult(inserted=len(rows), products=len(unique_products))
 
     def _build_campaign_payload(
-        self,
-        row: Dict[str, Any],
-        operator_id: str,
-        utc_now: datetime,
+            self,
+            row: Dict[str, Any],
+            operator_id: str,
+            utc_now: datetime,
     ) -> Optional[Dict[str, Any]]:
         platform_campaign_id = _clean_text(
             _pick_first(row, "platform_campaign_id", "campaign_id")
@@ -278,10 +278,10 @@ class CampaignIngestionService:
         }
 
     def _build_product_payload(
-        self,
-        row: Dict[str, Any],
-        operator_id: str,
-        utc_now: datetime,
+            self,
+            row: Dict[str, Any],
+            operator_id: str,
+            utc_now: datetime,
     ) -> Optional[Dict[str, Any]]:
         platform_campaign_id = _clean_text(
             _pick_first(row, "platform_campaign_id", "campaign_id")
@@ -331,7 +331,7 @@ class CampaignIngestionService:
         }
 
     async def _upsert_campaign(
-        self, session: AsyncSession, payload: Dict[str, Any]
+            self, session: AsyncSession, payload: Dict[str, Any]
     ) -> bool:
         def _eq_or_is_null(column, value: Any):
             return column.is_(None) if value is None else column == value
@@ -354,7 +354,7 @@ class CampaignIngestionService:
         return True
 
     async def _upsert_product(
-        self, session: AsyncSession, payload: Dict[str, Any]
+            self, session: AsyncSession, payload: Dict[str, Any]
     ) -> bool:
         stmt = select(Products).where(
             Products.platform_campaign_id == payload["platform_campaign_id"],

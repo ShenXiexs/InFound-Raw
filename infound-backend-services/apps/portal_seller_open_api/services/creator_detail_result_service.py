@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Iterable
 from urllib.parse import quote
@@ -19,18 +19,14 @@ from apps.portal_seller_open_api.models.entities import CurrentUserInfo
 from apps.portal_seller_open_api.services.normalization import (
     clean_text,
     generate_uppercase_uuid,
-    normalize_bool_flag,
     normalize_decimal,
     normalize_identifier,
     normalize_int,
     normalize_ratio_decimal,
     normalize_region_code,
-    normalize_utc_date,
-    normalize_utc_datetime,
 )
 from shared_domain.models.infound import (
-    CreatorCrawlLogs,
-    Creators,
+    IfTkCreators,
     SellerTkShops,
 )
 
@@ -40,9 +36,9 @@ class CreatorDetailResultIngestionService:
         self.db_session = db_session
 
     async def ingest(
-        self,
-        current_user: CurrentUserInfo,
-        payload: CreatorDetailResultIngestionRequest,
+            self,
+            current_user: CurrentUserInfo,
+            payload: CreatorDetailResultIngestionRequest,
     ) -> CreatorDetailResultIngestionResult:
         task_id = normalize_identifier(payload.task_id)
         if not task_id:
@@ -62,18 +58,17 @@ class CreatorDetailResultIngestionService:
             raise ValueError("platform_creator_id is required")
 
         creator_display_name = (
-            clean_text(context.platform_creator_display_name)
-            or clean_text(detail.creator_name)
-            or platform_creator_id
+                clean_text(context.platform_creator_display_name)
+                or clean_text(detail.creator_name)
+                or platform_creator_id
         )
         creator_username = (
-            clean_text(context.platform_creator_username)
-            or creator_display_name
-            or platform_creator_id
+                clean_text(context.platform_creator_username)
+                or creator_display_name
+                or platform_creator_id
         )
 
-        utc_now = datetime.utcnow()
-        collected_at = normalize_utc_datetime(detail.collected_at_utc) or utc_now
+        utc_now = datetime.now(timezone.utc)
         creator_values = self._build_creator_values(
             payload=payload,
             context=context,
@@ -86,9 +81,9 @@ class CreatorDetailResultIngestionService:
             utc_now=utc_now,
         )
 
-        creator_record = await self._find_creator(platform, platform_creator_id)
+        creator_record = await self._find_creator(platform_creator_id)
         if creator_record is None:
-            creator_record = Creators(
+            creator_record = IfTkCreators(
                 id=generate_uppercase_uuid(),
                 **creator_values,
             )
@@ -100,90 +95,31 @@ class CreatorDetailResultIngestionService:
                 skip_fields={"creator_id", "creation_time"},
             )
 
-        crawl_log = CreatorCrawlLogs(
-            id=generate_uppercase_uuid(),
-            crawl_date=normalize_utc_date(collected_at) or utc_now.date(),
-            platform=platform,
-            platform_creator_id=platform_creator_id,
-            platform_creator_display_name=creator_display_name,
-            platform_creator_username=creator_username,
-            email=creator_values.get("email"),
-            whatsapp=creator_values.get("whatsapp"),
-            introduction=creator_values.get("introduction"),
-            region=creator_values.get("region"),
-            currency=creator_values.get("currency"),
-            categories=creator_values.get("categories"),
-            chat_url=creator_values.get("chat_url"),
-            search_keywords=creator_values.get("search_keywords"),
-            brand_name=creator_values.get("brand_name"),
-            followers=creator_values.get("followers"),
-            top_brands=creator_values.get("top_brands"),
-            sales_revenue=creator_values.get("sales_revenue"),
-            sales_units_sold=creator_values.get("sales_units_sold"),
-            sales_gpm=creator_values.get("sales_gpm"),
-            sales_revenue_per_buyer=creator_values.get("sales_revenue_per_buyer"),
-            gmv_per_sales_channel=creator_values.get("gmv_per_sales_channel"),
-            gmv_by_product_category=creator_values.get("gmv_by_product_category"),
-            avg_commission_rate=creator_values.get("avg_commission_rate"),
-            collab_products=creator_values.get("collab_products"),
-            partnered_brands=creator_values.get("partnered_brands"),
-            product_price=creator_values.get("product_price"),
-            video_gpm=creator_values.get("video_gpm"),
-            videos=creator_values.get("videos"),
-            avg_video_views=creator_values.get("avg_video_views"),
-            avg_video_engagement_rate=creator_values.get("avg_video_engagement_rate"),
-            avg_video_likes=creator_values.get("avg_video_likes"),
-            avg_video_comments=creator_values.get("avg_video_comments"),
-            avg_video_shares=creator_values.get("avg_video_shares"),
-            live_gpm=creator_values.get("live_gpm"),
-            live_streams=creator_values.get("live_streams"),
-            avg_live_views=creator_values.get("avg_live_views"),
-            avg_live_engagement_rate=creator_values.get("avg_live_engagement_rate"),
-            avg_live_likes=creator_values.get("avg_live_likes"),
-            avg_live_comments=creator_values.get("avg_live_comments"),
-            avg_live_shares=creator_values.get("avg_live_shares"),
-            followers_male=creator_values.get("followers_male"),
-            followers_female=creator_values.get("followers_female"),
-            followers_18_24=creator_values.get("followers_18_24"),
-            followers_25_34=creator_values.get("followers_25_34"),
-            followers_35_44=creator_values.get("followers_35_44"),
-            followers_45_54=creator_values.get("followers_45_54"),
-            followers_55_more=creator_values.get("followers_55_more"),
-            connect=self._to_bit_value(context.connect),
-            reply=self._to_bit_value(context.reply),
-            send=self._to_bit_value(context.send),
-            creator_id=current_user.user_id,
-            creation_time=utc_now,
-            last_modifier_id=current_user.user_id,
-            last_modification_time=utc_now,
-        )
-        self.db_session.add(crawl_log)
         await self.db_session.commit()
 
         return CreatorDetailResultIngestionResult(
             task_id=task_id,
             creator_record_id=creator_record.id,
-            crawl_log_id=crawl_log.id,
             platform_creator_id=platform_creator_id,
         )
 
     def _build_creator_values(
-        self,
-        *,
-        payload: CreatorDetailResultIngestionRequest,
-        context: CreatorDetailContextItem,
-        detail: CreatorDetailDataItem,
-        platform: str,
-        platform_creator_id: str,
-        creator_display_name: str,
-        creator_username: str,
-        current_user: CurrentUserInfo,
-        utc_now: datetime,
+            self,
+            *,
+            payload: CreatorDetailResultIngestionRequest,
+            context: CreatorDetailContextItem,
+            detail: CreatorDetailDataItem,
+            platform: str,
+            platform_creator_id: str,
+            creator_display_name: str,
+            creator_username: str,
+            current_user: CurrentUserInfo,
+            utc_now: datetime,
     ) -> dict[str, Any]:
         region = (
-            normalize_region_code(detail.region)
-            or normalize_region_code(payload.shop_region_code)
-            or "MX"
+                normalize_region_code(detail.region)
+                or normalize_region_code(payload.shop_region_code)
+                or "MX"
         )
         chat_url = self._resolve_chat_url(
             platform=platform,
@@ -195,10 +131,10 @@ class CreatorDetailResultIngestionService:
         follower_age = self._ensure_mapping(detail.follower_age)
 
         return {
-            "platform": platform,
             "platform_creator_id": platform_creator_id,
             "platform_creator_display_name": creator_display_name,
             "platform_creator_username": creator_username,
+            "avatar": clean_text(context.avatar),
             "email": clean_text(context.email),
             "whatsapp": clean_text(context.whatsapp),
             "introduction": clean_text(detail.creator_intro),
@@ -284,20 +220,19 @@ class CreatorDetailResultIngestionService:
         result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def _find_creator(self, platform: str, platform_creator_id: str) -> Creators | None:
-        stmt = select(Creators).where(
-            Creators.platform == platform,
-            Creators.platform_creator_id == platform_creator_id,
+    async def _find_creator(self, platform_creator_id: str) -> IfTkCreators | None:
+        stmt = select(IfTkCreators).where(
+            IfTkCreators.platform_creator_id == platform_creator_id,
         )
         result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
     def _assign_model_values(
-        self,
-        model: Any,
-        values: dict[str, Any],
-        *,
-        skip_fields: set[str],
+            self,
+            model: Any,
+            values: dict[str, Any],
+            *,
+            skip_fields: set[str],
     ) -> None:
         for key, value in values.items():
             if key in skip_fields:
@@ -318,9 +253,9 @@ class CreatorDetailResultIngestionService:
         return {}
 
     def _extract_ratio_value(
-        self,
-        mapping: dict[str, Any],
-        aliases: Iterable[str],
+            self,
+            mapping: dict[str, Any],
+            aliases: Iterable[str],
     ) -> Decimal | None:
         normalized_aliases = [self._normalize_key(alias) for alias in aliases]
         for key, value in mapping.items():
@@ -379,12 +314,12 @@ class CreatorDetailResultIngestionService:
         return value.quantize(quant)
 
     def _resolve_chat_url(
-        self,
-        *,
-        platform: str,
-        explicit_chat_url: Any,
-        platform_creator_id: str,
-        region: str | None,
+            self,
+            *,
+            platform: str,
+            explicit_chat_url: Any,
+            platform_creator_id: str,
+            region: str | None,
     ) -> str | None:
         chat_url = clean_text(explicit_chat_url)
         if chat_url:
@@ -413,7 +348,3 @@ class CreatorDetailResultIngestionService:
         if normalized in {"VN"}:
             return "VND"
         return None
-
-    def _to_bit_value(self, value: Any) -> int | None:
-        normalized = normalize_bool_flag(value)
-        return int(normalized) if normalized is not None else None

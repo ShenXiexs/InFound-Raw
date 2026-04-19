@@ -18,13 +18,13 @@ from apps.portal_inner_open_api.services.chatbot_schedule_repository import (
     SampleSnapshot,
     chatbot_schedule_repository,
 )
+from core_base import get_logger
 from shared_domain.models.infound import (
     SampleCrawlLogs,
     SampleContentCrawlLogs,
     Samples,
     SampleContents,
 )
-from core_base import get_logger
 
 
 def _generate_uuid() -> str:
@@ -39,14 +39,14 @@ class SampleIngestionService:
         self.settings = settings
         self.db_session = db_session
         self.default_operator_id = (
-            str(
-                getattr(
-                    settings,
-                    "SAMPLE_DEFAULT_OPERATOR_ID",
-                    "00000000-0000-0000-0000-000000000000",
+                str(
+                    getattr(
+                        settings,
+                        "SAMPLE_DEFAULT_OPERATOR_ID",
+                        "00000000-0000-0000-0000-000000000000",
+                    )
                 )
-            )
-            or "00000000-0000-0000-0000-000000000000"
+                or "00000000-0000-0000-0000-000000000000"
         )
         self.default_region = str(
             getattr(settings, "SAMPLE_DEFAULT_REGION", "MX") or "MX"
@@ -58,7 +58,7 @@ class SampleIngestionService:
             raise ValueError("rows cannot be empty")
 
         operator_id = request.operator_id or self.default_operator_id
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
         crawl_date = date.today()
 
         content_summary = self._build_content_summary_map(rows)
@@ -148,11 +148,11 @@ class SampleIngestionService:
         return SampleIngestionResult(inserted=len(rows), products=len(products))
 
     def _build_sample_payload(
-        self,
-        row: Dict[str, Any],
-        operator_id: str,
-        utc_now: datetime,
-        summary_entries: List[Dict[str, Any]],
+            self,
+            row: Dict[str, Any],
+            operator_id: str,
+            utc_now: datetime,
+            summary_entries: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         platform_creator_display_name = self._extract_platform_creator_display_name(row)
         platform_creator_username = self._extract_platform_creator_username(row)
@@ -185,12 +185,12 @@ class SampleIngestionService:
         }
 
     def _build_sample_crawl_payload(
-        self,
-        row: Dict[str, Any],
-        operator_id: str,
-        utc_now: datetime,
-        crawl_date: date,
-        summary_entries: List[Dict[str, Any]],
+            self,
+            row: Dict[str, Any],
+            operator_id: str,
+            utc_now: datetime,
+            crawl_date: date,
+            summary_entries: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         platform_creator_display_name = self._extract_platform_creator_display_name(row)
         platform_creator_username = self._extract_platform_creator_username(row)
@@ -225,10 +225,10 @@ class SampleIngestionService:
         }
 
     def _build_sample_content_payload(
-        self,
-        row: Dict[str, Any],
-        operator_id: str,
-        utc_now: datetime,
+            self,
+            row: Dict[str, Any],
+            operator_id: str,
+            utc_now: datetime,
     ) -> Dict[str, Any]:
         # 兼容历史数据：既支持 'video'/'live'，也支持 '1'/'2'
         content_type = self._safe_str(row.get("type"))
@@ -270,18 +270,18 @@ class SampleIngestionService:
         }
 
     def _build_sample_content_log_payload(
-        self,
-        row: Dict[str, Any],
-        operator_id: str,
-        utc_now: datetime,
-        crawl_date: date,
+            self,
+            row: Dict[str, Any],
+            operator_id: str,
+            utc_now: datetime,
+            crawl_date: date,
     ) -> Dict[str, Any]:
         payload = self._build_sample_content_payload(row, operator_id, utc_now)
         payload.update({"id": _generate_uuid(), "crawl_date": crawl_date})
         return payload
 
     async def _upsert_sample(
-        self, session: AsyncSession, payload: Dict[str, Any]
+            self, session: AsyncSession, payload: Dict[str, Any]
     ) -> tuple[Samples, SampleSnapshot | None]:
         stmt = select(Samples).where(
             Samples.platform_product_id == payload["platform_product_id"],
@@ -289,7 +289,7 @@ class SampleIngestionService:
                 Samples.platform_creator_display_name.is_(None)
                 if payload.get("platform_creator_display_name") is None
                 else Samples.platform_creator_display_name
-                == payload.get("platform_creator_display_name")
+                     == payload.get("platform_creator_display_name")
             ),
         )
         result = await session.execute(stmt)
@@ -318,9 +318,9 @@ class SampleIngestionService:
         return instance, None
 
     async def _upsert_sample_content(
-        self,
-        session: AsyncSession,
-        payload: Dict[str, Any],
+            self,
+            session: AsyncSession,
+            payload: Dict[str, Any],
     ) -> None:
         def _eq_or_is_null(column, value: Any):
             return column.is_(None) if value is None else column == value
@@ -364,8 +364,8 @@ class SampleIngestionService:
             session.add(SampleContents(**data))
 
     def _build_content_summary_map(
-        self,
-        rows: List[Dict[str, Any]],
+            self,
+            rows: List[Dict[str, Any]],
     ) -> Dict[str, List[Dict[str, Any]]]:
         summary: Dict[str, List[Dict[str, Any]]] = {}
         seen: Dict[str, Set[str]] = {}
@@ -393,7 +393,7 @@ class SampleIngestionService:
         return summary
 
     def _build_summary_entries_for_row(
-        self, row: Dict[str, Any]
+            self, row: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         entries: List[Dict[str, Any]] = []
         promotion_fields = [
@@ -431,7 +431,7 @@ class SampleIngestionService:
         return entries
 
     def _logistics_summary_entries(
-        self, snapshot: Dict[str, Any]
+            self, snapshot: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         entries: List[Dict[str, Any]] = []
         timeline = snapshot.get("timeline") or []
@@ -451,9 +451,9 @@ class SampleIngestionService:
                         "type": "logistics",
                         "type_number": str(total),
                         "promotion_name": event.get("title")
-                        or event.get("status")
-                        or base_label
-                        or "Logistics update",
+                                          or event.get("status")
+                                          or base_label
+                                          or "Logistics update",
                         "promotion_time": event.get("time") or "",
                         "promotion_view_count": None,
                         "promotion_like_count": None,
@@ -546,7 +546,7 @@ class SampleIngestionService:
         return len(value) == 36 and value.count("-") == 4
 
     def _extract_platform_creator_display_name(
-        self, row: Dict[str, Any]
+            self, row: Dict[str, Any]
     ) -> Optional[str]:
         return self._safe_str(
             row.get("platform_creator_display_name") or row.get("creator_name")
@@ -558,7 +558,7 @@ class SampleIngestionService:
         )
 
     def _extract_platform_creator_id(
-        self, row: Dict[str, Any], operator_id: str
+            self, row: Dict[str, Any], operator_id: str
     ) -> Optional[str]:
         """
         Prefer platform creator id fields; fall back to crawler legacy keys.

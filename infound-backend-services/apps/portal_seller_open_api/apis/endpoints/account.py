@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Header
@@ -8,13 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.portal_seller_open_api.app_constants import HEADER_DEVICE_ID, HEADER_TOKEN, HEADER_DEVICE_TYPE
 from apps.portal_seller_open_api.core.config import Settings
-from apps.portal_seller_open_api.core.deps import get_sms_service, get_db_session, get_token_manager, get_settings
+from apps.portal_seller_open_api.core.deps import (
+    get_sms_service,
+    get_db_session,
+    get_token_manager,
+    get_settings,
+    get_current_user_info,
+)
 from apps.portal_seller_open_api.exceptions import raise_sms_error, ErrorCodes, raise_error, raise_account_error, \
     raise_user_error
 from apps.portal_seller_open_api.models.dtos.account import (
     SendVerificationCodeRequest,
     SignUpRequest,
     LoginRequest,
+    ChangePasswordRequest,
 )
 from apps.portal_seller_open_api.services.identity_user_service import get_password_hash, verify_password, \
     setup_user_stomp_queue
@@ -34,6 +41,23 @@ def _username_for_db(normalized_phone: str) -> str:
     if not normalized_phone or not normalized_phone.startswith("+"):
         return normalized_phone or ""
     return normalized_phone[1:]  # "+8615228749650" -> "8615228749650"
+
+
+def _format_utc_iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _build_sign_up_base_permission(now: datetime) -> dict:
+    return {
+        "availableDateRang": {
+            "startDate": _format_utc_iso(now),
+            "endDate": _format_utc_iso(now + timedelta(days=14)),
+        },
+        "maxShopCount": 5,
+        "maxOutreachCountPerDay": 100,
+        "maxRemindCreatorCountPerDay": 100,
+        "enableExportCreatorData": True,
+    }
 
 
 @router.post(
@@ -146,6 +170,7 @@ async def sign_up(
             creation_time=now,
             last_modifier_id=user_id,
             last_modification_time=now,
+            permission_setting=_build_sign_up_base_permission(now),
             deleted=0
         )
 
@@ -276,4 +301,50 @@ async def login(
         raise http_ex
     except Exception as e:
         logger.error(f"登录失败: {str(e)}", exc_info=True)
+        raise
+
+
+@router.post(
+    "/account/change-password",
+    response_model=APIResponse[dict],
+    response_model_by_alias=True,
+)
+async def change_password(
+        body: ChangePasswordRequest,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+) -> APIResponse[dict]:
+    """修改当前登录用户密码"""
+    try:
+        if body.newPassword != body.confirmPassword:
+            raise raise_account_error("两次输入的新密码不一致", ErrorCodes.PASSWORD_CONFIRM_MISMATCH)
+
+        if body.oldPassword == body.newPassword:
+            raise raise_account_error("新密码不能与原密码相同", ErrorCodes.PASSWORD_SAME_AS_OLD)
+
+        sql = select(IfIdentityUsers).where(
+            and_(
+                IfIdentityUsers.id == current_user_info.user_id,
+                (IfIdentityUsers.deleted.is_(None)) | (IfIdentityUsers.deleted == 0),
+            )
+        )
+        user: IfIdentityUsers = (await db.execute(sql)).scalar_one_or_none()
+        if not user:
+            raise raise_user_error("查无此用户", ErrorCodes.USER_NOT_FOUND)
+
+        if not verify_password(body.oldPassword, user.password_hash):
+            raise raise_account_error("原密码错误", ErrorCodes.INVALID_PASSWORD)
+
+        now = datetime.now(timezone.utc)
+        user.password_hash = get_password_hash(body.newPassword)
+        user.last_modifier_id = current_user_info.user_id
+        user.last_modification_time = now
+        await db.commit()
+
+        return success_response(data={"success": True})
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"修改密码失败: {str(e)}", exc_info=True)
+        await db.rollback()
         raise

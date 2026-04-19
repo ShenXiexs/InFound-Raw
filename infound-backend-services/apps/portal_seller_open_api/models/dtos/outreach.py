@@ -19,18 +19,25 @@ class CreatorFilterDTO(BaseDTO):
         validation_alias=AliasChoices("avgCommissionRate"),
         serialization_alias="avgCommissionRate",
     )
-    contentTypes: int | None = Field(default=None, validation_alias=AliasChoices("contentTypes"), serialization_alias="contentTypes")
-    creatorAgency: int | None = Field(default=None, validation_alias=AliasChoices("creatorAgency"), serialization_alias="creatorAgency")
-    fastGrowing: bool = Field(default=False, validation_alias=AliasChoices("fastGrowing"), serialization_alias="fastGrowing")
+    contentTypes: int | None = Field(default=None, validation_alias=AliasChoices("contentTypes"),
+                                     serialization_alias="contentTypes")
+    creatorAgency: int | None = Field(default=None, validation_alias=AliasChoices("creatorAgency"),
+                                      serialization_alias="creatorAgency")
+    fastGrowing: bool = Field(default=False, validation_alias=AliasChoices("fastGrowing"),
+                              serialization_alias="fastGrowing")
     notInvitedInPast90Days: bool = Field(
         default=False,
         validation_alias=AliasChoices("notInvitedInPast90Days"),
         serialization_alias="notInvitedInPast90Days",
     )
-    fansAgeRange: list[str] = Field(default_factory=list, validation_alias=AliasChoices("fansAgeRange"), serialization_alias="fansAgeRange")
-    fansGender: int | None = Field(default=None, validation_alias=AliasChoices("fansGender"), serialization_alias="fansGender")
-    fansCountRange: dict | None = Field(default=None, validation_alias=AliasChoices("fansCountRange"), serialization_alias="fansCountRange")
-    gmvRange: list[str] = Field(default_factory=list, validation_alias=AliasChoices("gmvRange"), serialization_alias="gmvRange")
+    fansAgeRange: list[str] = Field(default_factory=list, validation_alias=AliasChoices("fansAgeRange"),
+                                    serialization_alias="fansAgeRange")
+    fansGender: int | None = Field(default=None, validation_alias=AliasChoices("fansGender"),
+                                   serialization_alias="fansGender")
+    fansCountRange: dict | None = Field(default=None, validation_alias=AliasChoices("fansCountRange"),
+                                        serialization_alias="fansCountRange")
+    gmvRange: list[str] = Field(default_factory=list, validation_alias=AliasChoices("gmvRange"),
+                                serialization_alias="gmvRange")
     salesCountRange: list[str] = Field(
         default_factory=list,
         validation_alias=AliasChoices("salesCountRange"),
@@ -60,7 +67,8 @@ class CreatorFilterDTO(BaseDTO):
         validation_alias=AliasChoices("creatorEstimatedPublishRate"),
         serialization_alias="creatorEstimatedPublishRate",
     )
-    coBranding: list[str] = Field(default_factory=list, validation_alias=AliasChoices("coBranding"), serialization_alias="coBranding")
+    coBranding: list[str] = Field(default_factory=list, validation_alias=AliasChoices("coBranding"),
+                                  serialization_alias="coBranding")
     sortBy: int = Field(validation_alias=AliasChoices("sortBy"), serialization_alias="sortBy")
 
     @field_validator("sortBy")
@@ -154,6 +162,17 @@ class CreateOutreachTaskRequest(BaseDTO):
             return None
         text = str(value).strip()
         return text or None
+
+    @field_validator("startTime", mode="before")
+    @classmethod
+    def _normalize_start_time(cls, value) -> datetime | str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if not trimmed:
+                return None
+        return value
 
     @field_validator("duplicateCheckCode", mode="before")
     @classmethod
@@ -361,6 +380,38 @@ class OutreachTaskListData(BaseDTO):
     page: int = Field(validation_alias=AliasChoices("page"), serialization_alias="page")
     pageSize: int = Field(validation_alias=AliasChoices("pageSize"), serialization_alias="pageSize")
     items: list[OutreachTaskListItem] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("list"),
+        serialization_alias="list",
+    )
+
+
+class OutreachTaskRunRecordItem(BaseDTO):
+    creatorId: str = Field(validation_alias=AliasChoices("creatorId"), serialization_alias="creatorId")
+    creatorName: str = Field(validation_alias=AliasChoices("creatorName"), serialization_alias="creatorName")
+    followers: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("followers"),
+        serialization_alias="followers",
+    )
+    gmv: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("gmv"),
+        serialization_alias="gmv",
+    )
+    taskName: str = Field(validation_alias=AliasChoices("taskName"), serialization_alias="taskName")
+    sendTime: datetime | None = Field(
+        default=None,
+        validation_alias=AliasChoices("sendTime"),
+        serialization_alias="sendTime",
+    )
+
+
+class OutreachTaskRunRecordListData(BaseDTO):
+    total: int = Field(validation_alias=AliasChoices("total"), serialization_alias="total")
+    page: int = Field(validation_alias=AliasChoices("page"), serialization_alias="page")
+    pageSize: int = Field(validation_alias=AliasChoices("pageSize"), serialization_alias="pageSize")
+    items: list[OutreachTaskRunRecordItem] = Field(
         default_factory=list,
         validation_alias=AliasChoices("list"),
         serialization_alias="list",

@@ -4,6 +4,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.portal_seller_open_api.core.config import Settings
+from apps.portal_seller_open_api.exceptions import raise_token_error, ErrorCodes
 from apps.portal_seller_open_api.services.creator_detail_result_service import (
     CreatorDetailResultIngestionService,
 )
@@ -47,7 +48,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 def get_current_user_info(request: Request) -> CurrentUserInfo:
     current_user_info = getattr(request.state, "current_user_info", None)
     if current_user_info is None:
-        raise RuntimeError("current_user_info not initialized in app.state")
+        raise_token_error("Token 无效", ErrorCodes.INVALID_TOKEN)
     return current_user_info
 
 

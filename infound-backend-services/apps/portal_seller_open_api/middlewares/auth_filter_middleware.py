@@ -26,7 +26,9 @@ class AuthFilterMiddleware(BaseHTTPMiddleware):
         self.logger = get_logger()
 
     EXCLUDE_PATH_PATTERNS = [
-        r"^/account/.*$",
+        r"^/account/send-verification-code/sms$",
+        r"^/account/sign-up$",
+        r"^/account/login$",
         r"^/$",
         r"^/health$",
         r"^/docs.*",
@@ -35,6 +37,9 @@ class AuthFilterMiddleware(BaseHTTPMiddleware):
     ]
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if any(re.match(pattern, request.url.path) for pattern in self.EXCLUDE_PATH_PATTERNS):
             return await call_next(request)
 

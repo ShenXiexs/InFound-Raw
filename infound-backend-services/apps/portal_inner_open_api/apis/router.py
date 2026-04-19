@@ -1,6 +1,14 @@
 from fastapi import APIRouter
 
-from .endpoints import home, sample, chatbot, creator, outreach_task, campaign
+from .endpoints import (
+    campaign,
+    chatbot,
+    creator,
+    home,
+    outreach_filter_items,
+    outreach_task,
+    sample,
+)
 
 # 服务路由（前缀统一管理）
 open_api_router = APIRouter(prefix="", tags=["INNER OPEN API"])
@@ -11,4 +19,5 @@ open_api_router.include_router(sample.router)
 open_api_router.include_router(chatbot.router)
 open_api_router.include_router(creator.router)
 open_api_router.include_router(outreach_task.router)
+open_api_router.include_router(outreach_filter_items.router)
 open_api_router.include_router(campaign.router)

@@ -12,6 +12,7 @@ class CreatorDetailContextItem(BaseDTO):
     platform_creator_id: Optional[str] = None
     platform_creator_username: Optional[str] = None
     platform_creator_display_name: Optional[str] = None
+    avatar: Optional[str] = None
     chat_url: Optional[str] = None
     search_keyword: Optional[str] = None
     search_keywords: Optional[str] = None
@@ -82,5 +83,4 @@ class CreatorDetailResultIngestionRequest(BaseDTO):
 class CreatorDetailResultIngestionResult(BaseDTO):
     task_id: str
     creator_record_id: str
-    crawl_log_id: str
     platform_creator_id: str

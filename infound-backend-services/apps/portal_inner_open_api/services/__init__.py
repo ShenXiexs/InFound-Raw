@@ -33,6 +33,9 @@ from .creator_ingestion_service import CreatorIngestionService
 
 # 导出 Outreach 相关服务
 from .outreach_creator_ingestion_service import OutreachCreatorIngestionService
+from .outreach_filter_items_ingestion_service import (
+    OutreachFilterItemsIngestionService,
+)
 from .outreach_task_service import OutreachTaskService
 from .sample_ingestion_service import SampleIngestionService
 
@@ -48,6 +51,7 @@ __all__ = [
     "ChatbotStatusDetector",
     # Outreach 服务
     "OutreachCreatorIngestionService",
+    "OutreachFilterItemsIngestionService",
     "OutreachTaskService",
     # 其他服务
     "CreatorHistoryService",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from sqlalchemy import and_, or_, select
@@ -117,7 +117,7 @@ class SellerRpaSchedulerService:
                 await self._sleep(interval)
 
     async def _recover_pending_task_plans(self) -> None:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         batch_size = max(int(self.scheduler_settings.recovery_batch_size or 500), 1)
         async with DatabaseManager.get_session() as session:
             stmt = (
@@ -140,7 +140,7 @@ class SellerRpaSchedulerService:
             await self.dispatch_service.schedule_task_plan(task_plan)
             recovered += 1
             if task_plan.scheduled_time <= now and not await self.dispatch_service.has_dispatch_marker(
-                task_plan.id
+                    task_plan.id
             ):
                 try:
                     async with DatabaseManager.get_session() as dispatch_session:
@@ -186,7 +186,7 @@ class SellerRpaSchedulerService:
         self.logger.info("Seller RPA scheduler 已恢复待调度任务", recovered=recovered)
 
     async def _recover_invalid_running_task_plans(self) -> int:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         timeout_limit = now - self.RUNNING_RECOVERY_TIMEOUT
         batch_size = max(int(self.scheduler_settings.recovery_batch_size or 500), 1)
 
@@ -285,7 +285,7 @@ class SellerRpaSchedulerService:
         return await self.sample_monitor_plan_service.ensure_daily_plans()
 
     async def _dispatch_due_task_plans_once(self) -> bool:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         batch_size = max(int(self.scheduler_settings.delayed_batch_size or 50), 1)
         processed = False
 

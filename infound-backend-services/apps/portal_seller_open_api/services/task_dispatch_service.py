@@ -46,7 +46,7 @@ class SellerRpaTaskDispatchService:
         return True
 
     async def try_publish_task_plan(
-        self, task_plan: SellerTkRpaTaskPlans
+            self, task_plan: SellerTkRpaTaskPlans
     ) -> TaskDispatchResult:
         if task_plan.status != "PENDING":
             return TaskDispatchResult(
@@ -59,7 +59,7 @@ class SellerRpaTaskDispatchService:
         acquired = await asyncio.to_thread(
             client.set,
             marker_key,
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).isoformat(),
             ex=self.dispatch_marker_ttl_seconds,
             nx=True,
         )
@@ -93,11 +93,11 @@ class SellerRpaTaskDispatchService:
         await asyncio.gather(*actions, return_exceptions=True)
 
     async def get_due_task_ids(
-        self,
-        task_type: str,
-        *,
-        now: datetime | None = None,
-        batch_size: int = 50,
+            self,
+            task_type: str,
+            *,
+            now: datetime | None = None,
+            batch_size: int = 50,
     ) -> list[str]:
         normalized_task_type = str(task_type or "").upper()
         if normalized_task_type not in self.SUPPORTED_DELAYED_TASK_TYPES:

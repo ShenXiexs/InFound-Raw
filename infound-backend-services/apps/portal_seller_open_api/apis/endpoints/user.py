@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -17,14 +18,64 @@ from shared_seller_application_services.current_user_info import CurrentUserInfo
 router = APIRouter(tags=["用户"])
 
 
+def _format_utc_iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _build_reset_base_permission(now: datetime) -> dict[str, Any]:
+    return {
+        "availableDateRang": {
+            "startDate": _format_utc_iso(now),
+            "endDate": _format_utc_iso(now + timedelta(days=14)),
+        },
+        "maxShopCount": 2,
+        "maxOutreachCountPerDay": 0,
+        "maxRemindCreatorCountPerDay": 0,
+        "enableExportCreatorData": False,
+    }
+
+
+def _parse_utc_iso(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    value = raw.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _ensure_permission_not_expired(user: IfIdentityUsers) -> bool:
+    permission_setting = user.permission_setting or {}
+    date_range = permission_setting.get("availableDateRang")
+    if not isinstance(date_range, dict):
+        return False
+    end_date = _parse_utc_iso(date_range.get("endDate"))
+    if end_date is None:
+        return False
+    now = datetime.now(timezone.utc)
+    if now < end_date:
+        return False
+    user.permission_setting = _build_reset_base_permission(now)
+    return True
+
+
 def _build_user_payload(user: IfIdentityUsers) -> dict[str, Any]:
     user_type_str = str(user.user_type) if user.user_type is not None else "00"
 
     permission = user.permission_setting or {}
     default_permission = {
-        "availableCount": 0,
-        "availableStartDate": "",
-        "availableEndDate": "",
+        "availableDateRang": {
+            "startDate": "",
+            "endDate": "",
+        },
+        "maxShopCount": 0,
+        "maxOutreachCountPerDay": 0,
+        "maxRemindCreatorCountPerDay": 0,
+        "enableExportCreatorData": False,
         "enableDebug": False,
     }
     # 优先使用数据库中的值，缺失的字段用默认值
@@ -33,7 +84,9 @@ def _build_user_payload(user: IfIdentityUsers) -> dict[str, Any]:
     return {
         "userId": user.id,
         "username": user.user_name,
+        "phoneNumber": user.phone_number,
         "userType": user_type_str,
+        "updateTime": _format_utc_iso(datetime.now(timezone.utc)),
         "permission": final_permission,
     }
 
@@ -64,6 +117,11 @@ async def check_token(
     if not user:
         return error_response(message="Token 无效", code=1251)
 
+    permission_changed = _ensure_permission_not_expired(user)
+    if permission_changed:
+        await db.commit()
+        await db.refresh(user)
+
     return success_response(data=_build_user_payload(user))
 
 
@@ -90,6 +148,11 @@ async def current_user(
     user: IfIdentityUsers = (await db.execute(sql)).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="Unverified")
+
+    permission_changed = _ensure_permission_not_expired(user)
+    if permission_changed:
+        await db.commit()
+        await db.refresh(user)
 
     return success_response(data=_build_user_payload(user))
 
