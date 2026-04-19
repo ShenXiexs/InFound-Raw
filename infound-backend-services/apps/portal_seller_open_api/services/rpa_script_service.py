@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timezone
 from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import select
@@ -18,13 +19,13 @@ class SellerRpaScriptService:
         self.db_session = db_session
 
     async def upsert_script_snapshot(
-        self,
-        *,
-        actor_id: str,
-        code: str,
-        name: str,
-        script: dict | list | str | None,
-        version_hint: str | None = None,
+            self,
+            *,
+            actor_id: str,
+            code: str,
+            name: str,
+            script: dict | list | str | None,
+            version_hint: str | None = None,
     ) -> tuple[str | None, str | None]:
         normalized_code = clean_text(code)
         normalized_name = clean_text(name)
@@ -67,9 +68,9 @@ class SellerRpaScriptService:
             return normalized_code, current_version
 
         if (
-            existing.pro_script != serialized_script
-            or clean_text(existing.current_version) != current_version
-            or clean_text(existing.name) != normalized_name
+                existing.pro_script != serialized_script
+                or clean_text(existing.current_version) != current_version
+                or clean_text(existing.name) != normalized_name
         ):
             existing.name = normalized_name
             existing.pro_script = serialized_script
@@ -112,4 +113,4 @@ class SellerRpaScriptService:
     def _utc_now():
         from datetime import datetime
 
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)

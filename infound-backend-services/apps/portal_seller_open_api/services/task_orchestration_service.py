@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 from uuid import NAMESPACE_URL, uuid5
 
@@ -28,13 +28,13 @@ from apps.portal_seller_open_api.services.task_slot_dispatch_service import (
     SellerRpaTaskSingleSlotDispatchService,
 )
 from core_base import get_logger
-from shared_seller_application_services.current_user_info import CurrentUserInfo
 from shared_domain.models.infound import (
     SellerTkContractMonitorLogs,
     SellerTkSampleCrawlLogs,
     SellerTkSamples,
     SellerTkRpaTaskPlans,
 )
+from shared_seller_application_services.current_user_info import CurrentUserInfo
 
 
 class SellerRpaTaskOrchestrationService:
@@ -58,165 +58,249 @@ class SellerRpaTaskOrchestrationService:
         )
 
     async def prepare_outreach_follow_up_tasks(
-        self,
-        current_user: CurrentUserInfo,
-        *,
-        task_id: str,
-        shop_id: str,
-        shop_region_code: str,
-        search_keyword: str | None,
-        message: str | None,
-        first_message: str | None,
-        second_message: str | None,
-        creators: Iterable[Any],
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            task_id: str,
+            shop_id: str,
+            shop_region_code: str,
+            brand_name: str | None,
+            search_keyword: str | None,
+            message: str | None,
+            first_message: str | None,
+            second_message: str | None,
+            creators: Iterable[Any],
     ) -> list[SellerTkRpaTaskPlans]:
         parent_plan = await self._get_parent_task_plan(current_user.user_id, task_id, "OUTREACH")
         if parent_plan is None:
             self.logger.warn("建联派生任务失败：未找到父任务计划", task_id=task_id)
             return []
 
-        parent_payload = self._coerce_payload(parent_plan.task_payload)
+        parent_payload = self._coerce_payload(parent_plan.task_playload)
         parent_task_node = self._ensure_record(parent_payload.get("task"))
         parent_input_node = self._ensure_record(parent_payload.get("input"))
         parent_payload_node = self._ensure_record(parent_input_node.get("payload"))
         root_task_id = (
-            clean_text(parent_task_node.get("rootTaskId"))
-            or clean_text(parent_payload_node.get("rootTaskId"))
-            or parent_plan.id
+                clean_text(parent_task_node.get("rootTaskId"))
+                or clean_text(parent_payload_node.get("rootTaskId"))
+                or parent_plan.id
         )
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         created_plans: list[SellerTkRpaTaskPlans] = []
-        chat_message = clean_text(message) or clean_text(first_message)
 
         for raw_creator in creators:
-            creator_record = self._ensure_record(raw_creator)
-            platform_creator_id = normalize_identifier(
-                creator_record.get("platform_creator_id") or creator_record.get("creator_id")
+            created_plans.extend(
+                await self.prepare_outreach_follow_up_tasks_for_creator(
+                    current_user,
+                    task_id=task_id,
+                    shop_id=shop_id,
+                    shop_region_code=shop_region_code,
+                    brand_name=brand_name,
+                    search_keyword=search_keyword,
+                    message=message,
+                    first_message=first_message,
+                    second_message=second_message,
+                    creator=raw_creator,
+                    parent_plan=parent_plan,
+                    parent_payload=parent_payload,
+                    parent_payload_node=parent_payload_node,
+                    root_task_id=root_task_id,
+                    scheduled_time=now,
+                )
             )
-            if not platform_creator_id:
-                continue
 
-            creator_name = (
+        return created_plans
+
+    async def prepare_outreach_follow_up_tasks_for_creator(
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            task_id: str,
+            shop_id: str,
+            shop_region_code: str,
+            brand_name: str | None,
+            search_keyword: str | None,
+            message: str | None,
+            first_message: str | None,
+            second_message: str | None,
+            creator: Any,
+            parent_plan: SellerTkRpaTaskPlans | None = None,
+            parent_payload: dict[str, Any] | None = None,
+            parent_payload_node: dict[str, Any] | None = None,
+            root_task_id: str | None = None,
+            scheduled_time: datetime | None = None,
+    ) -> list[SellerTkRpaTaskPlans]:
+        parent_task_plan = parent_plan
+        if parent_task_plan is None:
+            parent_task_plan = await self._get_parent_task_plan(
+                current_user.user_id, task_id, "OUTREACH"
+            )
+        if parent_task_plan is None:
+            self.logger.warn("建联派生任务失败：未找到父任务计划", task_id=task_id)
+            return []
+
+        effective_parent_payload = (
+            deepcopy(parent_payload)
+            if isinstance(parent_payload, dict)
+            else self._coerce_payload(parent_task_plan.task_playload)
+        )
+        effective_parent_payload_node = (
+            deepcopy(parent_payload_node)
+            if isinstance(parent_payload_node, dict)
+            else self._ensure_record(
+                self._ensure_record(
+                    self._ensure_record(effective_parent_payload.get("input")).get("payload")
+                )
+            )
+        )
+        effective_root_task_id = (
+                clean_text(root_task_id)
+                or clean_text(self._ensure_record(effective_parent_payload.get("task")).get("rootTaskId"))
+                or clean_text(effective_parent_payload_node.get("rootTaskId"))
+                or parent_task_plan.id
+        )
+        now = scheduled_time or datetime.now(timezone.utc)
+
+        creator_record = self._ensure_record(creator)
+        platform_creator_id = normalize_identifier(
+            creator_record.get("platform_creator_id") or creator_record.get("creator_id")
+        )
+        if not platform_creator_id:
+            return []
+
+        creator_name = (
                 clean_text(creator_record.get("creator_name"))
                 or clean_text(creator_record.get("platform_creator_display_name"))
                 or platform_creator_id
-            )
-            base_context = {
-                "platform": "tiktok",
-                "platform_creator_id": platform_creator_id,
-                "platform_creator_display_name": creator_name,
-                "platform_creator_username": creator_name,
-                "search_keyword": clean_text(search_keyword),
-                "search_keywords": clean_text(search_keyword),
-                "connect": 1,
-                "reply": 0,
-                "send": 1,
+        )
+        base_context = {
+            "platform": "tiktok",
+            "platform_creator_id": platform_creator_id,
+            "platform_creator_display_name": creator_name,
+            "platform_creator_username": creator_name,
+            "search_keyword": clean_text(search_keyword),
+            "search_keywords": clean_text(search_keyword),
+            "connect": 1,
+            "reply": 0,
+            "send": 1,
+        }
+        creator_avatar = clean_text(
+            creator_record.get("avatar") or creator_record.get("avatar_url")
+        )
+        if creator_avatar:
+            base_context["avatar"] = creator_avatar
+        normalized_brand_name = clean_text(brand_name)
+        if normalized_brand_name:
+            base_context["brand_name"] = normalized_brand_name
+
+        created_plans: list[SellerTkRpaTaskPlans] = []
+        detail_payload = self._build_base_child_payload(
+            parent_payload=effective_parent_payload,
+            task_id=self.build_outreach_detail_task_id(
+                effective_root_task_id, platform_creator_id
+            ),
+            task_type="CREATOR_DETAIL",
+            task_name=f"达人详情-{creator_name}",
+            shop_id=shop_id,
+            shop_region_code=shop_region_code,
+            parent_task_id=parent_task_plan.id,
+            root_task_id=effective_root_task_id,
+            chain_stage="DETAIL",
+            scheduled_time=now,
+        )
+        detail_input_node = self._mutable_record(detail_payload, "input")
+        detail_input_payload = self._mutable_record(detail_input_node, "payload")
+        detail_input_payload.update(
+            {
+                "creatorId": platform_creator_id,
+                "context": base_context,
             }
+        )
+        self._copy_optional_value(
+            effective_parent_payload_node,
+            detail_input_payload,
+            "creatorDetailScript",
+            "script",
+        )
+        self._copy_optional_value(
+            effective_parent_payload_node,
+            detail_input_payload,
+            "creatorDetailScriptPath",
+            "scriptPath",
+        )
+        detail_plan = await self._create_child_task_plan(
+            current_user=current_user,
+            task_id=detail_payload["task"]["taskId"],
+            task_type="CREATOR_DETAIL",
+            task_playload=detail_payload,
+            scheduled_time=now,
+        )
+        if detail_plan is not None:
+            created_plans.append(detail_plan)
 
-            detail_payload = self._build_base_child_payload(
-                parent_payload=parent_payload,
-                task_id=self._stable_task_id(
-                    f"seller-rpa:detail:{root_task_id}:{platform_creator_id}"
-                ),
-                task_type="CREATOR_DETAIL",
-                task_name=f"达人详情-{creator_name}",
-                shop_id=shop_id,
-                shop_region_code=shop_region_code,
-                parent_task_id=parent_plan.id,
-                root_task_id=root_task_id,
-                chain_stage="DETAIL",
-                scheduled_time=now,
-            )
-            detail_input_node = self._mutable_record(detail_payload, "input")
-            detail_input_payload = self._mutable_record(detail_input_node, "payload")
-            detail_input_payload.update(
-                {
-                    "creatorId": platform_creator_id,
-                    "context": base_context,
-                }
-            )
-            self._copy_optional_value(
-                parent_payload_node,
-                detail_input_payload,
-                "creatorDetailScript",
-                "script",
-            )
-            self._copy_optional_value(
-                parent_payload_node,
-                detail_input_payload,
-                "creatorDetailScriptPath",
-                "scriptPath",
-            )
-            detail_plan = await self._create_child_task_plan(
-                current_user=current_user,
-                task_id=detail_payload["task"]["taskId"],
-                task_type="CREATOR_DETAIL",
-                task_payload=detail_payload,
-                scheduled_time=now,
-            )
-            if detail_plan is not None:
-                created_plans.append(detail_plan)
+        chat_message = clean_text(message) or clean_text(first_message)
+        if not chat_message:
+            return created_plans
 
-            if not chat_message:
-                continue
-
-            chat_payload = self._build_base_child_payload(
-                parent_payload=parent_payload,
-                task_id=self._stable_task_id(
-                    f"seller-rpa:chat:{root_task_id}:{platform_creator_id}"
-                ),
-                task_type="CHAT",
-                task_name=f"聊天任务-{creator_name}",
-                shop_id=shop_id,
-                shop_region_code=shop_region_code,
-                parent_task_id=parent_plan.id,
-                root_task_id=root_task_id,
-                chain_stage="CHAT",
-                scheduled_time=now,
-            )
-            chat_input_node = self._mutable_record(chat_payload, "input")
-            chat_input_payload = self._mutable_record(chat_input_node, "payload")
-            chat_input_payload.update(
-                {
-                    "creatorId": platform_creator_id,
-                    "creatorName": creator_name,
-                    "message": chat_message,
-                    "firstMessage": clean_text(first_message) or chat_message,
-                    "secondMessage": clean_text(second_message),
-                    "businessMode": "chat",
-                    "recipients": [
-                        {
-                            "creatorId": platform_creator_id,
-                            "creatorName": creator_name,
-                            "message": chat_message,
-                        }
-                    ],
-                }
-            )
-            self._copy_optional_value(parent_payload_node, chat_input_payload, "chatScript", "script")
-            self._copy_optional_value(
-                parent_payload_node, chat_input_payload, "chatScriptPath", "scriptPath"
-            )
-            chat_plan = await self._create_child_task_plan(
-                current_user=current_user,
-                task_id=chat_payload["task"]["taskId"],
-                task_type="CHAT",
-                task_payload=chat_payload,
-                scheduled_time=now,
-            )
-            if chat_plan is not None:
-                created_plans.append(chat_plan)
+        chat_payload = self._build_base_child_payload(
+            parent_payload=effective_parent_payload,
+            task_id=self.build_outreach_chat_task_id(
+                effective_root_task_id, platform_creator_id
+            ),
+            task_type="CHAT",
+            task_name=f"聊天任务-{creator_name}",
+            shop_id=shop_id,
+            shop_region_code=shop_region_code,
+            parent_task_id=parent_task_plan.id,
+            root_task_id=effective_root_task_id,
+            chain_stage="CHAT",
+            scheduled_time=now,
+        )
+        chat_input_node = self._mutable_record(chat_payload, "input")
+        chat_input_payload = self._mutable_record(chat_input_node, "payload")
+        chat_input_payload.update(
+            {
+                "creatorId": platform_creator_id,
+                "creatorName": creator_name,
+                "message": chat_message,
+                "firstMessage": clean_text(first_message) or chat_message,
+                "secondMessage": clean_text(second_message),
+                "businessMode": "chat",
+                "recipients": [
+                    {
+                        "creatorId": platform_creator_id,
+                        "creatorName": creator_name,
+                        "message": chat_message,
+                    }
+                ],
+            }
+        )
+        self._copy_optional_value(
+            effective_parent_payload_node, chat_input_payload, "chatScript", "script"
+        )
+        self._copy_optional_value(
+            effective_parent_payload_node, chat_input_payload, "chatScriptPath", "scriptPath"
+        )
+        chat_plan = await self._create_child_task_plan(
+            current_user=current_user,
+            task_id=chat_payload["task"]["taskId"],
+            task_type="CHAT",
+            task_playload=chat_payload,
+            scheduled_time=now,
+        )
+        if chat_plan is not None:
+            created_plans.append(chat_plan)
 
         return created_plans
 
     async def prepare_sample_follow_up_tasks(
-        self,
-        current_user: CurrentUserInfo,
-        *,
-        task_id: str,
-        shop_id: str,
-        shop_region_code: str,
-        rows: Iterable[Any],
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            task_id: str,
+            shop_id: str,
+            shop_region_code: str,
+            rows: Iterable[Any],
     ) -> list[SellerTkRpaTaskPlans]:
         parent_plan = await self._get_parent_task_plan(
             current_user.user_id, task_id, "SAMPLE_MONITOR"
@@ -231,16 +315,16 @@ class SellerRpaTaskOrchestrationService:
         if not active_rule_bindings:
             return []
 
-        parent_payload = self._coerce_payload(parent_plan.task_payload)
+        parent_payload = self._coerce_payload(parent_plan.task_playload)
         parent_task_node = self._ensure_record(parent_payload.get("task"))
         parent_input_node = self._ensure_record(parent_payload.get("input"))
         parent_payload_node = self._ensure_record(parent_input_node.get("payload"))
         root_task_id = (
-            clean_text(parent_task_node.get("rootTaskId"))
-            or clean_text(parent_payload_node.get("rootTaskId"))
-            or parent_plan.id
+                clean_text(parent_task_node.get("rootTaskId"))
+                or clean_text(parent_payload_node.get("rootTaskId"))
+                or parent_plan.id
         )
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         created_plans: list[SellerTkRpaTaskPlans] = []
 
         for raw_row in rows:
@@ -282,10 +366,10 @@ class SellerRpaTaskOrchestrationService:
                     continue
 
                 message = (
-                    clean_text(binding.message_template)
-                    or clean_text(rule.remark)
-                    or clean_text(rule.name)
-                    or rule.code
+                        clean_text(binding.message_template)
+                        or clean_text(rule.remark)
+                        or clean_text(rule.name)
+                        or rule.code
                 )
                 self.db_session.add(
                     SellerTkContractMonitorLogs(
@@ -350,7 +434,7 @@ class SellerRpaTaskOrchestrationService:
                     current_user=current_user,
                     task_id=child_task_id,
                     task_type="URGE_CHAT",
-                    task_payload=urge_payload,
+                    task_playload=urge_payload,
                     scheduled_time=now,
                 )
                 if urge_plan is not None:
@@ -361,7 +445,7 @@ class SellerRpaTaskOrchestrationService:
     async def dispatch_task_plans(self, task_plans: Iterable[SellerTkRpaTaskPlans]) -> None:
         for task_plan in task_plans:
             try:
-                if task_plan.scheduled_time <= datetime.utcnow():
+                if task_plan.scheduled_time <= datetime.now(timezone.utc):
                     await self.slot_dispatch_service.dispatch_if_slot_available(
                         task_plan,
                         payload={},
@@ -378,10 +462,10 @@ class SellerRpaTaskOrchestrationService:
                 )
 
     async def _get_parent_task_plan(
-        self,
-        user_id: str,
-        task_id: str,
-        task_type: str,
+            self,
+            user_id: str,
+            task_id: str,
+            task_type: str,
     ) -> SellerTkRpaTaskPlans | None:
         stmt = select(SellerTkRpaTaskPlans).where(
             SellerTkRpaTaskPlans.user_id == user_id,
@@ -397,9 +481,9 @@ class SellerRpaTaskOrchestrationService:
         return result.scalar_one_or_none()
 
     async def _get_active_contract_rules(
-        self,
-        user_id: str,
-        shop_id: str,
+            self,
+            user_id: str,
+            shop_id: str,
     ) -> list[ContractReminderEffectiveRule]:
         service = ContractReminderService(self.db_session)
         bindings = await service.load_active_rule_bindings(user_id, shop_id)
@@ -408,12 +492,12 @@ class SellerRpaTaskOrchestrationService:
         ]
 
     async def _load_contract_monitor_state(
-        self,
-        current_user: CurrentUserInfo,
-        *,
-        shop_id: str,
-        row_context: dict[str, Any],
-        updated_at: datetime,
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            shop_id: str,
+            row_context: dict[str, Any],
+            updated_at: datetime,
     ) -> dict[str, Any] | None:
         platform_product_id = normalize_identifier(row_context.get("platform_product_id"))
         platform_creator_id = normalize_identifier(row_context.get("platform_creator_id"))
@@ -439,8 +523,8 @@ class SellerRpaTaskOrchestrationService:
         status_entered_at = updated_at
         last_crawled_at = sample.last_modification_time or updated_at
         if (
-            current_status in {"content_pending", "completed"}
-            and self._contract_status_to_sample_status(current_status) is not None
+                current_status in {"content_pending", "completed"}
+                and self._contract_status_to_sample_status(current_status) is not None
         ):
             history_result = await self.db_session.execute(
                 select(SellerTkSampleCrawlLogs)
@@ -477,7 +561,7 @@ class SellerRpaTaskOrchestrationService:
             "platform_creator_id": platform_creator_id,
             "sample_request_id": normalize_identifier(row_context.get("sample_request_id")),
             "creator_name": clean_text(row_context.get("creator_name"))
-            or clean_text(sample.platform_creator_display_name),
+                            or clean_text(sample.platform_creator_display_name),
             "current_status": current_status,
             "previous_status": previous_status,
             "status_entered_at": status_entered_at,
@@ -488,13 +572,13 @@ class SellerRpaTaskOrchestrationService:
         }
 
     async def _create_child_task_plan(
-        self,
-        *,
-        current_user: CurrentUserInfo,
-        task_id: str,
-        task_type: str,
-        task_payload: dict[str, Any],
-        scheduled_time: datetime,
+            self,
+            *,
+            current_user: CurrentUserInfo,
+            task_id: str,
+            task_type: str,
+            task_playload: dict[str, Any],
+            scheduled_time: datetime,
     ) -> SellerTkRpaTaskPlans | None:
         existing = await self._find_task_plan(task_id)
         if existing is not None:
@@ -504,7 +588,7 @@ class SellerRpaTaskOrchestrationService:
             id=task_id,
             user_id=current_user.user_id,
             task_type=task_type,
-            task_payload=task_payload,
+            task_playload=task_playload,
             status="PENDING",
             scheduled_time=scheduled_time,
             start_time=None,
@@ -520,18 +604,18 @@ class SellerRpaTaskOrchestrationService:
         return task_plan
 
     def _build_base_child_payload(
-        self,
-        *,
-        parent_payload: dict[str, Any],
-        task_id: str,
-        task_type: str,
-        task_name: str,
-        shop_id: str,
-        shop_region_code: str,
-        parent_task_id: str,
-        root_task_id: str,
-        chain_stage: str,
-        scheduled_time: datetime,
+            self,
+            *,
+            parent_payload: dict[str, Any],
+            task_id: str,
+            task_type: str,
+            task_name: str,
+            shop_id: str,
+            shop_region_code: str,
+            parent_task_id: str,
+            root_task_id: str,
+            chain_stage: str,
+            scheduled_time: datetime,
     ) -> dict[str, Any]:
         parent_task_node = self._ensure_record(parent_payload.get("task"))
         parent_input_node = self._ensure_record(parent_payload.get("input"))
@@ -573,6 +657,22 @@ class SellerRpaTaskOrchestrationService:
     @staticmethod
     def _stable_task_id(seed: str) -> str:
         return str(uuid5(NAMESPACE_URL, seed)).upper()
+
+    @classmethod
+    def build_outreach_detail_task_id(
+            cls, root_task_id: str, platform_creator_id: str
+    ) -> str:
+        return cls._stable_task_id(
+            f"seller-rpa:detail:{root_task_id}:{platform_creator_id}"
+        )
+
+    @classmethod
+    def build_outreach_chat_task_id(
+            cls, root_task_id: str, platform_creator_id: str
+    ) -> str:
+        return cls._stable_task_id(
+            f"seller-rpa:chat:{root_task_id}:{platform_creator_id}"
+        )
 
     @staticmethod
     def _coerce_payload(value: Any) -> dict[str, Any]:
@@ -616,10 +716,10 @@ class SellerRpaTaskOrchestrationService:
 
     @staticmethod
     def _copy_optional_value(
-        source: dict[str, Any],
-        target: dict[str, Any],
-        source_key: str,
-        target_key: str,
+            source: dict[str, Any],
+            target: dict[str, Any],
+            source_key: str,
+            target_key: str,
     ) -> None:
         value = source.get(source_key)
         if value not in (None, "", [], {}):
@@ -674,10 +774,10 @@ class SellerRpaTaskOrchestrationService:
         }
 
     def _select_due_contract_rules(
-        self,
-        monitor: dict[str, Any],
-        rules: Iterable[ContractReminderEffectiveRule],
-        now: datetime,
+            self,
+            monitor: dict[str, Any],
+            rules: Iterable[ContractReminderEffectiveRule],
+            now: datetime,
     ) -> list[ContractReminderEffectiveRule]:
         due_rules: list[ContractReminderEffectiveRule] = []
         current_status = clean_text(monitor.get("current_status"))
@@ -693,8 +793,8 @@ class SellerRpaTaskOrchestrationService:
 
             if rule.code == self.RULE_CONTENT_PENDING_3D:
                 if (
-                    current_status == "content_pending"
-                    and status_entered_at + timedelta(days=3) <= now
+                        current_status == "content_pending"
+                        and status_entered_at + timedelta(days=3) <= now
                 ):
                     due_rules.append(binding)
                 continue
@@ -706,11 +806,11 @@ class SellerRpaTaskOrchestrationService:
         return due_rules
 
     def _resolve_contract_status_window(
-        self,
-        history_rows: list[SellerTkSampleCrawlLogs],
-        *,
-        expected_status: str,
-        fallback_time: datetime,
+            self,
+            history_rows: list[SellerTkSampleCrawlLogs],
+            *,
+            expected_status: str,
+            fallback_time: datetime,
     ) -> tuple[datetime, str | None]:
         status_entered_at = fallback_time
         previous_status: str | None = None

@@ -1,0 +1,3353 @@
+{
+  "cn": {
+    "schema_version": "2026-04-08",
+    "modules": [
+      {
+        "module_key": "creatorFilters",
+        "module_title": "达人",
+        "filters": [
+          {
+            "status": "ok",
+            "filter_key": "productCategorySelections",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "productCategorySelections",
+              "filter_title": "商品类目",
+              "action_type": "selectCascaderOptionsByValue",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "商品类目"
+              ],
+              "panel_selector": "ul.arco-cascader-list.arco-cascader-list-multiple",
+              "option_selector": "ul.arco-cascader-list.arco-cascader-list-multiple li",
+              "scroll_container_selector": "ul.arco-cascader-list.arco-cascader-list-multiple"
+            },
+            "filter_kind": "cascader_multiple",
+            "filter_title": "商品类目",
+            "snapshot_summary": {
+              "option_count": 24,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bl > div#arco-cascader-popup-0.arco-cascader-popup"
+            },
+            "option_items": [
+              {
+                "label": "家居用品",
+                "value": "600001",
+                "raw_label": "Home Supplies (7)",
+                "selected_by_default": false,
+                "source_value": "600001",
+                "count_hint": 7
+              },
+              {
+                "label": "厨房用品",
+                "value": "600024",
+                "raw_label": "Kitchenware (9)",
+                "selected_by_default": false,
+                "source_value": "600024",
+                "count_hint": 9
+              },
+              {
+                "label": "家纺布艺",
+                "value": "600154",
+                "raw_label": "Textiles & Soft Furnishings (3)",
+                "selected_by_default": false,
+                "source_value": "600154",
+                "count_hint": 3
+              },
+              {
+                "label": "家电",
+                "value": "600942",
+                "raw_label": "Household Appliances (4)",
+                "selected_by_default": false,
+                "source_value": "600942",
+                "count_hint": 4
+              },
+              {
+                "label": "女装与女士内衣",
+                "value": "601152",
+                "raw_label": "Womenswear & Underwear (7)",
+                "selected_by_default": false,
+                "source_value": "601152",
+                "count_hint": 7
+              },
+              {
+                "label": "鞋靴",
+                "value": "601352",
+                "raw_label": "Shoes (3)",
+                "selected_by_default": false,
+                "source_value": "601352",
+                "count_hint": 3
+              },
+              {
+                "label": "美妆个护",
+                "value": "601450",
+                "raw_label": "Beauty & Personal Care (10)",
+                "selected_by_default": false,
+                "source_value": "601450",
+                "count_hint": 10
+              },
+              {
+                "label": "手机与数码",
+                "value": "601739",
+                "raw_label": "Phones & Electronics (9)",
+                "selected_by_default": false,
+                "source_value": "601739",
+                "count_hint": 9
+              },
+              {
+                "label": "电脑办公",
+                "value": "601755",
+                "raw_label": "Computers & Office Equipment (7)",
+                "selected_by_default": false,
+                "source_value": "601755",
+                "count_hint": 7
+              },
+              {
+                "label": "宠物用品",
+                "value": "602118",
+                "raw_label": "Pet Supplies (11)",
+                "selected_by_default": false,
+                "source_value": "602118",
+                "count_hint": 11
+              },
+              {
+                "label": "运动与户外",
+                "value": "603014",
+                "raw_label": "Sports & Outdoor (11)",
+                "selected_by_default": false,
+                "source_value": "603014",
+                "count_hint": 11
+              },
+              {
+                "label": "玩具和爱好",
+                "value": "604206",
+                "raw_label": "Toys & Hobbies (8)",
+                "selected_by_default": false,
+                "source_value": "604206",
+                "count_hint": 8
+              },
+              {
+                "label": "家具",
+                "value": "604453",
+                "raw_label": "Furniture (4)",
+                "selected_by_default": false,
+                "source_value": "604453",
+                "count_hint": 4
+              },
+              {
+                "label": "五金工具",
+                "value": "604579",
+                "raw_label": "Tools & Hardware (8)",
+                "selected_by_default": false,
+                "source_value": "604579",
+                "count_hint": 8
+              },
+              {
+                "label": "家装建材",
+                "value": "604968",
+                "raw_label": "Home Improvement (9)",
+                "selected_by_default": false,
+                "source_value": "604968",
+                "count_hint": 9
+              },
+              {
+                "label": "汽车与摩托车",
+                "value": "605196",
+                "raw_label": "Automotive & Motorcycle (7)",
+                "selected_by_default": false,
+                "source_value": "605196",
+                "count_hint": 7
+              },
+              {
+                "label": "时尚配件",
+                "value": "605248",
+                "raw_label": "Fashion Accessories (7)",
+                "selected_by_default": false,
+                "source_value": "605248",
+                "count_hint": 7
+              },
+              {
+                "label": "保健",
+                "value": "700645",
+                "raw_label": "Health (1)",
+                "selected_by_default": false,
+                "source_value": "700645",
+                "count_hint": 1
+              },
+              {
+                "label": "图书、杂志和音频",
+                "value": "801928",
+                "raw_label": "Books, Magazines & Audio (9)",
+                "selected_by_default": false,
+                "source_value": "801928",
+                "count_hint": 9
+              },
+              {
+                "label": "儿童时尚",
+                "value": "802184",
+                "raw_label": "Kids' Fashion (5)",
+                "selected_by_default": false,
+                "source_value": "802184",
+                "count_hint": 5
+              },
+              {
+                "label": "男装与男士内衣",
+                "value": "824328",
+                "raw_label": "Menswear & Underwear (6)",
+                "selected_by_default": false,
+                "source_value": "824328",
+                "count_hint": 6
+              },
+              {
+                "label": "箱包",
+                "value": "824584",
+                "raw_label": "Luggage & Bags (5)",
+                "selected_by_default": false,
+                "source_value": "824584",
+                "count_hint": 5
+              },
+              {
+                "label": "收藏品",
+                "value": "951432",
+                "raw_label": "Collectibles (4)",
+                "selected_by_default": false,
+                "source_value": "951432",
+                "count_hint": 4
+              },
+              {
+                "label": "珠宝与衍生品",
+                "value": "953224",
+                "raw_label": "Jewelry Accessories & Derivatives (3)",
+                "selected_by_default": false,
+                "source_value": "953224",
+                "count_hint": 3
+              }
+            ],
+            "option_tree": [
+              {
+                "label": "家居用品",
+                "value": "600001",
+                "raw_label": "Home Supplies (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "厨房用品",
+                "value": "600024",
+                "raw_label": "Kitchenware (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "家纺布艺",
+                "value": "600154",
+                "raw_label": "Textiles & Soft Furnishings (3)",
+                "count_hint": 3,
+                "children": []
+              },
+              {
+                "label": "家电",
+                "value": "600942",
+                "raw_label": "Household Appliances (4)",
+                "count_hint": 4,
+                "children": []
+              },
+              {
+                "label": "女装与女士内衣",
+                "value": "601152",
+                "raw_label": "Womenswear & Underwear (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "鞋靴",
+                "value": "601352",
+                "raw_label": "Shoes (3)",
+                "count_hint": 3,
+                "children": []
+              },
+              {
+                "label": "美妆个护",
+                "value": "601450",
+                "raw_label": "Beauty & Personal Care (10)",
+                "count_hint": 10,
+                "children": []
+              },
+              {
+                "label": "手机与数码",
+                "value": "601739",
+                "raw_label": "Phones & Electronics (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "电脑办公",
+                "value": "601755",
+                "raw_label": "Computers & Office Equipment (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "宠物用品",
+                "value": "602118",
+                "raw_label": "Pet Supplies (11)",
+                "count_hint": 11,
+                "children": []
+              },
+              {
+                "label": "运动与户外",
+                "value": "603014",
+                "raw_label": "Sports & Outdoor (11)",
+                "count_hint": 11,
+                "children": []
+              },
+              {
+                "label": "玩具和爱好",
+                "value": "604206",
+                "raw_label": "Toys & Hobbies (8)",
+                "count_hint": 8,
+                "children": []
+              },
+              {
+                "label": "家具",
+                "value": "604453",
+                "raw_label": "Furniture (4)",
+                "count_hint": 4,
+                "children": []
+              },
+              {
+                "label": "五金工具",
+                "value": "604579",
+                "raw_label": "Tools & Hardware (8)",
+                "count_hint": 8,
+                "children": []
+              },
+              {
+                "label": "家装建材",
+                "value": "604968",
+                "raw_label": "Home Improvement (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "汽车与摩托车",
+                "value": "605196",
+                "raw_label": "Automotive & Motorcycle (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "时尚配件",
+                "value": "605248",
+                "raw_label": "Fashion Accessories (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "保健",
+                "value": "700645",
+                "raw_label": "Health (1)",
+                "count_hint": 1,
+                "children": []
+              },
+              {
+                "label": "图书、杂志和音频",
+                "value": "801928",
+                "raw_label": "Books, Magazines & Audio (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "儿童时尚",
+                "value": "802184",
+                "raw_label": "Kids' Fashion (5)",
+                "count_hint": 5,
+                "children": []
+              },
+              {
+                "label": "男装与男士内衣",
+                "value": "824328",
+                "raw_label": "Menswear & Underwear (6)",
+                "count_hint": 6,
+                "children": []
+              },
+              {
+                "label": "箱包",
+                "value": "824584",
+                "raw_label": "Luggage & Bags (5)",
+                "count_hint": 5,
+                "children": []
+              },
+              {
+                "label": "收藏品",
+                "value": "951432",
+                "raw_label": "Collectibles (4)",
+                "count_hint": 4,
+                "children": []
+              },
+              {
+                "label": "珠宝与衍生品",
+                "value": "953224",
+                "raw_label": "Jewelry Accessories & Derivatives (3)",
+                "count_hint": 3,
+                "children": []
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "avgCommissionRate",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "avgCommissionRate",
+              "filter_title": "平均佣金率",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "平均佣金率"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "平均佣金率",
+            "snapshot_summary": {
+              "option_count": 5,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "全部",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "小于20%",
+                "value": "Less than 20%",
+                "raw_label": "Less than 20%",
+                "selected_by_default": false
+              },
+              {
+                "label": "小于15%",
+                "value": "Less than 15%",
+                "raw_label": "Less than 15%",
+                "selected_by_default": false
+              },
+              {
+                "label": "小于10%",
+                "value": "Less than 10%",
+                "raw_label": "Less than 10%",
+                "selected_by_default": false
+              },
+              {
+                "label": "小于5%",
+                "value": "Less than 5%",
+                "raw_label": "Less than 5%",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "contentType",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "contentType",
+              "filter_title": "内容类型",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "内容类型"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "内容类型",
+            "snapshot_summary": {
+              "option_count": 3,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "全部",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "视频",
+                "value": "Video",
+                "raw_label": "Video",
+                "selected_by_default": false
+              },
+              {
+                "label": "直播",
+                "value": "LIVE",
+                "raw_label": "LIVE",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "creatorAgency",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "creatorAgency",
+              "filter_title": "达人机构",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "达人机构"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "达人机构",
+            "snapshot_summary": {
+              "option_count": 3,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "全部",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "机构签约达人",
+                "value": "Managed by Agency",
+                "raw_label": "Managed by Agency",
+                "selected_by_default": false
+              },
+              {
+                "label": "独立达人",
+                "value": "Independent creators",
+                "raw_label": "Independent creators",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "spotlightCreator",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "spotlightCreator",
+              "filter_title": "聚光达人",
+              "action_type": "setCheckbox",
+              "trigger_selector": "label#isRisingStar_input",
+              "trigger_texts": [
+                "聚光达人"
+              ]
+            },
+            "filter_kind": "checkbox",
+            "filter_title": "聚光达人",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": null
+            },
+            "toggle_option_items": [
+              {
+                "label": "未勾选",
+                "value": false
+              },
+              {
+                "label": "聚光达人",
+                "value": true
+              }
+            ],
+            "supported_values": [
+              false,
+              true
+            ],
+            "current_checked": false
+          },
+          {
+            "status": "ok",
+            "filter_key": "fastGrowing",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "fastGrowing",
+              "filter_title": "快速增长",
+              "action_type": "setCheckbox",
+              "trigger_selector": "label#isFastGrowing_input",
+              "trigger_texts": [
+                "快速增长"
+              ]
+            },
+            "filter_kind": "checkbox",
+            "filter_title": "快速增长",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": null
+            },
+            "toggle_option_items": [
+              {
+                "label": "未勾选",
+                "value": false
+              },
+              {
+                "label": "快速增长",
+                "value": true
+              }
+            ],
+            "supported_values": [
+              false,
+              true
+            ],
+            "current_checked": false
+          },
+          {
+            "status": "ok",
+            "filter_key": "notInvitedInPast90Days",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "达人",
+              "filter_key": "notInvitedInPast90Days",
+              "filter_title": "近90天未邀约",
+              "action_type": "setCheckbox",
+              "trigger_selector": "label#isInvitedBefore_input",
+              "trigger_texts": [
+                "近90天未邀约"
+              ]
+            },
+            "filter_kind": "checkbox",
+            "filter_title": "近90天未邀约",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": null
+            },
+            "toggle_option_items": [
+              {
+                "label": "未勾选",
+                "value": false
+              },
+              {
+                "label": "近90天未邀约",
+                "value": true
+              }
+            ],
+            "supported_values": [
+              false,
+              true
+            ],
+            "current_checked": false
+          }
+        ]
+      },
+      {
+        "module_key": "followerFilters",
+        "module_title": "粉丝数",
+        "filters": [
+          {
+            "status": "ok",
+            "filter_key": "followerAgeSelections",
+            "dsl_binding": {
+              "module_key": "followerFilters",
+              "module_title": "粉丝数",
+              "filter_key": "followerAgeSelections",
+              "filter_title": "粉丝年龄",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "粉丝年龄"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "粉丝年龄",
+            "snapshot_summary": {
+              "option_count": 5,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "18 - 24岁",
+                "value": "18 - 24",
+                "raw_label": "18 - 24",
+                "selected_by_default": false
+              },
+              {
+                "label": "25 - 34岁",
+                "value": "25 - 34",
+                "raw_label": "25 - 34",
+                "selected_by_default": false
+              },
+              {
+                "label": "35 - 44岁",
+                "value": "35 - 44",
+                "raw_label": "35 - 44",
+                "selected_by_default": false
+              },
+              {
+                "label": "45 - 54岁",
+                "value": "45 - 54",
+                "raw_label": "45 - 54",
+                "selected_by_default": false
+              },
+              {
+                "label": "55岁以上",
+                "value": "55+",
+                "raw_label": "55+",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "followerGender",
+            "dsl_binding": {
+              "module_key": "followerFilters",
+              "module_title": "粉丝数",
+              "filter_key": "followerGender",
+              "filter_title": "粉丝性别",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "粉丝性别"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "粉丝性别",
+            "snapshot_summary": {
+              "option_count": 3,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "全部",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "女性",
+                "value": "Female",
+                "raw_label": "Female",
+                "selected_by_default": false
+              },
+              {
+                "label": "男性",
+                "value": "Male",
+                "raw_label": "Male",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "followerCountRange",
+            "dsl_binding": {
+              "module_key": "followerFilters",
+              "module_title": "粉丝数",
+              "filter_key": "followerCountRange",
+              "filter_title": "粉丝数",
+              "action_type": "fillDropdownRange",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "粉丝数",
+                "Follower c"
+              ],
+              "wait_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"]",
+              "min_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"] input[data-e2e=\"d9c26458-94d3-e920\"]",
+              "max_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"] input[data-e2e=\"b7512111-8b2f-a07b\"]"
+            },
+            "filter_kind": "range_input",
+            "filter_title": "粉丝数",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 2,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "10K",
+                "value": "10K"
+              },
+              {
+                "label": "100K",
+                "value": "100K"
+              },
+              {
+                "label": "1M",
+                "value": "1M"
+              },
+              {
+                "label": "10M+",
+                "value": "10M+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div > span.arco-trigger.arco-dropdown > div.px-16.pb-20 > div > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 2,
+                "value": "10,000,000+",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div > span.arco-trigger.arco-dropdown > div.px-16.pb-20 > div > div.flex.items-center > input.arco-input.arco-input-size-default"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "module_key": "performanceFilters",
+        "module_title": "表现",
+        "filters": [
+          {
+            "status": "ok",
+            "filter_key": "gmvSelections",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "gmvSelections",
+              "filter_title": "GMV",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "GMV"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "GMV",
+            "snapshot_summary": {
+              "option_count": 4,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "MX$0-MX$100",
+                "value": "MX$0-MX$100",
+                "raw_label": "MX$0-MX$100",
+                "selected_by_default": false
+              },
+              {
+                "label": "MX$100-MX$1K",
+                "value": "MX$100-MX$1K",
+                "raw_label": "MX$100-MX$1K",
+                "selected_by_default": false
+              },
+              {
+                "label": "MX$1K-MX$10K",
+                "value": "MX$1K-MX$10K",
+                "raw_label": "MX$1K-MX$10K",
+                "selected_by_default": false
+              },
+              {
+                "label": "MX$10K+",
+                "value": "MX$10K+",
+                "raw_label": "MX$10K+",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "itemsSoldSelections",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "itemsSoldSelections",
+              "filter_title": "销量",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "销量"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "销量",
+            "snapshot_summary": {
+              "option_count": 4,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "0-10",
+                "value": "0-10",
+                "raw_label": "0-10",
+                "selected_by_default": false
+              },
+              {
+                "label": "10-100",
+                "value": "10-100",
+                "raw_label": "10-100",
+                "selected_by_default": false
+              },
+              {
+                "label": "100-1,000",
+                "value": "100-1,000",
+                "raw_label": "100-1,000",
+                "selected_by_default": false
+              },
+              {
+                "label": "1,000+",
+                "value": "1,000+",
+                "raw_label": "1,000+",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "averageViewsPerVideoMin",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "averageViewsPerVideoMin",
+              "filter_title": "单条视频平均播放量",
+              "action_type": "fillDropdownThreshold",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "单条视频平均播放量"
+              ],
+              "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+            },
+            "filter_kind": "threshold_input",
+            "filter_title": "单条视频平均播放量",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 1,
+              "checkbox_count": 1,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "100",
+                "value": "100"
+              },
+              {
+                "label": "1K",
+                "value": "1K"
+              },
+              {
+                "label": "10K",
+                "value": "10K"
+              },
+              {
+                "label": "100K+",
+                "value": "100K+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              }
+            ],
+            "toggle_option_items": [
+              {
+                "label": "按可带货视频筛选",
+                "value": true
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "averageViewersPerLiveMin",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "averageViewersPerLiveMin",
+              "filter_title": "单场直播平均观看人数",
+              "action_type": "fillDropdownThreshold",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "单场直播平均观看人数"
+              ],
+              "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+            },
+            "filter_kind": "threshold_input",
+            "filter_title": "单场直播平均观看人数",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 2,
+              "checkbox_count": 2,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "100",
+                "value": "100"
+              },
+              {
+                "label": "1K",
+                "value": "1K"
+              },
+              {
+                "label": "10K",
+                "value": "10K"
+              },
+              {
+                "label": "100K+",
+                "value": "100K+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 2,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              }
+            ],
+            "toggle_option_items": [
+              {
+                "label": "按可带货视频筛选",
+                "value": true
+              },
+              {
+                "label": "按可带货直播筛选",
+                "value": true
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "engagementRateMinPercent",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "engagementRateMinPercent",
+              "filter_title": "互动率",
+              "action_type": "fillDropdownThreshold",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "互动率"
+              ],
+              "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+            },
+            "filter_kind": "threshold_input",
+            "filter_title": "互动率",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 3,
+              "checkbox_count": 3,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "1",
+                "value": "1"
+              },
+              {
+                "label": "3",
+                "value": "3"
+              },
+              {
+                "label": "5",
+                "value": "5"
+              },
+              {
+                "label": "10+",
+                "value": "10+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 2,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 3,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div.bg-white.px-16 > div.flex.items-center > div.arco-input-group-wrapper.arco-input-group-wrapper-default > span.arco-input-group > span.arco-input-inner-wrapper.arco-input-inner-wrapper-default > input.arco-input.arco-input-size-default"
+              }
+            ],
+            "toggle_option_items": [
+              {
+                "label": "按可带货视频筛选",
+                "value": true
+              },
+              {
+                "label": "按可带货直播筛选",
+                "value": true
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "estPostRate",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "estPostRate",
+              "filter_title": "预估发帖报价",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "预估发帖报价"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "预估发帖报价",
+            "snapshot_summary": {
+              "option_count": 4,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "全部",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "一般",
+                "value": "OK",
+                "raw_label": "OK",
+                "selected_by_default": false
+              },
+              {
+                "label": "良好",
+                "value": "Good",
+                "raw_label": "Good",
+                "selected_by_default": false
+              },
+              {
+                "label": "更优",
+                "value": "Better",
+                "raw_label": "Better",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "brandCollaborationSelections",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "表现",
+              "filter_key": "brandCollaborationSelections",
+              "filter_title": "品牌合作",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "品牌合作"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "品牌合作",
+            "snapshot_summary": {
+              "option_count": 57,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div > span.arco-trigger.arco-dropdown > div.brandSelectContainer-sAvwZV > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "LOOMBER",
+                "value": "LOOMBER",
+                "raw_label": "LOOMBER",
+                "selected_by_default": false
+              },
+              {
+                "label": "Eva Moda",
+                "value": "Eva Moda",
+                "raw_label": "Eva Moda",
+                "selected_by_default": false
+              },
+              {
+                "label": "vetega",
+                "value": "vetega",
+                "raw_label": "vetega",
+                "selected_by_default": false
+              },
+              {
+                "label": "WINKTOYS",
+                "value": "WINKTOYS",
+                "raw_label": "WINKTOYS",
+                "selected_by_default": false
+              },
+              {
+                "label": "B Life",
+                "value": "B Life",
+                "raw_label": "B Life",
+                "selected_by_default": false
+              },
+              {
+                "label": "Sinless Beauty",
+                "value": "Sinless Beauty",
+                "raw_label": "Sinless Beauty",
+                "selected_by_default": false
+              },
+              {
+                "label": "AYVANNA RÊVER",
+                "value": "AYVANNA RÊVER",
+                "raw_label": "AYVANNA RÊVER",
+                "selected_by_default": false
+              },
+              {
+                "label": "Beyond Vitamins",
+                "value": "Beyond Vitamins",
+                "raw_label": "Beyond Vitamins",
+                "selected_by_default": false
+              },
+              {
+                "label": "FUTUREM",
+                "value": "FUTUREM",
+                "raw_label": "FUTUREM",
+                "selected_by_default": false
+              },
+              {
+                "label": "REDHUT",
+                "value": "REDHUT",
+                "raw_label": "REDHUT",
+                "selected_by_default": false
+              },
+              {
+                "label": "CEELIKE",
+                "value": "CEELIKE",
+                "raw_label": "CEELIKE",
+                "selected_by_default": false
+              },
+              {
+                "label": "L'Oréal Paris",
+                "value": "L'Oréal Paris",
+                "raw_label": "L'Oréal Paris",
+                "selected_by_default": false
+              },
+              {
+                "label": "SARELLY SARELLY",
+                "value": "SARELLY SARELLY",
+                "raw_label": "SARELLY SARELLY",
+                "selected_by_default": false
+              },
+              {
+                "label": "Windboss",
+                "value": "Windboss",
+                "raw_label": "Windboss",
+                "selected_by_default": false
+              },
+              {
+                "label": "SEESE",
+                "value": "SEESE",
+                "raw_label": "SEESE",
+                "selected_by_default": false
+              },
+              {
+                "label": "TIMEOFF",
+                "value": "TIMEOFF",
+                "raw_label": "TIMEOFF",
+                "selected_by_default": false
+              },
+              {
+                "label": "AMOCOCO",
+                "value": "AMOCOCO",
+                "raw_label": "AMOCOCO",
+                "selected_by_default": false
+              },
+              {
+                "label": "Pink Up",
+                "value": "Pink Up",
+                "raw_label": "Pink Up",
+                "selected_by_default": false
+              },
+              {
+                "label": "YuYa",
+                "value": "YuYa",
+                "raw_label": "YuYa",
+                "selected_by_default": false
+              },
+              {
+                "label": "DISNEY MICKEY & CO.",
+                "value": "DISNEY MICKEY & CO.",
+                "raw_label": "DISNEY MICKEY & CO.",
+                "selected_by_default": false
+              },
+              {
+                "label": "MEOKY",
+                "value": "MEOKY",
+                "raw_label": "MEOKY",
+                "selected_by_default": false
+              },
+              {
+                "label": "NEWELLME",
+                "value": "NEWELLME",
+                "raw_label": "NEWELLME",
+                "selected_by_default": false
+              },
+              {
+                "label": "Boysea",
+                "value": "Boysea",
+                "raw_label": "Boysea",
+                "selected_by_default": false
+              },
+              {
+                "label": "Magcubic",
+                "value": "Magcubic",
+                "raw_label": "Magcubic",
+                "selected_by_default": false
+              },
+              {
+                "label": "PHELENSEYE",
+                "value": "PHELENSEYE",
+                "raw_label": "PHELENSEYE",
+                "selected_by_default": false
+              },
+              {
+                "label": "Ultramo",
+                "value": "Ultramo",
+                "raw_label": "Ultramo",
+                "selected_by_default": false
+              },
+              {
+                "label": "BIOTEEP",
+                "value": "BIOTEEP",
+                "raw_label": "BIOTEEP",
+                "selected_by_default": false
+              },
+              {
+                "label": "ARTPHRO",
+                "value": "ARTPHRO",
+                "raw_label": "ARTPHRO",
+                "selected_by_default": false
+              },
+              {
+                "label": "ERUN",
+                "value": "ERUN",
+                "raw_label": "ERUN",
+                "selected_by_default": false
+              },
+              {
+                "label": "ZENZ TU INSPIRACION PERFECTA",
+                "value": "ZENZ TU INSPIRACION PERFECTA",
+                "raw_label": "ZENZ TU INSPIRACION PERFECTA",
+                "selected_by_default": false
+              },
+              {
+                "label": "SARELLY CREATIVO LAB",
+                "value": "SARELLY CREATIVO LAB",
+                "raw_label": "SARELLY CREATIVO LAB",
+                "selected_by_default": false
+              },
+              {
+                "label": "EUHOMY",
+                "value": "EUHOMY",
+                "raw_label": "EUHOMY",
+                "selected_by_default": false
+              },
+              {
+                "label": "NYX Professional Makeup",
+                "value": "NYX Professional Makeup",
+                "raw_label": "NYX Professional Makeup",
+                "selected_by_default": false
+              },
+              {
+                "label": "Maybelline New York",
+                "value": "Maybelline New York",
+                "raw_label": "Maybelline New York",
+                "selected_by_default": false
+              },
+              {
+                "label": "QPJ",
+                "value": "QPJ",
+                "raw_label": "QPJ",
+                "selected_by_default": false
+              },
+              {
+                "label": "Lonkoom",
+                "value": "Lonkoom",
+                "raw_label": "Lonkoom",
+                "selected_by_default": false
+              },
+              {
+                "label": "Megneta",
+                "value": "Megneta",
+                "raw_label": "Megneta",
+                "selected_by_default": false
+              },
+              {
+                "label": "VIFSSG",
+                "value": "VIFSSG",
+                "raw_label": "VIFSSG",
+                "selected_by_default": false
+              },
+              {
+                "label": "Aolon",
+                "value": "Aolon",
+                "raw_label": "Aolon",
+                "selected_by_default": false
+              },
+              {
+                "label": "REVLON",
+                "value": "REVLON",
+                "raw_label": "REVLON",
+                "selected_by_default": false
+              },
+              {
+                "label": "Mayorlei",
+                "value": "Mayorlei",
+                "raw_label": "Mayorlei",
+                "selected_by_default": false
+              },
+              {
+                "label": "GARNIER",
+                "value": "GARNIER",
+                "raw_label": "GARNIER",
+                "selected_by_default": false
+              },
+              {
+                "label": "GAN AI",
+                "value": "GAN AI",
+                "raw_label": "GAN AI",
+                "selected_by_default": false
+              },
+              {
+                "label": "SACE LADY",
+                "value": "SACE LADY",
+                "raw_label": "SACE LADY",
+                "selected_by_default": false
+              },
+              {
+                "label": "Xiaomi",
+                "value": "Xiaomi",
+                "raw_label": "Xiaomi",
+                "selected_by_default": false
+              },
+              {
+                "label": "B&Qaugen",
+                "value": "B&Qaugen",
+                "raw_label": "B&Qaugen",
+                "selected_by_default": false
+              },
+              {
+                "label": "KAISASA",
+                "value": "KAISASA",
+                "raw_label": "KAISASA",
+                "selected_by_default": false
+              },
+              {
+                "label": "GILIPUR",
+                "value": "GILIPUR",
+                "raw_label": "GILIPUR",
+                "selected_by_default": false
+              },
+              {
+                "label": "Amos",
+                "value": "Amos",
+                "raw_label": "Amos",
+                "selected_by_default": false
+              },
+              {
+                "label": "MAC",
+                "value": "MAC",
+                "raw_label": "MAC",
+                "selected_by_default": false
+              },
+              {
+                "label": "DIOSA LUNA",
+                "value": "DIOSA LUNA",
+                "raw_label": "DIOSA LUNA",
+                "selected_by_default": false
+              },
+              {
+                "label": "MAANGE",
+                "value": "MAANGE",
+                "raw_label": "MAANGE",
+                "selected_by_default": false
+              },
+              {
+                "label": "Hotcom",
+                "value": "Hotcom",
+                "raw_label": "Hotcom",
+                "selected_by_default": false
+              },
+              {
+                "label": "beauty creations",
+                "value": "beauty creations",
+                "raw_label": "beauty creations",
+                "selected_by_default": false
+              },
+              {
+                "label": "MISS CHERRY",
+                "value": "MISS CHERRY",
+                "raw_label": "MISS CHERRY",
+                "selected_by_default": false
+              },
+              {
+                "label": "PAPA FEEL",
+                "value": "PAPA FEEL",
+                "raw_label": "PAPA FEEL",
+                "selected_by_default": false
+              },
+              {
+                "label": "Lenovo",
+                "value": "Lenovo",
+                "raw_label": "Lenovo",
+                "selected_by_default": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "shop_type": "local",
+    "region_code": "MX",
+    "generated_at": "2026-03-19T13:26:34.416385+00:00",
+    "sort_binding": {
+      "status": "ok",
+      "field_key": "filterSortBy",
+      "field_title": "排序方式",
+      "dsl_binding": {
+        "field_key": "filterSortBy",
+        "field_title": "排序方式",
+        "action_type": "selectDropdownSingle",
+        "trigger_selector": "div[class*=\"sort-comp__StyledContainer\"] div.arco-select-view",
+        "trigger_texts": [
+          "相关度",
+          "销售额",
+          "销量",
+          "粉丝数",
+          "平均视频播放量",
+          "互动率"
+        ],
+        "wait_selector": "div.arco-select-popup div[role=\"listbox\"]",
+        "option_selector": "div.arco-select-popup li[role=\"option\"].arco-select-option",
+        "scroll_container_selector": "div.arco-select-popup-inner",
+        "option_map": {
+          "1": "相关度",
+          "2": "销售额",
+          "3": "销量",
+          "4": "粉丝数",
+          "5": "平均视频播放量",
+          "6": "互动率"
+        }
+      },
+      "option_items": [
+        {
+          "label": "相关度",
+          "value": "1"
+        },
+        {
+          "label": "销售额",
+          "value": "2"
+        },
+        {
+          "label": "销量",
+          "value": "3"
+        },
+        {
+          "label": "粉丝数",
+          "value": "4"
+        },
+        {
+          "label": "平均视频播放量",
+          "value": "5"
+        },
+        {
+          "label": "互动率",
+          "value": "6"
+        }
+      ],
+      "snapshot_summary": {
+        "option_count": 6,
+        "button_texts": [],
+        "active_root_dom_path": "div.arco-select-popup-inner.m4b-select-popup-inner.m4b-new-select-size-small"
+      }
+    },
+    "dsl_reference": "infound-desktop-client-master/apps/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts",
+    "capture_source": "portal_tiktok_shop_collection",
+    "page_ready_text": "Find creators",
+    "search_binding": {
+      "field_key": "searchKeyword",
+      "action_type": "fillSelector + clickByText + pressKey",
+      "selector": "input[data-tid=\"m4b_input_search\"]",
+      "dismiss_text": "Find creators"
+    }
+  },
+  "en": {
+    "schema_version": "2026-03-30",
+    "modules": [
+      {
+        "module_key": "creatorFilters",
+        "module_title": "Creators",
+        "filters": [
+          {
+            "status": "ok",
+            "filter_key": "productCategorySelections",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "productCategorySelections",
+              "filter_title": "Product category",
+              "action_type": "selectCascaderOptionsByValue",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Product category"
+              ],
+              "panel_selector": "ul.arco-cascader-list.arco-cascader-list-multiple",
+              "option_selector": "ul.arco-cascader-list.arco-cascader-list-multiple li",
+              "scroll_container_selector": "ul.arco-cascader-list.arco-cascader-list-multiple"
+            },
+            "filter_kind": "cascader_multiple",
+            "filter_title": "Product category",
+            "snapshot_summary": {
+              "option_count": 24,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bl > div#arco-cascader-popup-0.arco-cascader-popup"
+            },
+            "option_items": [
+              {
+                "label": "Home Supplies",
+                "value": "600001",
+                "raw_label": "Home Supplies (7)",
+                "selected_by_default": false,
+                "source_value": "600001",
+                "count_hint": 7
+              },
+              {
+                "label": "Kitchenware",
+                "value": "600024",
+                "raw_label": "Kitchenware (9)",
+                "selected_by_default": false,
+                "source_value": "600024",
+                "count_hint": 9
+              },
+              {
+                "label": "Textiles & Soft Furnishings",
+                "value": "600154",
+                "raw_label": "Textiles & Soft Furnishings (3)",
+                "selected_by_default": false,
+                "source_value": "600154",
+                "count_hint": 3
+              },
+              {
+                "label": "Household Appliances",
+                "value": "600942",
+                "raw_label": "Household Appliances (4)",
+                "selected_by_default": false,
+                "source_value": "600942",
+                "count_hint": 4
+              },
+              {
+                "label": "Womenswear & Underwear",
+                "value": "601152",
+                "raw_label": "Womenswear & Underwear (7)",
+                "selected_by_default": false,
+                "source_value": "601152",
+                "count_hint": 7
+              },
+              {
+                "label": "Shoes",
+                "value": "601352",
+                "raw_label": "Shoes (3)",
+                "selected_by_default": false,
+                "source_value": "601352",
+                "count_hint": 3
+              },
+              {
+                "label": "Beauty & Personal Care",
+                "value": "601450",
+                "raw_label": "Beauty & Personal Care (10)",
+                "selected_by_default": false,
+                "source_value": "601450",
+                "count_hint": 10
+              },
+              {
+                "label": "Phones & Electronics",
+                "value": "601739",
+                "raw_label": "Phones & Electronics (9)",
+                "selected_by_default": false,
+                "source_value": "601739",
+                "count_hint": 9
+              },
+              {
+                "label": "Computers & Office Equipment",
+                "value": "601755",
+                "raw_label": "Computers & Office Equipment (7)",
+                "selected_by_default": false,
+                "source_value": "601755",
+                "count_hint": 7
+              },
+              {
+                "label": "Pet Supplies",
+                "value": "602118",
+                "raw_label": "Pet Supplies (11)",
+                "selected_by_default": false,
+                "source_value": "602118",
+                "count_hint": 11
+              },
+              {
+                "label": "Sports & Outdoor",
+                "value": "603014",
+                "raw_label": "Sports & Outdoor (11)",
+                "selected_by_default": false,
+                "source_value": "603014",
+                "count_hint": 11
+              },
+              {
+                "label": "Toys & Hobbies",
+                "value": "604206",
+                "raw_label": "Toys & Hobbies (8)",
+                "selected_by_default": false,
+                "source_value": "604206",
+                "count_hint": 8
+              },
+              {
+                "label": "Furniture",
+                "value": "604453",
+                "raw_label": "Furniture (4)",
+                "selected_by_default": false,
+                "source_value": "604453",
+                "count_hint": 4
+              },
+              {
+                "label": "Tools & Hardware",
+                "value": "604579",
+                "raw_label": "Tools & Hardware (8)",
+                "selected_by_default": false,
+                "source_value": "604579",
+                "count_hint": 8
+              },
+              {
+                "label": "Home Improvement",
+                "value": "604968",
+                "raw_label": "Home Improvement (9)",
+                "selected_by_default": false,
+                "source_value": "604968",
+                "count_hint": 9
+              },
+              {
+                "label": "Automotive & Motorcycle",
+                "value": "605196",
+                "raw_label": "Automotive & Motorcycle (7)",
+                "selected_by_default": false,
+                "source_value": "605196",
+                "count_hint": 7
+              },
+              {
+                "label": "Fashion Accessories",
+                "value": "605248",
+                "raw_label": "Fashion Accessories (7)",
+                "selected_by_default": false,
+                "source_value": "605248",
+                "count_hint": 7
+              },
+              {
+                "label": "Health",
+                "value": "700645",
+                "raw_label": "Health (1)",
+                "selected_by_default": false,
+                "source_value": "700645",
+                "count_hint": 1
+              },
+              {
+                "label": "Books, Magazines & Audio",
+                "value": "801928",
+                "raw_label": "Books, Magazines & Audio (9)",
+                "selected_by_default": false,
+                "source_value": "801928",
+                "count_hint": 9
+              },
+              {
+                "label": "Kids' Fashion",
+                "value": "802184",
+                "raw_label": "Kids' Fashion (5)",
+                "selected_by_default": false,
+                "source_value": "802184",
+                "count_hint": 5
+              },
+              {
+                "label": "Menswear & Underwear",
+                "value": "824328",
+                "raw_label": "Menswear & Underwear (6)",
+                "selected_by_default": false,
+                "source_value": "824328",
+                "count_hint": 6
+              },
+              {
+                "label": "Luggage & Bags",
+                "value": "824584",
+                "raw_label": "Luggage & Bags (5)",
+                "selected_by_default": false,
+                "source_value": "824584",
+                "count_hint": 5
+              },
+              {
+                "label": "Collectibles",
+                "value": "951432",
+                "raw_label": "Collectibles (4)",
+                "selected_by_default": false,
+                "source_value": "951432",
+                "count_hint": 4
+              },
+              {
+                "label": "Jewelry Accessories & Derivatives",
+                "value": "953224",
+                "raw_label": "Jewelry Accessories & Derivatives (3)",
+                "selected_by_default": false,
+                "source_value": "953224",
+                "count_hint": 3
+              }
+            ],
+            "option_tree": [
+              {
+                "label": "Home Supplies",
+                "value": "600001",
+                "raw_label": "Home Supplies (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "Kitchenware",
+                "value": "600024",
+                "raw_label": "Kitchenware (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "Textiles & Soft Furnishings",
+                "value": "600154",
+                "raw_label": "Textiles & Soft Furnishings (3)",
+                "count_hint": 3,
+                "children": []
+              },
+              {
+                "label": "Household Appliances",
+                "value": "600942",
+                "raw_label": "Household Appliances (4)",
+                "count_hint": 4,
+                "children": []
+              },
+              {
+                "label": "Womenswear & Underwear",
+                "value": "601152",
+                "raw_label": "Womenswear & Underwear (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "Shoes",
+                "value": "601352",
+                "raw_label": "Shoes (3)",
+                "count_hint": 3,
+                "children": []
+              },
+              {
+                "label": "Beauty & Personal Care",
+                "value": "601450",
+                "raw_label": "Beauty & Personal Care (10)",
+                "count_hint": 10,
+                "children": []
+              },
+              {
+                "label": "Phones & Electronics",
+                "value": "601739",
+                "raw_label": "Phones & Electronics (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "Computers & Office Equipment",
+                "value": "601755",
+                "raw_label": "Computers & Office Equipment (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "Pet Supplies",
+                "value": "602118",
+                "raw_label": "Pet Supplies (11)",
+                "count_hint": 11,
+                "children": []
+              },
+              {
+                "label": "Sports & Outdoor",
+                "value": "603014",
+                "raw_label": "Sports & Outdoor (11)",
+                "count_hint": 11,
+                "children": []
+              },
+              {
+                "label": "Toys & Hobbies",
+                "value": "604206",
+                "raw_label": "Toys & Hobbies (8)",
+                "count_hint": 8,
+                "children": []
+              },
+              {
+                "label": "Furniture",
+                "value": "604453",
+                "raw_label": "Furniture (4)",
+                "count_hint": 4,
+                "children": []
+              },
+              {
+                "label": "Tools & Hardware",
+                "value": "604579",
+                "raw_label": "Tools & Hardware (8)",
+                "count_hint": 8,
+                "children": []
+              },
+              {
+                "label": "Home Improvement",
+                "value": "604968",
+                "raw_label": "Home Improvement (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "Automotive & Motorcycle",
+                "value": "605196",
+                "raw_label": "Automotive & Motorcycle (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "Fashion Accessories",
+                "value": "605248",
+                "raw_label": "Fashion Accessories (7)",
+                "count_hint": 7,
+                "children": []
+              },
+              {
+                "label": "Health",
+                "value": "700645",
+                "raw_label": "Health (1)",
+                "count_hint": 1,
+                "children": []
+              },
+              {
+                "label": "Books, Magazines & Audio",
+                "value": "801928",
+                "raw_label": "Books, Magazines & Audio (9)",
+                "count_hint": 9,
+                "children": []
+              },
+              {
+                "label": "Kids' Fashion",
+                "value": "802184",
+                "raw_label": "Kids' Fashion (5)",
+                "count_hint": 5,
+                "children": []
+              },
+              {
+                "label": "Menswear & Underwear",
+                "value": "824328",
+                "raw_label": "Menswear & Underwear (6)",
+                "count_hint": 6,
+                "children": []
+              },
+              {
+                "label": "Luggage & Bags",
+                "value": "824584",
+                "raw_label": "Luggage & Bags (5)",
+                "count_hint": 5,
+                "children": []
+              },
+              {
+                "label": "Collectibles",
+                "value": "951432",
+                "raw_label": "Collectibles (4)",
+                "count_hint": 4,
+                "children": []
+              },
+              {
+                "label": "Jewelry Accessories & Derivatives",
+                "value": "953224",
+                "raw_label": "Jewelry Accessories & Derivatives (3)",
+                "count_hint": 3,
+                "children": []
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "avgCommissionRate",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "avgCommissionRate",
+              "filter_title": "Avg. commission rate",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Avg. commission rate"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "Avg. commission rate",
+            "snapshot_summary": {
+              "option_count": 5,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "All",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "Less than 20%",
+                "value": "Less than 20%",
+                "raw_label": "Less than 20%",
+                "selected_by_default": false
+              },
+              {
+                "label": "Less than 15%",
+                "value": "Less than 15%",
+                "raw_label": "Less than 15%",
+                "selected_by_default": false
+              },
+              {
+                "label": "Less than 10%",
+                "value": "Less than 10%",
+                "raw_label": "Less than 10%",
+                "selected_by_default": false
+              },
+              {
+                "label": "Less than 5%",
+                "value": "Less than 5%",
+                "raw_label": "Less than 5%",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "contentType",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "contentType",
+              "filter_title": "Content type",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Content type"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "Content type",
+            "snapshot_summary": {
+              "option_count": 3,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "All",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "Video",
+                "value": "Video",
+                "raw_label": "Video",
+                "selected_by_default": false
+              },
+              {
+                "label": "LIVE",
+                "value": "LIVE",
+                "raw_label": "LIVE",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "creatorAgency",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "creatorAgency",
+              "filter_title": "Creator agency",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Creator agency"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "Creator agency",
+            "snapshot_summary": {
+              "option_count": 3,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "All",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "Managed by Agency",
+                "value": "Managed by Agency",
+                "raw_label": "Managed by Agency",
+                "selected_by_default": false
+              },
+              {
+                "label": "Independent creators",
+                "value": "Independent creators",
+                "raw_label": "Independent creators",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "spotlightCreator",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "spotlightCreator",
+              "filter_title": "Spotlight Creator",
+              "action_type": "setCheckbox",
+              "trigger_selector": "label#isRisingStar_input",
+              "trigger_texts": [
+                "Spotlight Creator"
+              ]
+            },
+            "filter_kind": "checkbox",
+            "filter_title": "Spotlight Creator",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": null
+            },
+            "toggle_option_items": [
+              {
+                "label": "Unchecked",
+                "value": false
+              },
+              {
+                "label": "Spotlight Creator",
+                "value": true
+              }
+            ],
+            "supported_values": [
+              false,
+              true
+            ],
+            "current_checked": false
+          },
+          {
+            "status": "ok",
+            "filter_key": "fastGrowing",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "fastGrowing",
+              "filter_title": "Fast growing",
+              "action_type": "setCheckbox",
+              "trigger_selector": "label#isFastGrowing_input",
+              "trigger_texts": [
+                "Fast growing"
+              ]
+            },
+            "filter_kind": "checkbox",
+            "filter_title": "Fast growing",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": null
+            },
+            "toggle_option_items": [
+              {
+                "label": "Unchecked",
+                "value": false
+              },
+              {
+                "label": "Fast growing",
+                "value": true
+              }
+            ],
+            "supported_values": [
+              false,
+              true
+            ],
+            "current_checked": false
+          },
+          {
+            "status": "ok",
+            "filter_key": "notInvitedInPast90Days",
+            "dsl_binding": {
+              "module_key": "creatorFilters",
+              "module_title": "Creators",
+              "filter_key": "notInvitedInPast90Days",
+              "filter_title": "Not invited in past 90 days",
+              "action_type": "setCheckbox",
+              "trigger_selector": "label#isInvitedBefore_input",
+              "trigger_texts": [
+                "Not invited in past 90 days"
+              ]
+            },
+            "filter_kind": "checkbox",
+            "filter_title": "Not invited in past 90 days",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": null
+            },
+            "toggle_option_items": [
+              {
+                "label": "Unchecked",
+                "value": false
+              },
+              {
+                "label": "Not invited in past 90 days",
+                "value": true
+              }
+            ],
+            "supported_values": [
+              false,
+              true
+            ],
+            "current_checked": false
+          }
+        ]
+      },
+      {
+        "module_key": "followerFilters",
+        "module_title": "Followers",
+        "filters": [
+          {
+            "status": "ok",
+            "filter_key": "followerAgeSelections",
+            "dsl_binding": {
+              "module_key": "followerFilters",
+              "module_title": "Followers",
+              "filter_key": "followerAgeSelections",
+              "filter_title": "Follower age",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Follower age"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "Follower age",
+            "snapshot_summary": {
+              "option_count": 5,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "18 - 24",
+                "value": "18 - 24",
+                "raw_label": "18 - 24",
+                "selected_by_default": false
+              },
+              {
+                "label": "25 - 34",
+                "value": "25 - 34",
+                "raw_label": "25 - 34",
+                "selected_by_default": false
+              },
+              {
+                "label": "35 - 44",
+                "value": "35 - 44",
+                "raw_label": "35 - 44",
+                "selected_by_default": false
+              },
+              {
+                "label": "45 - 54",
+                "value": "45 - 54",
+                "raw_label": "45 - 54",
+                "selected_by_default": false
+              },
+              {
+                "label": "55+",
+                "value": "55+",
+                "raw_label": "55+",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "followerGender",
+            "dsl_binding": {
+              "module_key": "followerFilters",
+              "module_title": "Followers",
+              "filter_key": "followerGender",
+              "filter_title": "Follower gender",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Follower gender"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "Follower gender",
+            "snapshot_summary": {
+              "option_count": 3,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "All",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "Female",
+                "value": "Female",
+                "raw_label": "Female",
+                "selected_by_default": false
+              },
+              {
+                "label": "Male",
+                "value": "Male",
+                "raw_label": "Male",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "followerCountRange",
+            "dsl_binding": {
+              "module_key": "followerFilters",
+              "module_title": "Followers",
+              "filter_key": "followerCountRange",
+              "filter_title": "Follower count",
+              "action_type": "fillDropdownRange",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Follower count",
+                "Follower size",
+                "Follower c"
+              ],
+              "wait_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"]",
+              "min_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"] input[data-e2e=\"d9c26458-94d3-e920\"]",
+              "max_selector": "div[data-e2e=\"ec40fffd-2fcf-30d5\"] input[data-e2e=\"b7512111-8b2f-a07b\"]"
+            },
+            "filter_kind": "range_input",
+            "filter_title": "Follower count",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 2,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "10K",
+                "value": "10K"
+              },
+              {
+                "label": "100K",
+                "value": "100K"
+              },
+              {
+                "label": "1M",
+                "value": "1M"
+              },
+              {
+                "label": "10M+",
+                "value": "10M+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div > span.arco-trigger.arco-dropdown > div.px-16.pb-20 > div > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 2,
+                "value": "10,000,000+",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div > span.arco-trigger.arco-dropdown > div.px-16.pb-20 > div > div.flex.items-center > input.arco-input.arco-input-size-default"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "module_key": "performanceFilters",
+        "module_title": "Performance",
+        "filters": [
+          {
+            "status": "ok",
+            "filter_key": "gmvSelections",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "gmvSelections",
+              "filter_title": "GMV",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "GMV"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "GMV",
+            "snapshot_summary": {
+              "option_count": 4,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "MX$0-MX$100",
+                "value": "MX$0-MX$100",
+                "raw_label": "MX$0-MX$100",
+                "selected_by_default": false
+              },
+              {
+                "label": "MX$100-MX$1K",
+                "value": "MX$100-MX$1K",
+                "raw_label": "MX$100-MX$1K",
+                "selected_by_default": false
+              },
+              {
+                "label": "MX$1K-MX$10K",
+                "value": "MX$1K-MX$10K",
+                "raw_label": "MX$1K-MX$10K",
+                "selected_by_default": false
+              },
+              {
+                "label": "MX$10K+",
+                "value": "MX$10K+",
+                "raw_label": "MX$10K+",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "itemsSoldSelections",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "itemsSoldSelections",
+              "filter_title": "Items sold",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Items sold"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "Items sold",
+            "snapshot_summary": {
+              "option_count": 4,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "0-10",
+                "value": "0-10",
+                "raw_label": "0-10",
+                "selected_by_default": false
+              },
+              {
+                "label": "10-100",
+                "value": "10-100",
+                "raw_label": "10-100",
+                "selected_by_default": false
+              },
+              {
+                "label": "100-1,000",
+                "value": "100-1,000",
+                "raw_label": "100-1,000",
+                "selected_by_default": false
+              },
+              {
+                "label": "1,000+",
+                "value": "1,000+",
+                "raw_label": "1,000+",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "averageViewsPerVideoMin",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "averageViewsPerVideoMin",
+              "filter_title": "Average views per video",
+              "action_type": "fillDropdownThreshold",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Average views per video"
+              ],
+              "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+            },
+            "filter_kind": "threshold_input",
+            "filter_title": "Average views per video",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 1,
+              "checkbox_count": 1,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "100",
+                "value": "100"
+              },
+              {
+                "label": "1K",
+                "value": "1K"
+              },
+              {
+                "label": "10K",
+                "value": "10K"
+              },
+              {
+                "label": "100K+",
+                "value": "100K+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              }
+            ],
+            "toggle_option_items": [
+              {
+                "label": "Filter by shoppable videos",
+                "value": true
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "averageViewersPerLiveMin",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "averageViewersPerLiveMin",
+              "filter_title": "Average viewers per LIVE",
+              "action_type": "fillDropdownThreshold",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Average viewers per LIVE"
+              ],
+              "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+            },
+            "filter_kind": "threshold_input",
+            "filter_title": "Average viewers per LIVE",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 2,
+              "checkbox_count": 2,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "100",
+                "value": "100"
+              },
+              {
+                "label": "1K",
+                "value": "1K"
+              },
+              {
+                "label": "10K",
+                "value": "10K"
+              },
+              {
+                "label": "100K+",
+                "value": "100K+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 2,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              }
+            ],
+            "toggle_option_items": [
+              {
+                "label": "Filter by shoppable videos",
+                "value": true
+              },
+              {
+                "label": "Filter by shoppable LIVE streams",
+                "value": true
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "engagementRateMinPercent",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "engagementRateMinPercent",
+              "filter_title": "Engagement rate",
+              "action_type": "fillDropdownThreshold",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Engagement rate"
+              ],
+              "wait_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "input_selector": "input[data-tid=\"m4b_input\"][data-e2e=\"7f6a7b3f-260b-00c0\"]",
+              "checkbox_label_selector": "label[data-tid=\"m4b_checkbox\"]"
+            },
+            "filter_kind": "threshold_input",
+            "filter_title": "Engagement rate",
+            "snapshot_summary": {
+              "option_count": 0,
+              "input_count": 3,
+              "checkbox_count": 3,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin.m4b-loading > div.arco-spin-children > div > div.searchFilter-ur_BH4 > div.filter-J7EF96.min-h-[208px] > div#filter-container.bg-neutral-bg4"
+            },
+            "preset_option_items": [
+              {
+                "label": "0",
+                "value": "0"
+              },
+              {
+                "label": "1",
+                "value": "1"
+              },
+              {
+                "label": "3",
+                "value": "3"
+              },
+              {
+                "label": "5",
+                "value": "5"
+              },
+              {
+                "label": "10+",
+                "value": "10+"
+              }
+            ],
+            "input_items": [
+              {
+                "index": 1,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 2,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div#filter-container.bg-neutral-bg4 > div > span.arco-trigger.arco-dropdown > div.bg-white.px-16 > div.flex.items-center > input.arco-input.arco-input-size-default"
+              },
+              {
+                "index": 3,
+                "value": "0",
+                "placeholder": "",
+                "input_type": "",
+                "dom_path": "div.bg-white.px-16 > div.flex.items-center > div.arco-input-group-wrapper.arco-input-group-wrapper-default > span.arco-input-group > span.arco-input-inner-wrapper.arco-input-inner-wrapper-default > input.arco-input.arco-input-size-default"
+              }
+            ],
+            "toggle_option_items": [
+              {
+                "label": "Filter by shoppable videos",
+                "value": true
+              },
+              {
+                "label": "Filter by shoppable LIVE streams",
+                "value": true
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "estPostRate",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "estPostRate",
+              "filter_title": "Est. post rate",
+              "action_type": "selectDropdownSingle",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Est. post rate"
+              ],
+              "wait_selector": "li.arco-select-option",
+              "option_selector": "li.arco-select-option"
+            },
+            "filter_kind": "single_select",
+            "filter_title": "Est. post rate",
+            "snapshot_summary": {
+              "option_count": 4,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div.arco-spin-children > div > div.searchFilter-ur_BH4 > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "All",
+                "value": "All",
+                "raw_label": "All",
+                "selected_by_default": true
+              },
+              {
+                "label": "OK",
+                "value": "OK",
+                "raw_label": "OK",
+                "selected_by_default": false
+              },
+              {
+                "label": "Good",
+                "value": "Good",
+                "raw_label": "Good",
+                "selected_by_default": false
+              },
+              {
+                "label": "Better",
+                "value": "Better",
+                "raw_label": "Better",
+                "selected_by_default": false
+              }
+            ]
+          },
+          {
+            "status": "ok",
+            "filter_key": "brandCollaborationSelections",
+            "dsl_binding": {
+              "module_key": "performanceFilters",
+              "module_title": "Performance",
+              "filter_key": "brandCollaborationSelections",
+              "filter_title": "Brand collaborations",
+              "action_type": "selectDropdownMultiple",
+              "trigger_selector": "button[data-tid=\"m4b_button\"] .arco-typography",
+              "trigger_texts": [
+                "Brand collaborations"
+              ],
+              "wait_selector": "div.arco-select-popup.arco-select-popup-multiple",
+              "option_selector": "span.arco-select-option.m4b-select-option",
+              "scroll_container_selector": ".arco-select-popup-inner"
+            },
+            "filter_kind": "multi_select",
+            "filter_title": "Brand collaborations",
+            "snapshot_summary": {
+              "option_count": 57,
+              "input_count": 0,
+              "checkbox_count": 0,
+              "button_texts": [],
+              "active_root_dom_path": "div > span.arco-trigger.arco-dropdown > div.brandSelectContainer-sAvwZV > div > span.arco-trigger.arco-trigger-position-bottom > div.arco-select-popup.m4b-select-popup"
+            },
+            "option_items": [
+              {
+                "label": "LOOMBER",
+                "value": "LOOMBER",
+                "raw_label": "LOOMBER",
+                "selected_by_default": false
+              },
+              {
+                "label": "Eva Moda",
+                "value": "Eva Moda",
+                "raw_label": "Eva Moda",
+                "selected_by_default": false
+              },
+              {
+                "label": "vetega",
+                "value": "vetega",
+                "raw_label": "vetega",
+                "selected_by_default": false
+              },
+              {
+                "label": "WINKTOYS",
+                "value": "WINKTOYS",
+                "raw_label": "WINKTOYS",
+                "selected_by_default": false
+              },
+              {
+                "label": "B Life",
+                "value": "B Life",
+                "raw_label": "B Life",
+                "selected_by_default": false
+              },
+              {
+                "label": "Sinless Beauty",
+                "value": "Sinless Beauty",
+                "raw_label": "Sinless Beauty",
+                "selected_by_default": false
+              },
+              {
+                "label": "AYVANNA RÊVER",
+                "value": "AYVANNA RÊVER",
+                "raw_label": "AYVANNA RÊVER",
+                "selected_by_default": false
+              },
+              {
+                "label": "Beyond Vitamins",
+                "value": "Beyond Vitamins",
+                "raw_label": "Beyond Vitamins",
+                "selected_by_default": false
+              },
+              {
+                "label": "FUTUREM",
+                "value": "FUTUREM",
+                "raw_label": "FUTUREM",
+                "selected_by_default": false
+              },
+              {
+                "label": "REDHUT",
+                "value": "REDHUT",
+                "raw_label": "REDHUT",
+                "selected_by_default": false
+              },
+              {
+                "label": "CEELIKE",
+                "value": "CEELIKE",
+                "raw_label": "CEELIKE",
+                "selected_by_default": false
+              },
+              {
+                "label": "L'Oréal Paris",
+                "value": "L'Oréal Paris",
+                "raw_label": "L'Oréal Paris",
+                "selected_by_default": false
+              },
+              {
+                "label": "SARELLY SARELLY",
+                "value": "SARELLY SARELLY",
+                "raw_label": "SARELLY SARELLY",
+                "selected_by_default": false
+              },
+              {
+                "label": "Windboss",
+                "value": "Windboss",
+                "raw_label": "Windboss",
+                "selected_by_default": false
+              },
+              {
+                "label": "SEESE",
+                "value": "SEESE",
+                "raw_label": "SEESE",
+                "selected_by_default": false
+              },
+              {
+                "label": "TIMEOFF",
+                "value": "TIMEOFF",
+                "raw_label": "TIMEOFF",
+                "selected_by_default": false
+              },
+              {
+                "label": "AMOCOCO",
+                "value": "AMOCOCO",
+                "raw_label": "AMOCOCO",
+                "selected_by_default": false
+              },
+              {
+                "label": "Pink Up",
+                "value": "Pink Up",
+                "raw_label": "Pink Up",
+                "selected_by_default": false
+              },
+              {
+                "label": "YuYa",
+                "value": "YuYa",
+                "raw_label": "YuYa",
+                "selected_by_default": false
+              },
+              {
+                "label": "DISNEY MICKEY & CO.",
+                "value": "DISNEY MICKEY & CO.",
+                "raw_label": "DISNEY MICKEY & CO.",
+                "selected_by_default": false
+              },
+              {
+                "label": "MEOKY",
+                "value": "MEOKY",
+                "raw_label": "MEOKY",
+                "selected_by_default": false
+              },
+              {
+                "label": "NEWELLME",
+                "value": "NEWELLME",
+                "raw_label": "NEWELLME",
+                "selected_by_default": false
+              },
+              {
+                "label": "Boysea",
+                "value": "Boysea",
+                "raw_label": "Boysea",
+                "selected_by_default": false
+              },
+              {
+                "label": "Magcubic",
+                "value": "Magcubic",
+                "raw_label": "Magcubic",
+                "selected_by_default": false
+              },
+              {
+                "label": "PHELENSEYE",
+                "value": "PHELENSEYE",
+                "raw_label": "PHELENSEYE",
+                "selected_by_default": false
+              },
+              {
+                "label": "Ultramo",
+                "value": "Ultramo",
+                "raw_label": "Ultramo",
+                "selected_by_default": false
+              },
+              {
+                "label": "BIOTEEP",
+                "value": "BIOTEEP",
+                "raw_label": "BIOTEEP",
+                "selected_by_default": false
+              },
+              {
+                "label": "ARTPHRO",
+                "value": "ARTPHRO",
+                "raw_label": "ARTPHRO",
+                "selected_by_default": false
+              },
+              {
+                "label": "ERUN",
+                "value": "ERUN",
+                "raw_label": "ERUN",
+                "selected_by_default": false
+              },
+              {
+                "label": "ZENZ TU INSPIRACION PERFECTA",
+                "value": "ZENZ TU INSPIRACION PERFECTA",
+                "raw_label": "ZENZ TU INSPIRACION PERFECTA",
+                "selected_by_default": false
+              },
+              {
+                "label": "SARELLY CREATIVO LAB",
+                "value": "SARELLY CREATIVO LAB",
+                "raw_label": "SARELLY CREATIVO LAB",
+                "selected_by_default": false
+              },
+              {
+                "label": "EUHOMY",
+                "value": "EUHOMY",
+                "raw_label": "EUHOMY",
+                "selected_by_default": false
+              },
+              {
+                "label": "NYX Professional Makeup",
+                "value": "NYX Professional Makeup",
+                "raw_label": "NYX Professional Makeup",
+                "selected_by_default": false
+              },
+              {
+                "label": "Maybelline New York",
+                "value": "Maybelline New York",
+                "raw_label": "Maybelline New York",
+                "selected_by_default": false
+              },
+              {
+                "label": "QPJ",
+                "value": "QPJ",
+                "raw_label": "QPJ",
+                "selected_by_default": false
+              },
+              {
+                "label": "Lonkoom",
+                "value": "Lonkoom",
+                "raw_label": "Lonkoom",
+                "selected_by_default": false
+              },
+              {
+                "label": "Megneta",
+                "value": "Megneta",
+                "raw_label": "Megneta",
+                "selected_by_default": false
+              },
+              {
+                "label": "VIFSSG",
+                "value": "VIFSSG",
+                "raw_label": "VIFSSG",
+                "selected_by_default": false
+              },
+              {
+                "label": "Aolon",
+                "value": "Aolon",
+                "raw_label": "Aolon",
+                "selected_by_default": false
+              },
+              {
+                "label": "REVLON",
+                "value": "REVLON",
+                "raw_label": "REVLON",
+                "selected_by_default": false
+              },
+              {
+                "label": "Mayorlei",
+                "value": "Mayorlei",
+                "raw_label": "Mayorlei",
+                "selected_by_default": false
+              },
+              {
+                "label": "GARNIER",
+                "value": "GARNIER",
+                "raw_label": "GARNIER",
+                "selected_by_default": false
+              },
+              {
+                "label": "GAN AI",
+                "value": "GAN AI",
+                "raw_label": "GAN AI",
+                "selected_by_default": false
+              },
+              {
+                "label": "SACE LADY",
+                "value": "SACE LADY",
+                "raw_label": "SACE LADY",
+                "selected_by_default": false
+              },
+              {
+                "label": "Xiaomi",
+                "value": "Xiaomi",
+                "raw_label": "Xiaomi",
+                "selected_by_default": false
+              },
+              {
+                "label": "B&Qaugen",
+                "value": "B&Qaugen",
+                "raw_label": "B&Qaugen",
+                "selected_by_default": false
+              },
+              {
+                "label": "KAISASA",
+                "value": "KAISASA",
+                "raw_label": "KAISASA",
+                "selected_by_default": false
+              },
+              {
+                "label": "GILIPUR",
+                "value": "GILIPUR",
+                "raw_label": "GILIPUR",
+                "selected_by_default": false
+              },
+              {
+                "label": "Amos",
+                "value": "Amos",
+                "raw_label": "Amos",
+                "selected_by_default": false
+              },
+              {
+                "label": "MAC",
+                "value": "MAC",
+                "raw_label": "MAC",
+                "selected_by_default": false
+              },
+              {
+                "label": "DIOSA LUNA",
+                "value": "DIOSA LUNA",
+                "raw_label": "DIOSA LUNA",
+                "selected_by_default": false
+              },
+              {
+                "label": "MAANGE",
+                "value": "MAANGE",
+                "raw_label": "MAANGE",
+                "selected_by_default": false
+              },
+              {
+                "label": "Hotcom",
+                "value": "Hotcom",
+                "raw_label": "Hotcom",
+                "selected_by_default": false
+              },
+              {
+                "label": "beauty creations",
+                "value": "beauty creations",
+                "raw_label": "beauty creations",
+                "selected_by_default": false
+              },
+              {
+                "label": "MISS CHERRY",
+                "value": "MISS CHERRY",
+                "raw_label": "MISS CHERRY",
+                "selected_by_default": false
+              },
+              {
+                "label": "PAPA FEEL",
+                "value": "PAPA FEEL",
+                "raw_label": "PAPA FEEL",
+                "selected_by_default": false
+              },
+              {
+                "label": "Lenovo",
+                "value": "Lenovo",
+                "raw_label": "Lenovo",
+                "selected_by_default": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "shop_type": "local",
+    "region_code": "MX",
+    "generated_at": "2026-03-19T13:26:34.416385+00:00",
+    "sort_binding": {
+      "status": "ok",
+      "field_key": "filterSortBy",
+      "field_title": "Sort by",
+      "dsl_binding": {
+        "field_key": "filterSortBy",
+        "field_title": "Sort by",
+        "action_type": "selectDropdownSingle",
+        "trigger_selector": "div[class*=\"sort-comp__StyledContainer\"] div.arco-select-view",
+        "trigger_texts": [
+          "Relevancy",
+          "GMV",
+          "Items sold",
+          "Followers",
+          "Avg. video views",
+          "Engagement rate"
+        ],
+        "wait_selector": "div.arco-select-popup div[role=\"listbox\"]",
+        "option_selector": "div.arco-select-popup li[role=\"option\"].arco-select-option",
+        "scroll_container_selector": "div.arco-select-popup-inner",
+        "option_map": {
+          "1": "Relevancy",
+          "2": "GMV",
+          "3": "Items sold",
+          "4": "Followers",
+          "5": "Avg. video views",
+          "6": "Engagement rate"
+        }
+      },
+      "option_items": [
+        {
+          "label": "Relevancy",
+          "value": "1"
+        },
+        {
+          "label": "GMV",
+          "value": "2"
+        },
+        {
+          "label": "Items sold",
+          "value": "3"
+        },
+        {
+          "label": "Followers",
+          "value": "4"
+        },
+        {
+          "label": "Avg. video views",
+          "value": "5"
+        },
+        {
+          "label": "Engagement rate",
+          "value": "6"
+        }
+      ],
+      "snapshot_summary": {
+        "option_count": 6,
+        "button_texts": [],
+        "active_root_dom_path": "div.arco-select-popup-inner.m4b-select-popup-inner.m4b-new-select-size-small"
+      }
+    },
+    "dsl_reference": "infound-desktop-client-master/apps/frontend.rpa.simulation/src/main/modules/rpa/outreach/support.ts",
+    "capture_source": "portal_tiktok_shop_collection",
+    "page_ready_text": "Find creators",
+    "search_binding": {
+      "field_key": "searchKeyword",
+      "action_type": "fillSelector + clickByText + pressKey",
+      "selector": "input[data-tid=\"m4b_input_search\"]",
+      "dismiss_text": "Find creators"
+    }
+  }
+}

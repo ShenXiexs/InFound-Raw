@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import update, func, select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +21,7 @@ class SentinelService:
 
     async def _recover_zombie_tasks(self):
         """1. 回收僵尸任务：心跳超时 5 分钟"""
-        utc_now = datetime.now()
+        utc_now = datetime.now(timezone.utc)
         timeout_limit = utc_now - timedelta(minutes=5)
 
         # 找出那些断了气（心跳超时）的任务
@@ -53,7 +53,7 @@ class SentinelService:
 
     async def _expire_old_pending_tasks(self):
         """2. 清理过期任务：超过 24 小时没人领"""
-        expiry_limit = datetime.now() - timedelta(hours=24)
+        expiry_limit = datetime.now(timezone.utc) - timedelta(hours=24)
 
         stmt = (
             update(SellerTkRpaTaskPlans)

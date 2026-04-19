@@ -18,8 +18,8 @@ from apps.portal_inner_open_api.services.chatbot_schedule_repository import (
     _normalize_status,
     chatbot_schedule_repository,
 )
-from shared_domain.models.infound import Samples, Creators
 from core_base import get_logger
+from shared_domain.models.infound import Samples, Creators
 
 logger = get_logger()
 
@@ -33,7 +33,7 @@ class SampleScheduleRow:
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
 
 
 class ChatbotSchedulePublisher:
@@ -67,7 +67,7 @@ class ChatbotSchedulePublisher:
             getattr(chatbot_schedule_repository, "NO_CONTENT_INTERVAL_DAYS", 5) or 5
         )
         self.no_content_max_runs = (
-            int(getattr(chatbot_schedule_repository, "REPEAT_TIMES", 3) or 3) + 1
+                int(getattr(chatbot_schedule_repository, "REPEAT_TIMES", 3) or 3) + 1
         )
         self._stop_event = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
@@ -159,11 +159,11 @@ class ChatbotSchedulePublisher:
         return processed
 
     async def _fetch_due_samples(
-        self,
-        session: AsyncSession,
-        *,
-        lock_rows: bool = False,
-        limit: Optional[int] = None,
+            self,
+            session: AsyncSession,
+            *,
+            lock_rows: bool = False,
+            limit: Optional[int] = None,
     ) -> List[SampleScheduleRow]:
         now = _utcnow()
         limit_value = int(limit or self.batch_size)
@@ -242,7 +242,7 @@ class ChatbotSchedulePublisher:
         return rows
 
     async def _build_task_for_schedule(
-        self, session: AsyncSession, row: SampleScheduleRow
+            self, session: AsyncSession, row: SampleScheduleRow
     ) -> Optional[dict]:
         sample = await self._load_sample(session, row.sample_id)
         if not sample:
@@ -278,7 +278,7 @@ class ChatbotSchedulePublisher:
         }
 
     async def _load_sample(
-        self, session: AsyncSession, sample_id: str
+            self, session: AsyncSession, sample_id: str
     ) -> Optional[Samples]:
         result = await session.execute(
             select(Samples).where(Samples.id == sample_id).limit(1)
@@ -286,7 +286,7 @@ class ChatbotSchedulePublisher:
         return result.scalars().first()
 
     async def _load_creator_whatsapp(
-        self, session: AsyncSession, platform_creator_id: Optional[str]
+            self, session: AsyncSession, platform_creator_id: Optional[str]
     ) -> Optional[str]:
         if not platform_creator_id:
             return None
@@ -311,26 +311,28 @@ class ChatbotSchedulePublisher:
         return False
 
     async def _mark_executed(
-        self, session: AsyncSession, row: SampleScheduleRow
+            self, session: AsyncSession, row: SampleScheduleRow
     ) -> None:
         now = _utcnow()
         if row.scenario == self.SCENARIO_SHIPPED:
             await session.execute(
                 text("""
-                    UPDATE `samples`
-                    SET chatbot_shipped_sent_at = :now
-                    WHERE id = :sample_id AND chatbot_shipped_sent_at IS NULL;
-                    """),
+                     UPDATE `samples`
+                     SET chatbot_shipped_sent_at = :now
+                     WHERE id = :sample_id
+                       AND chatbot_shipped_sent_at IS NULL;
+                     """),
                 {"sample_id": row.sample_id, "now": now},
             )
             return
         if row.scenario == self.SCENARIO_CONTENT_PENDING:
             await session.execute(
                 text("""
-                    UPDATE `samples`
-                    SET chatbot_content_pending_sent_at = :now
-                    WHERE id = :sample_id AND chatbot_content_pending_sent_at IS NULL;
-                    """),
+                     UPDATE `samples`
+                     SET chatbot_content_pending_sent_at = :now
+                     WHERE id = :sample_id
+                       AND chatbot_content_pending_sent_at IS NULL;
+                     """),
                 {"sample_id": row.sample_id, "now": now},
             )
             return
@@ -347,12 +349,12 @@ class ChatbotSchedulePublisher:
 
         await session.execute(
             text("""
-                UPDATE `samples`
-                SET no_content_run_count = :new_count,
-                    no_content_next_run_at = :next_time,
-                    no_content_active = :active
-                WHERE id = :sample_id;
-                """),
+                 UPDATE `samples`
+                 SET no_content_run_count   = :new_count,
+                     no_content_next_run_at = :next_time,
+                     no_content_active      = :active
+                 WHERE id = :sample_id;
+                 """),
             {
                 "sample_id": row.sample_id,
                 "new_count": new_count,
@@ -362,15 +364,15 @@ class ChatbotSchedulePublisher:
         )
 
     async def _deactivate_no_content(
-        self, session: AsyncSession, sample_id: str
+            self, session: AsyncSession, sample_id: str
     ) -> None:
         await session.execute(
             text("""
-                UPDATE `samples`
-                SET no_content_active = 0,
-                    no_content_next_run_at = NULL
-                WHERE id = :sample_id;
-                """),
+                 UPDATE `samples`
+                 SET no_content_active      = 0,
+                     no_content_next_run_at = NULL
+                 WHERE id = :sample_id;
+                 """),
             {"sample_id": sample_id},
         )
 

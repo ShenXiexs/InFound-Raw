@@ -22,7 +22,7 @@ class SampleSnapshot:
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
 
 
 def _normalize_status(value: Optional[str]) -> Optional[str]:
@@ -45,8 +45,8 @@ def _is_empty_content_summary(summary: Any) -> bool:
             if item_type and item_type != "logistics":
                 return False
             if any(
-                str(item.get(key) or "").strip()
-                for key in {"promotion_name", "promotion_time"}
+                    str(item.get(key) or "").strip()
+                    for key in {"promotion_name", "promotion_time"}
             ) and item_type != "logistics":
                 return False
         return True
@@ -70,11 +70,11 @@ class ChatbotScheduleRepository:
     REPEAT_TIMES = 3  # repeat 3 times after the first send
 
     async def apply_sample_snapshot(
-        self,
-        session: AsyncSession,
-        *,
-        previous: Optional[SampleSnapshot],
-        current: SampleSnapshot,
+            self,
+            session: AsyncSession,
+            *,
+            previous: Optional[SampleSnapshot],
+            current: SampleSnapshot,
     ) -> None:
         curr_status = _normalize_status(current.status)
         now = _utcnow()
@@ -100,7 +100,7 @@ class ChatbotScheduleRepository:
 
         # 重复提醒：已完成且内容为空 → 激活；否则关闭。
         if curr_status == self.STATUS_COMPLETED and _is_empty_content_summary(
-            current.content_summary
+                current.content_summary
         ):
             await self._activate_no_content_schedule(
                 session,
@@ -112,12 +112,12 @@ class ChatbotScheduleRepository:
             await self._deactivate_no_content(session, sample_id=current.sample_id)
 
     async def _mark_one_shot_sent(
-        self,
-        session: AsyncSession,
-        *,
-        sample_id: str,
-        column: str,
-        now: datetime,
+            self,
+            session: AsyncSession,
+            *,
+            sample_id: str,
+            column: str,
+            now: datetime,
     ) -> None:
         await session.execute(
             text(
@@ -131,20 +131,20 @@ class ChatbotScheduleRepository:
         )
 
     async def _activate_no_content_schedule(
-        self,
-        session: AsyncSession,
-        *,
-        sample_id: str,
-        max_runs: int,
-        now: datetime,
+            self,
+            session: AsyncSession,
+            *,
+            sample_id: str,
+            max_runs: int,
+            now: datetime,
     ) -> None:
         await session.execute(
             text(
                 """
                 UPDATE `samples`
-                SET no_content_active = 1,
+                SET no_content_active      = 1,
                     no_content_next_run_at = :now,
-                    no_content_run_count = COALESCE(no_content_run_count, 0)
+                    no_content_run_count   = COALESCE(no_content_run_count, 0)
                 WHERE id = :sample_id
                   AND (no_content_active IS NULL OR no_content_active = 0)
                   AND COALESCE(no_content_run_count, 0) < :max_runs;
@@ -154,18 +154,19 @@ class ChatbotScheduleRepository:
         )
 
     async def _deactivate_no_content(
-        self,
-        session: AsyncSession,
-        *,
-        sample_id: str,
+            self,
+            session: AsyncSession,
+            *,
+            sample_id: str,
     ) -> None:
         await session.execute(
             text(
                 """
                 UPDATE `samples`
-                SET no_content_active = 0,
+                SET no_content_active      = 0,
                     no_content_next_run_at = NULL
-                WHERE id = :sample_id AND no_content_active = 1;
+                WHERE id = :sample_id
+                  AND no_content_active = 1;
                 """
             ),
             {"sample_id": sample_id},

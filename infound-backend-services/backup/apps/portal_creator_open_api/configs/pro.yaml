@@ -1,7 +1,0 @@
-MYSQL_HOST: "172.17.0.1"
-MYSQL_USER: "infound-pro"
-MYSQL_DB: "infound.pro"
-MYSQL_PASSWORD: "J6B^tu)E~$HJBb"
-
-REDIS_HOST: "172.17.0.1"
-REDIS_PREFIX: "if.pro"

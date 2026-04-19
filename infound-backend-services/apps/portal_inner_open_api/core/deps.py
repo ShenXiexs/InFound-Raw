@@ -12,6 +12,7 @@ from apps.portal_inner_open_api.services import (
     CreatorIngestionService,
     CreatorHistoryService,
     OutreachCreatorIngestionService,
+    OutreachFilterItemsIngestionService,
     OutreachTaskService,
 )
 from shared_domain import DatabaseManager
@@ -73,6 +74,12 @@ def get_outreach_task_service(
         db: AsyncSession = Depends(get_db_session),
 ) -> OutreachTaskService:
     return OutreachTaskService(db)
+
+
+def get_outreach_filter_items_ingestion_service(
+        db: AsyncSession = Depends(get_db_session),
+) -> OutreachFilterItemsIngestionService:
+    return OutreachFilterItemsIngestionService(db)
 
 
 def get_chatbot_message_builder(

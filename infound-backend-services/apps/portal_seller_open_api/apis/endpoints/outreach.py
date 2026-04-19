@@ -1,18 +1,18 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import and_, select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.portal_seller_open_api.core.deps import (
     get_current_user_info,
     get_db_session,
-    get_outreach_result_service,
     get_settings,
 )
+from apps.portal_seller_open_api.exceptions import ErrorCodes
 from apps.portal_seller_open_api.models.dtos.outreach import (
     CreateOutreachTaskRequest,
     CreateOutreachTaskData,
@@ -27,13 +27,8 @@ from apps.portal_seller_open_api.models.dtos.outreach import (
     OutreachTaskListRequest,
     OutreachTaskListData,
     OutreachTaskListItem,
-)
-from apps.portal_seller_open_api.models.outreach_result import (
-    OutreachResultIngestionRequest,
-    OutreachResultIngestionResult,
-)
-from apps.portal_seller_open_api.services.outreach_result_service import (
-    OutreachResultIngestionService,
+    OutreachTaskRunRecordListData,
+    OutreachTaskRunRecordItem,
 )
 from apps.portal_seller_open_api.services.normalization import clean_text
 from apps.portal_seller_open_api.services.rpa_script_service import (
@@ -49,39 +44,35 @@ from apps.portal_seller_open_api.services.task_slot_dispatch_service import (
     SellerRpaTaskSingleSlotDispatchService,
 )
 from core_base import APIResponse, error_response, get_logger, success_response
-from shared_seller_application_services.current_user_info import CurrentUserInfo
 from shared_domain import DatabaseManager
-from shared_domain.models.task_plan_extension import TaskStatus
 from shared_domain.models.infound import (
     IfIdentityUsers,
+    IfTkCreators,
+    SellerTkOutreachTaskLogs,
     SellerTkRpaTaskPlans,
     SellerTkOutreachSettings,
     SellerTkShopPlatformSettings,
     SellerTkShops,
 )
+from shared_domain.models.task_plan_extension import TaskStatus
+from shared_seller_application_services.current_user_info import CurrentUserInfo
 
 router = APIRouter(tags=["建联"])
 logger = get_logger(__name__)
 
 
-@router.post(
-    "/api/v1/rpa/outreach/results",
-    response_model=APIResponse[OutreachResultIngestionResult],
-    response_model_by_alias=True,
-)
-async def ingest_outreach_results(
-    payload: OutreachResultIngestionRequest,
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
-    service: OutreachResultIngestionService = Depends(get_outreach_result_service),
-) -> APIResponse[OutreachResultIngestionResult]:
+def _read_non_negative_int(raw: Any) -> int | None:
     try:
-        result = await service.ingest(current_user_info, payload)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    return success_response(result)
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value < 0:
+        return None
+    return value
+
+
+def _get_max_outreach_count_per_day(permission_setting: dict[str, Any]) -> int | None:
+    return _read_non_negative_int(permission_setting.get("maxOutreachCountPerDay"))
 
 
 @router.get(
@@ -90,9 +81,9 @@ async def ingest_outreach_results(
     response_model_by_alias=True,
 )
 async def get_outreach_creator_filter_items(
-    shopId: str,
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        shop_id: str,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
 ) -> APIResponse[dict]:
     """
     返回前端筛选列表所需的达人过滤配置（creator_filter_items）。
@@ -108,7 +99,7 @@ async def get_outreach_creator_filter_items(
         )
         .where(
             and_(
-                SellerTkShops.id == shopId,
+                SellerTkShops.id == shop_id,
                 SellerTkShops.user_id == user_id,
                 SellerTkShops.deleted == 0,
                 SellerTkShopPlatformSettings.is_active == 1,
@@ -125,7 +116,7 @@ async def get_outreach_creator_filter_items(
         try:
             creator_filter_items = json.loads(creator_filter_items)
         except (TypeError, ValueError) as exc:
-            logger.error("达人筛选配置 JSON 解析失败", exc_info=exc, shop_id=shopId, user_id=user_id)
+            logger.error("达人筛选配置 JSON 解析失败", exc_info=exc, shop_id=shop_id, user_id=user_id)
             return error_response(message="达人筛选配置格式错误", code=500)
 
     if creator_filter_items is None:
@@ -133,11 +124,26 @@ async def get_outreach_creator_filter_items(
     if not isinstance(creator_filter_items, dict):
         logger.error(
             "达人筛选配置类型错误（应为 dict）",
-            shop_id=shopId,
+            shop_id=shop_id,
             user_id=user_id,
             actual_type=str(type(creator_filter_items)),
         )
         return error_response(message="达人筛选配置格式错误", code=500)
+
+    localized_config = None
+    for locale_key in ("cn", "zh-CN", "zh_CN"):
+        candidate = creator_filter_items.get(locale_key)
+        if isinstance(candidate, dict) and isinstance(candidate.get("modules"), list):
+            localized_config = candidate
+            break
+    if localized_config is None:
+        for value in creator_filter_items.values():
+            if isinstance(value, dict) and isinstance(value.get("modules"), list):
+                localized_config = value
+                break
+    if localized_config is None:
+        return error_response(message="达人筛选配置格式错误", code=500)
+    creator_filter_items = localized_config
 
     modules = creator_filter_items.get("modules") or []
     if not isinstance(modules, list):
@@ -346,6 +352,7 @@ def _status_to_text(status_value) -> str:
         TaskStatus.CANCELLED.value: TaskStatus.CANCELLED.value,
         "3": TaskStatus.COMPLETED.value,
         TaskStatus.COMPLETED.value: TaskStatus.COMPLETED.value,
+        TaskStatus.FAILED.value: TaskStatus.FAILED.value,
     }
     return mapping.get(text, text or TaskStatus.PENDING.value)
 
@@ -417,6 +424,7 @@ def _status_tokens(status: str) -> set[str]:
         TaskStatus.RUNNING.value: {TaskStatus.RUNNING.value, "1"},
         TaskStatus.CANCELLED.value: {TaskStatus.CANCELLED.value, "2"},
         TaskStatus.COMPLETED.value: {TaskStatus.COMPLETED.value, "3"},
+        TaskStatus.FAILED.value: {TaskStatus.FAILED.value},
         "0": {TaskStatus.PENDING.value, "0"},
         "1": {TaskStatus.RUNNING.value, "1"},
         "2": {TaskStatus.CANCELLED.value, "2"},
@@ -430,13 +438,13 @@ def _running_status_tokens() -> set[str]:
 
 
 async def _upsert_outreach_rpa_plan(
-    db: AsyncSession,
-    *,
-    task_id: str,
-    user_id: str,
-    task_payload: dict,
-    scheduled_time: datetime,
-    now: datetime,
+        db: AsyncSession,
+        *,
+        task_id: str,
+        user_id: str,
+        task_playload: dict,
+        scheduled_time: datetime,
+        now: datetime,
 ) -> None:
     plan_stmt = select(SellerTkRpaTaskPlans).where(SellerTkRpaTaskPlans.id == task_id).with_for_update()
     plan_row = (await db.execute(plan_stmt)).scalar_one_or_none()
@@ -446,7 +454,7 @@ async def _upsert_outreach_rpa_plan(
                 id=task_id,
                 user_id=user_id,
                 task_type="OUTREACH",
-                task_payload=task_payload,
+                task_playload=task_playload,
                 status=TaskStatus.PENDING.value,
                 scheduled_time=scheduled_time,
                 start_time=None,
@@ -462,7 +470,7 @@ async def _upsert_outreach_rpa_plan(
     else:
         plan_row.user_id = user_id
         plan_row.task_type = "OUTREACH"
-        plan_row.task_payload = task_payload
+        plan_row.task_playload = task_playload
         plan_row.status = TaskStatus.PENDING.value
         plan_row.scheduled_time = scheduled_time
         plan_row.start_time = None
@@ -471,6 +479,7 @@ async def _upsert_outreach_rpa_plan(
         plan_row.error_msg = None
         plan_row.last_modifier_id = user_id
         plan_row.last_modification_time = now
+
 
 def _uppercase_uuid() -> str:
     return str(uuid.uuid4()).upper()
@@ -554,10 +563,10 @@ def _build_outreach_filter_payload(task: SellerTkOutreachSettings) -> dict:
 
 
 async def _load_outreach_filter_script(
-    db: AsyncSession,
-    *,
-    region_code: str,
-    shop_type: str,
+        db: AsyncSession,
+        *,
+        region_code: str,
+        shop_type: str,
 ) -> dict | None:
     stmt = select(SellerTkShopPlatformSettings).where(
         SellerTkShopPlatformSettings.region_code == region_code,
@@ -573,12 +582,12 @@ async def _load_outreach_filter_script(
 
 
 async def _register_outreach_filter_script(
-    db: AsyncSession,
-    *,
-    actor_id: str,
-    region_code: str,
-    shop_type: str,
-    filter_script: dict | None,
+        db: AsyncSession,
+        *,
+        actor_id: str,
+        region_code: str,
+        shop_type: str,
+        filter_script: dict | None,
 ) -> tuple[str | None, str | None]:
     if not isinstance(filter_script, dict) or not filter_script:
         return None, None
@@ -600,16 +609,16 @@ async def _register_outreach_filter_script(
 
 
 def _build_outreach_setting_snapshot(
-    *,
-    user_id: str,
-    task: SellerTkOutreachSettings,
-    shop: SellerTkShops,
-    task_status: str,
-    scheduled_time: datetime,
-    attach_products: bool,
-    product_ids: list[str],
-    filter_script_code: str | None,
-    filter_script_version: str | None,
+        *,
+        user_id: str,
+        task: SellerTkOutreachSettings,
+        shop: SellerTkShops,
+        task_status: str,
+        scheduled_time: datetime,
+        attach_products: bool,
+        product_ids: list[str],
+        filter_script_code: str | None,
+        filter_script_version: str | None,
 ) -> dict:
     filter_payload = _build_outreach_filter_payload(task)
     return {
@@ -665,16 +674,16 @@ def _build_outreach_setting_snapshot(
     }
 
 
-def _build_outreach_task_payload(
-    *,
-    user_id: str,
-    task: SellerTkOutreachSettings,
-    shop: SellerTkShops,
-    scheduled_time: datetime,
-    task_status: str,
-    filter_script: dict | None,
-    filter_script_code: str | None,
-    filter_script_version: str | None,
+def _build_outreach_task_playload(
+        *,
+        user_id: str,
+        task: SellerTkOutreachSettings,
+        shop: SellerTkShops,
+        scheduled_time: datetime,
+        task_status: str,
+        filter_script: dict | None,
+        filter_script_code: str | None,
+        filter_script_version: str | None,
 ) -> dict:
     attach_products, product_ids = _parse_message_ext(task.message)
     filter_payload = _build_outreach_filter_payload(task)
@@ -758,18 +767,18 @@ def _build_outreach_task_payload(
 
 
 def _build_transient_outreach_task_plan(
-    *,
-    task_id: str,
-    user_id: str,
-    task_payload: dict,
-    scheduled_time: datetime,
-    now: datetime,
+        *,
+        task_id: str,
+        user_id: str,
+        task_playload: dict,
+        scheduled_time: datetime,
+        now: datetime,
 ) -> SellerTkRpaTaskPlans:
     return SellerTkRpaTaskPlans(
         id=task_id,
         user_id=user_id,
         task_type="OUTREACH",
-        task_payload=task_payload,
+        task_playload=task_playload,
         status=TaskStatus.PENDING.value,
         scheduled_time=scheduled_time,
         start_time=None,
@@ -784,23 +793,23 @@ def _build_transient_outreach_task_plan(
 
 
 async def _dispatch_or_schedule_outreach_task_plan(
-    *,
-    settings,
-    task_id: str,
-    user_id: str,
-    task_payload: dict,
-    scheduled_time: datetime,
-    now: datetime,
-    dispatch_immediately: bool,
-    dispatch_failure_message: str,
-    schedule_failure_message: str,
-    fallback_schedule_failure_message: str | None = None,
+        *,
+        settings,
+        task_id: str,
+        user_id: str,
+        task_playload: dict,
+        scheduled_time: datetime,
+        now: datetime,
+        dispatch_immediately: bool,
+        dispatch_failure_message: str,
+        schedule_failure_message: str,
+        fallback_schedule_failure_message: str | None = None,
 ) -> bool:
     try:
         transient_task_plan = _build_transient_outreach_task_plan(
             task_id=task_id,
             user_id=user_id,
-            task_payload=task_payload,
+            task_playload=task_playload,
             scheduled_time=scheduled_time,
             now=now,
         )
@@ -872,11 +881,11 @@ async def _dispatch_or_schedule_outreach_task_plan(
     description="获取配置列表（兼容旧入口）",
 )
 async def list_outreach_tasks(
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
-    body: OutreachTaskListRequest = Body(..., description="任务列表筛选条件"),
-    page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, alias="pageSize", ge=1, le=100, description="每页数量"),
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        body: OutreachTaskListRequest = Body(..., description="任务列表筛选条件"),
+        page: int = Query(1, ge=1, description="页码"),
+        page_size: int = Query(20, alias="pageSize", ge=1, le=100, description="每页数量"),
 ) -> APIResponse[OutreachTaskListData]:
     user_id = current_user_info.user_id
     shop_id = body.shopId
@@ -957,10 +966,10 @@ async def list_outreach_tasks(
     description="新建建联任务",
 )
 async def create_outreach_task(
-    request: Request,
-    body: CreateOutreachTaskRequest,
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        request: Request,
+        body: CreateOutreachTaskRequest,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
 ) -> APIResponse[CreateOutreachTaskData]:
     user_id = current_user_info.user_id
     now = _to_millis_precision(datetime.now(timezone.utc))
@@ -972,17 +981,14 @@ async def create_outreach_task(
     )
     user_row = (await db.execute(user_stmt)).scalar_one_or_none()
     if not user_row:
-        return error_response(message="Token 无效", code=1251)
+        return error_response(message="Token 无效", code=ErrorCodes.INVALID_TOKEN)
     permission_setting = user_row.permission_setting or {}
-    raw_available = permission_setting.get("availableCount")
-    available_count = None
-    if raw_available is not None:
-        try:
-            available_count = int(raw_available)
-        except (TypeError, ValueError):
-            pass
-    if available_count is not None and available_count > 0 and body.plannedCount > available_count:
-        return error_response(message=f"建联人数超过权限上限（最多 {available_count} 人）", code=1252)
+    max_outreach_count = _get_max_outreach_count_per_day(permission_setting)
+    if max_outreach_count is not None and body.plannedCount > max_outreach_count:
+        return error_response(
+            message=f"建联人数超过权限上限（最多 {max_outreach_count} 人）",
+            code=ErrorCodes.OUTREACH_COUNT_LIMIT_EXCEEDED,
+        )
 
     shop_stmt = select(SellerTkShops).where(
         and_(
@@ -1089,7 +1095,7 @@ async def create_outreach_task(
         shop_type=shop.shop_type,
         filter_script=filter_script,
     )
-    task_payload = _build_outreach_task_payload(
+    task_playload = _build_outreach_task_playload(
         user_id=user_id,
         task=task,
         shop=shop,
@@ -1103,14 +1109,14 @@ async def create_outreach_task(
         db,
         task_id=task_id,
         user_id=user_id,
-        task_payload=task_payload,
+        task_playload=task_playload,
         scheduled_time=scheduled_time,
         now=now,
     )
 
     try:
         await db.commit()
-    except Exception:
+    except Exception as exc:
         await db.rollback()
         return error_response(message="新建建联任务失败", code=500)
 
@@ -1120,7 +1126,7 @@ async def create_outreach_task(
             settings=settings,
             task_id=task_id,
             user_id=user_id,
-            task_payload=task_payload,
+            task_playload=task_playload,
             scheduled_time=scheduled_time,
             now=now,
             dispatch_immediately=True,
@@ -1133,7 +1139,7 @@ async def create_outreach_task(
             settings=settings,
             task_id=task_id,
             user_id=user_id,
-            task_payload=task_payload,
+            task_playload=task_playload,
             scheduled_time=scheduled_time,
             now=now,
             dispatch_immediately=False,
@@ -1158,9 +1164,9 @@ async def create_outreach_task(
     response_model_by_alias=True,
 )
 async def get_outreach_task(
-    task_id: str,
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        task_id: str,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
 ) -> APIResponse[OutreachTaskDetailResponse]:
     task_stmt = select(SellerTkOutreachSettings).where(
         and_(
@@ -1212,17 +1218,100 @@ async def get_outreach_task(
     return success_response(data=detail)
 
 
+@router.get(
+    "/outreach/tasks/{task_id}/records",
+    response_model=APIResponse[OutreachTaskRunRecordListData],
+    response_model_by_alias=True,
+)
+async def list_outreach_task_run_records(
+        task_id: str,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        page: int = Query(1, ge=1, description="页码"),
+        page_size: int = Query(10, alias="pageSize", ge=1, le=100, description="每页数量"),
+) -> APIResponse[OutreachTaskRunRecordListData]:
+    task_stmt = select(SellerTkOutreachSettings).where(
+        and_(
+            SellerTkOutreachSettings.id == task_id,
+            SellerTkOutreachSettings.user_id == current_user_info.user_id,
+        )
+    )
+    task_row = (await db.execute(task_stmt)).scalar_one_or_none()
+    if not task_row:
+        return error_response(message="任务不存在", code=404)
+
+    total_stmt = select(func.count(SellerTkOutreachTaskLogs.id)).where(
+        and_(
+            SellerTkOutreachTaskLogs.task_id == task_id,
+            SellerTkOutreachTaskLogs.shop_id == task_row.shop_id,
+        )
+    )
+    total = int((await db.execute(total_stmt)).scalar() or 0)
+
+    offset = (page - 1) * page_size
+    stmt = (
+        select(
+            SellerTkOutreachTaskLogs.platform_creator_id,
+            SellerTkOutreachTaskLogs.last_modification_time,
+            IfTkCreators.platform_creator_username,
+            IfTkCreators.platform_creator_display_name,
+            IfTkCreators.followers,
+            IfTkCreators.sales_revenue,
+        )
+        .select_from(SellerTkOutreachTaskLogs)
+        .join(
+            IfTkCreators,
+            IfTkCreators.platform_creator_id == SellerTkOutreachTaskLogs.platform_creator_id,
+            isouter=True,
+        )
+        .where(
+            and_(
+                SellerTkOutreachTaskLogs.task_id == task_id,
+                SellerTkOutreachTaskLogs.shop_id == task_row.shop_id,
+            )
+        )
+        .order_by(SellerTkOutreachTaskLogs.id.asc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    rows = (await db.execute(stmt)).all()
+    items = [
+        OutreachTaskRunRecordItem(
+            creatorId=row.platform_creator_id,
+            creatorName=(
+                    row.platform_creator_display_name
+                    or row.platform_creator_username
+                    or row.platform_creator_id
+            ),
+            followers=int(row.followers) if row.followers is not None else None,
+            gmv=float(row.sales_revenue) if row.sales_revenue is not None else None,
+            taskName=task_row.task_name,
+            sendTime=_to_utc(row.last_modification_time) if row.last_modification_time else None,
+        )
+        for row in rows
+    ]
+
+    return success_response(
+        data=OutreachTaskRunRecordListData(
+            total=total,
+            page=page,
+            pageSize=page_size,
+            items=items,
+        )
+    )
+
+
 @router.put(
     "/outreach/tasks/{task_id}",
     response_model=APIResponse[UpdateOutreachTaskData],
     response_model_by_alias=True,
 )
 async def update_outreach_task(
-    request: Request,
-    task_id: str,
-    body: UpdateOutreachTaskRequest,
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        request: Request,
+        task_id: str,
+        body: UpdateOutreachTaskRequest,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
 ) -> APIResponse[UpdateOutreachTaskData]:
     user_id = current_user_info.user_id
     now = _to_millis_precision(datetime.now(timezone.utc))
@@ -1250,17 +1339,14 @@ async def update_outreach_task(
     )
     user_row = (await db.execute(user_stmt)).scalar_one_or_none()
     if not user_row:
-        return error_response(message="Token 无效", code=1251)
+        return error_response(message="Token 无效", code=ErrorCodes.INVALID_TOKEN)
     permission_setting = user_row.permission_setting or {}
-    raw_available = permission_setting.get("availableCount")
-    available_count = None
-    if raw_available is not None:
-        try:
-            available_count = int(raw_available)
-        except (TypeError, ValueError):
-            pass
-    if available_count is not None and available_count > 0 and body.plannedCount > available_count:
-        return error_response(message=f"建联人数超过权限上限（最多 {available_count} 人）", code=400)
+    max_outreach_count = _get_max_outreach_count_per_day(permission_setting)
+    if max_outreach_count is not None and body.plannedCount > max_outreach_count:
+        return error_response(
+            message=f"建联人数超过权限上限（最多 {max_outreach_count} 人）",
+            code=ErrorCodes.OUTREACH_COUNT_LIMIT_EXCEEDED,
+        )
 
     # 启动时间校验
     if body.startTime is not None:
@@ -1354,7 +1440,7 @@ async def update_outreach_task(
         shop_type=shop_row.shop_type,
         filter_script=filter_script,
     )
-    task_payload = _build_outreach_task_payload(
+    task_playload = _build_outreach_task_playload(
         user_id=user_id,
         task=refreshed_task,
         shop=shop_row,
@@ -1368,7 +1454,7 @@ async def update_outreach_task(
         db,
         task_id=task_id,
         user_id=user_id,
-        task_payload=task_payload,
+        task_playload=task_playload,
         scheduled_time=plan_scheduled_time,
         now=now,
     )
@@ -1379,7 +1465,7 @@ async def update_outreach_task(
             settings=settings,
             task_id=task_id,
             user_id=user_id,
-            task_payload=task_payload,
+            task_playload=task_playload,
             scheduled_time=plan_scheduled_time,
             now=now,
             dispatch_immediately=True,
@@ -1392,7 +1478,7 @@ async def update_outreach_task(
             settings=settings,
             task_id=task_id,
             user_id=user_id,
-            task_payload=task_payload,
+            task_playload=task_playload,
             scheduled_time=plan_scheduled_time,
             now=now,
             dispatch_immediately=False,
@@ -1414,11 +1500,11 @@ async def update_outreach_task(
     response_model_by_alias=True,
 )
 async def start_outreach_task(
-    request: Request,
-    task_id: str,
-    body: StartOutreachTaskRequest,
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        request: Request,
+        task_id: str,
+        body: StartOutreachTaskRequest,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
 ) -> APIResponse[StartOutreachTaskData]:
     user_id = current_user_info.user_id
     now = _to_millis_precision(datetime.now(timezone.utc))
@@ -1443,16 +1529,17 @@ async def start_outreach_task(
     if str(task_row.status).upper() not in {TaskStatus.PENDING.value, "0"}:
         return error_response(message="任务已启动或已结束，不可重复启动", code=409)
 
-    running_stmt = select(SellerTkOutreachSettings.id).where(
-        and_(
-            SellerTkOutreachSettings.shop_id == body.shopId,
-            SellerTkOutreachSettings.id != task_id,
-            SellerTkOutreachSettings.status.in_(list(_running_status_tokens())),
-        )
-    ).with_for_update()
-    other_running = (await db.execute(running_stmt)).scalar_one_or_none()
-    if other_running:
-        return error_response(message="该店铺已有运行中的建联任务，请等待完成或结束后再启动", code=409)
+    if False:
+        running_stmt = select(SellerTkOutreachSettings.id).where(
+            and_(
+                SellerTkOutreachSettings.shop_id == body.shopId,
+                SellerTkOutreachSettings.id != task_id,
+                SellerTkOutreachSettings.status.in_(list(_running_status_tokens())),
+            )
+        ).with_for_update()
+        other_running = (await db.execute(running_stmt)).scalars().first()
+        if other_running:
+            return error_response(message="该店铺已有运行中的建联任务，请等待完成或结束后再启动", code=409)
 
     scheduled_time = now
     task_row.status = TaskStatus.RUNNING.value
@@ -1485,7 +1572,7 @@ async def start_outreach_task(
         shop_type=shop_row.shop_type,
         filter_script=filter_script,
     )
-    task_payload = _build_outreach_task_payload(
+    task_playload = _build_outreach_task_playload(
         user_id=user_id,
         task=task_row,
         shop=shop_row,
@@ -1499,7 +1586,7 @@ async def start_outreach_task(
         db,
         task_id=task_id,
         user_id=user_id,
-        task_payload=task_payload,
+        task_playload=task_playload,
         scheduled_time=scheduled_time,
         now=now,
     )
@@ -1510,7 +1597,7 @@ async def start_outreach_task(
         settings=settings,
         task_id=task_id,
         user_id=user_id,
-        task_payload=task_payload,
+        task_playload=task_playload,
         scheduled_time=scheduled_time,
         now=now,
         dispatch_immediately=True,
@@ -1535,11 +1622,11 @@ async def start_outreach_task(
     response_model_by_alias=True,
 )
 async def end_outreach_task(
-    request: Request,
-    task_id: str,
-    body: EndOutreachTaskRequest,
-    db: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        request: Request,
+        task_id: str,
+        body: EndOutreachTaskRequest,
+        db: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user_info: CurrentUserInfo = Depends(get_current_user_info),
 ) -> APIResponse[EndOutreachTaskData]:
     user_id = current_user_info.user_id
     now = _to_millis_precision(datetime.now(timezone.utc))

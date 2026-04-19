@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,10 +43,10 @@ class ContractReminderService:
         self.db_session = db_session
 
     async def list_rule_configs(
-        self,
-        current_user: CurrentUserInfo,
-        *,
-        shop_id: str,
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            shop_id: str,
     ) -> ContractReminderRuleConfigListData:
         normalized_shop_id = await self._ensure_owned_shop(current_user.user_id, shop_id)
         effective_rules = await self._load_rule_bindings(
@@ -76,12 +76,12 @@ class ContractReminderService:
         )
 
     async def save_rule_configs(
-        self,
-        current_user: CurrentUserInfo,
-        payload: ContractReminderRuleConfigUpdateRequest,
+            self,
+            current_user: CurrentUserInfo,
+            payload: ContractReminderRuleConfigUpdateRequest,
     ) -> ContractReminderRuleConfigListData:
         normalized_shop_id = await self._ensure_owned_shop(current_user.user_id, payload.shopId)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         stmt = (
             select(SellerTkContractMonitorRules)
@@ -151,13 +151,13 @@ class ContractReminderService:
         return await self.list_rule_configs(current_user, shop_id=normalized_shop_id)
 
     async def list_monitors(
-        self,
-        current_user: CurrentUserInfo,
-        *,
-        shop_id: str,
-        current_status: str | None,
-        page: int,
-        page_size: int,
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            shop_id: str,
+            current_status: str | None,
+            page: int,
+            page_size: int,
     ) -> ContractReminderMonitorListData:
         normalized_shop_id = await self._ensure_owned_shop(current_user.user_id, shop_id)
         stmt = select(SellerTkSamples).where(
@@ -213,16 +213,16 @@ class ContractReminderService:
         )
 
     async def list_logs(
-        self,
-        current_user: CurrentUserInfo,
-        *,
-        shop_id: str,
-        rule_code: str | None,
-        platform_creator_id: str | None,
-        task_plan_id: str | None,
-        send_status: str | None,
-        page: int,
-        page_size: int,
+            self,
+            current_user: CurrentUserInfo,
+            *,
+            shop_id: str,
+            rule_code: str | None,
+            platform_creator_id: str | None,
+            task_plan_id: str | None,
+            send_status: str | None,
+            page: int,
+            page_size: int,
     ) -> ContractReminderLogListData:
         normalized_shop_id = await self._ensure_owned_shop(current_user.user_id, shop_id)
         stmt = select(SellerTkContractMonitorLogs).where(
@@ -283,9 +283,9 @@ class ContractReminderService:
         )
 
     async def load_active_rule_bindings(
-        self,
-        user_id: str,
-        shop_id: str,
+            self,
+            user_id: str,
+            shop_id: str,
     ) -> list[ContractReminderEffectiveRule]:
         normalized_shop_id = normalize_identifier(shop_id)
         if not normalized_shop_id:
@@ -297,9 +297,9 @@ class ContractReminderService:
         ]
 
     async def _load_rule_bindings(
-        self,
-        user_id: str,
-        shop_id: str,
+            self,
+            user_id: str,
+            shop_id: str,
     ) -> list[ContractReminderEffectiveRule]:
         rule_stmt = select(SellerTkContractMonitorRules).order_by(
             SellerTkContractMonitorRules.id.asc()

@@ -12,8 +12,8 @@ from apps.portal_inner_open_api.models.outreach_task import (
     OutreachTaskIngestionRequest,
     OutreachTaskIngestionResult,
 )
-from shared_domain.models.infound import OutreachTasks
 from core_base import get_logger
+from shared_domain.models.infound import OutreachTasks
 
 logger = get_logger()
 
@@ -214,12 +214,12 @@ class OutreachTaskService:
         self.default_operator_id = "00000000-0000-0000-0000-000000000000"
 
     async def ingest(
-        self, request: OutreachTaskIngestionRequest
+            self, request: OutreachTaskIngestionRequest
     ) -> OutreachTaskIngestionResult:
         row = request.task.model_dump()
         operator_id = request.operator_id or self.default_operator_id
         audit_id = _normalize_uuid_text(operator_id)
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
 
         payload = self._build_payload(row, audit_id, utc_now)
         task_id = payload["id"]
@@ -235,7 +235,7 @@ class OutreachTaskService:
         return OutreachTaskIngestionResult(task_id=task_id)
 
     def _build_payload(
-        self, row_data: Dict[str, Any], audit_id: str, utc_now: datetime
+            self, row_data: Dict[str, Any], audit_id: str, utc_now: datetime
     ) -> Dict[str, Any]:
         task_id = _clean_text(row_data.get("task_id")) or _generate_uuid()
         created_at = _parse_datetime(row_data.get("created_at")) or utc_now
@@ -264,7 +264,7 @@ class OutreachTaskService:
             "message_send_strategy": _to_int(
                 row_data.get("only_first") or row_data.get("message_send_strategy")
             )
-            or 0,
+                                     or 0,
             "task_type": _clean_text(row_data.get("task_type")) or "Connect",
             "status": _clean_text(row_data.get("status")) or "pending",
             "message": _clean_text(row_data.get("message")),
@@ -301,11 +301,11 @@ class OutreachTaskService:
         return payload
 
     async def increment_progress(
-        self,
-        *,
-        task_id: str,
-        delta: int,
-        operator_id: Optional[str],
+            self,
+            *,
+            task_id: str,
+            delta: int,
+            operator_id: Optional[str],
     ) -> int:
         task_id_clean = _clean_text(task_id)
         if not task_id_clean:
@@ -321,7 +321,7 @@ class OutreachTaskService:
             .where(OutreachTasks.id == task_id_clean)
             .values(
                 new_creators_real_count=(
-                    func.coalesce(OutreachTasks.new_creators_real_count, 0) + delta
+                        func.coalesce(OutreachTasks.new_creators_real_count, 0) + delta
                 ),
                 last_modifier_id=audit_id,
                 last_modification_time=utc_now,
@@ -339,7 +339,7 @@ class OutreachTaskService:
         return int(count or 0)
 
     async def _upsert_task(
-        self, session: AsyncSession, payload: Dict[str, Any]
+            self, session: AsyncSession, payload: Dict[str, Any]
     ) -> None:
         stmt = select(OutreachTasks).where(OutreachTasks.id == payload["id"])
         result = await session.execute(stmt)

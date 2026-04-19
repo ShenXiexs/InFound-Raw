@@ -13,8 +13,8 @@ from apps.portal_inner_open_api.models.creator import (
     CreatorIngestionRequest,
     CreatorIngestionResult,
 )
-from shared_domain.models.infound import CreatorCrawlLogs, Creators
 from core_base import get_logger
+from shared_domain.models.infound import CreatorCrawlLogs, Creators
 
 PREFERRED_UUID_NODE = 0x2AA7A70856D4
 
@@ -230,12 +230,12 @@ def _prepare_creator_payload(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def _build_crawl_log_payload(
-    row: Dict[str, Any],
-    base_payload: Dict[str, Any],
-    audit_id: str,
-    utc_now: datetime,
-    crawl_date: date,
-    task_id: Optional[str],
+        row: Dict[str, Any],
+        base_payload: Dict[str, Any],
+        audit_id: str,
+        utc_now: datetime,
+        crawl_date: date,
+        task_id: Optional[str],
 ) -> Dict[str, Any]:
     return {
         "id": _generate_uuid(),
@@ -315,7 +315,7 @@ class CreatorIngestionService:
 
         operator_id = request.operator_id or self.default_operator_id
         audit_id = _normalize_uuid_text(operator_id)
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
         crawl_date = date.today()
         task_id = None
         if request.options:
@@ -375,7 +375,7 @@ class CreatorIngestionService:
         return CreatorIngestionResult(inserted=inserted, creators=len(creator_ids))
 
     async def _upsert_creator(
-        self, session: AsyncSession, payload: Dict[str, Any]
+            self, session: AsyncSession, payload: Dict[str, Any]
     ) -> None:
         stmt = select(Creators).where(Creators.id == payload["id"])
         result = await session.execute(stmt)

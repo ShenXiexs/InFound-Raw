@@ -63,6 +63,13 @@ class ShopEntry(BaseDTO):
         min_length=1,
         max_length=255,
     )
+    homeUrl: str = Field(
+        validation_alias=AliasChoices("homeUrl"),
+        serialization_alias="homeUrl",
+        description="店铺入口 URL",
+        min_length=1,
+        max_length=255,
+    )
 
 
 class ShopListItem(BaseDTO):
@@ -105,6 +112,13 @@ class ShopListItem(BaseDTO):
         validation_alias=AliasChoices("loginUrl"),
         serialization_alias="loginUrl",
         description="登录入口",
+        min_length=1,
+        max_length=255,
+    )
+    homeUrl: str = Field(
+        validation_alias=AliasChoices("homeUrl"),
+        serialization_alias="homeUrl",
+        description="店铺入口 URL",
         min_length=1,
         max_length=255,
     )

@@ -1,4 +1,0 @@
-MYSQL_HOST: "172.17.0.1"
-
-REDIS_HOST: "172.17.0.1"
-REDIS_PREFIX: "if.stg"

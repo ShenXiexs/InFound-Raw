@@ -95,6 +95,7 @@ def register_tasks(logger: structlog.stdlib.BoundLogger, scheduler: AsyncIOSched
                 name=task_config["name"],
                 **trigger_kwargs,
             )
+            
             logger.info("Task registered successfully", task_name=task_config["name"], trigger=trigger_type,
                         kwargs=trigger_kwargs)
         except Exception as e:

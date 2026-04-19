@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,11 +39,11 @@ class SellerRpaTaskSingleSlotDispatchService:
         self.dispatch_service = SellerRpaTaskDispatchService(settings)
 
     async def dispatch_if_slot_available(
-        self,
-        task_plan: SellerTkRpaTaskPlans,
-        *,
-        payload: dict | None = None,
-        schedule_retry_on_busy: bool = True,
+            self,
+            task_plan: SellerTkRpaTaskPlans,
+            *,
+            payload: dict | None = None,
+            schedule_retry_on_busy: bool = True,
     ) -> SellerRpaSingleSlotDispatchResult:
         normalized_task_type = str(task_plan.task_type or "").strip().upper()
         normalized_user_id = str(task_plan.user_id or "").strip()
@@ -65,9 +65,9 @@ class SellerRpaTaskSingleSlotDispatchService:
             )
 
         if await self.has_running_task(
-            user_id=normalized_user_id,
-            task_type=normalized_task_type,
-            exclude_task_id=normalized_task_id,
+                user_id=normalized_user_id,
+                task_type=normalized_task_type,
+                exclude_task_id=normalized_task_id,
         ):
             if schedule_retry_on_busy:
                 await self.dispatch_service.schedule_task_plan(task_plan)
@@ -108,10 +108,10 @@ class SellerRpaTaskSingleSlotDispatchService:
         )
 
     async def dispatch_next_pending_task(
-        self,
-        *,
-        user_id: str,
-        task_type: str,
+            self,
+            *,
+            user_id: str,
+            task_type: str,
     ) -> SellerRpaSingleSlotDispatchResult:
         normalized_user_id = str(user_id or "").strip()
         normalized_task_type = str(task_type or "").strip().upper()
@@ -122,8 +122,8 @@ class SellerRpaTaskSingleSlotDispatchService:
             )
 
         if await self.has_running_task(
-            user_id=normalized_user_id,
-            task_type=normalized_task_type,
+                user_id=normalized_user_id,
+                task_type=normalized_task_type,
         ):
             return SellerRpaSingleSlotDispatchResult(
                 dispatched=False,
@@ -137,7 +137,7 @@ class SellerRpaTaskSingleSlotDispatchService:
                 SellerTkRpaTaskPlans.user_id == normalized_user_id,
                 SellerTkRpaTaskPlans.task_type == normalized_task_type,
                 SellerTkRpaTaskPlans.status == self.PENDING_STATUS,
-                SellerTkRpaTaskPlans.scheduled_time <= datetime.utcnow(),
+                SellerTkRpaTaskPlans.scheduled_time <= datetime.now(timezone.utc),
             )
             .order_by(
                 SellerTkRpaTaskPlans.scheduled_time.asc(),
@@ -156,11 +156,11 @@ class SellerRpaTaskSingleSlotDispatchService:
         return await self.dispatch_if_slot_available(task_plan)
 
     async def has_running_task(
-        self,
-        *,
-        user_id: str,
-        task_type: str,
-        exclude_task_id: str | None = None,
+            self,
+            *,
+            user_id: str,
+            task_type: str,
+            exclude_task_id: str | None = None,
     ) -> bool:
         stmt = select(SellerTkRpaTaskPlans.id).where(
             SellerTkRpaTaskPlans.user_id == str(user_id).strip(),
@@ -178,7 +178,7 @@ class SellerRpaTaskSingleSlotDispatchService:
             result.close()
 
     async def _scalar_one_or_none(
-        self, stmt: Select[tuple[SellerTkRpaTaskPlans]]
+            self, stmt: Select[tuple[SellerTkRpaTaskPlans]]
     ) -> SellerTkRpaTaskPlans | None:
         result = await self.db_session.execute(stmt)
         try:
