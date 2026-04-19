@@ -19,17 +19,18 @@ interface RuntimeAuthState {
   token: string
   deviceId: string
   tokenName: string
-  source: 'url' | 'runtime-auth' | 'global-state' | 'storage' | 'none'
+  source: 'url' | 'global-state' | 'storage' | 'none'
 }
 
 const APP_GLOBAL_STATE_GET_ALL_CHANNEL = 'app-global-state-get-all'
-const APP_GET_RUNTIME_AUTH_CHANNEL = 'app-get-runtime-auth'
 const TOKEN_HEADER_KEY = 'xunda-token'
 const DEVICE_ID_HEADER_KEY = 'xunda-device-id'
 const TOKEN_NAME_STORAGE_KEY = 'xunda-token-name'
 const URL_TOKEN_PARAM = 'xundaToken'
 const URL_TOKEN_NAME_PARAM = 'xundaTokenName'
 const URL_DEVICE_ID_PARAM = 'xundaDeviceId'
+const LOG_LIST_SAMPLE_SIZE = 3
+const PANEL_INFO_LOG_SUPPRESSED_URL_PATTERNS = ['/outreach/task-settings']
 
 let requestSequence = 0
 let pendingAuthState: Promise<RuntimeAuthState> | null = null
@@ -53,6 +54,86 @@ const toPlainHeaders = (headers: unknown): Record<string, any> => {
   if (headers instanceof AxiosHeaders) return headers.toJSON()
   if (typeof (headers as any).toJSON === 'function') return (headers as any).toJSON()
   return headers as Record<string, any>
+}
+
+const maskSensitiveValue = (value: unknown): unknown => {
+  const normalizedValue = normalizeString(value)
+  if (!normalizedValue) return value
+  if (normalizedValue.length <= 12) return '***'
+  return `${normalizedValue.slice(0, 6)}...${normalizedValue.slice(-4)}`
+}
+
+const toLogHeaders = (headers: unknown): Record<string, any> => {
+  const plainHeaders = toPlainHeaders(headers)
+  const maskedHeaders = { ...plainHeaders }
+
+  ;[TOKEN_HEADER_KEY, 'authorization', 'cookie'].forEach((headerName) => {
+    const exactKey = Object.keys(maskedHeaders).find((key) => key.toLowerCase() === headerName)
+    if (exactKey) {
+      maskedHeaders[exactKey] = maskSensitiveValue(maskedHeaders[exactKey])
+    }
+  })
+
+  return maskedHeaders
+}
+
+const summarizeListItem = (item: unknown): unknown => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return item
+  }
+
+  const record = item as Record<string, unknown>
+  const preferredKeys = [
+    'taskId',
+    'taskName',
+    'status',
+    'startTime',
+    'plannedCount',
+    'realCount',
+    'newCount',
+    'spendTime',
+    'lastModificationTime',
+    'id',
+    'name'
+  ]
+
+  const pickedEntries = preferredKeys
+    .filter((key) => record[key] !== undefined)
+    .map((key) => [key, record[key]] as const)
+
+  if (pickedEntries.length) {
+    return Object.fromEntries(pickedEntries)
+  }
+
+  return Object.fromEntries(Object.entries(record).slice(0, 8))
+}
+
+const summarizeResponseData = (data: unknown): unknown => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return data
+  }
+
+  const responseRecord = data as Record<string, unknown>
+  const payload = responseRecord.data
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return data
+  }
+
+  const payloadRecord = payload as Record<string, unknown>
+  const list = payloadRecord.list
+  if (!Array.isArray(list)) {
+    return data
+  }
+
+  const { list: _list, ...restPayload } = payloadRecord
+  return {
+    ...responseRecord,
+    data: {
+      ...restPayload,
+      listCount: list.length,
+      listSample: list.slice(0, LOG_LIST_SAMPLE_SIZE).map((item) => summarizeListItem(item))
+    }
+  }
 }
 
 const resolveRequestUrl = (config: Pick<AxiosRequestConfig, 'baseURL' | 'url'>): string => {
@@ -93,6 +174,11 @@ const logWithDesktopStyle = getWindowLogger()
 const logWithPanel = (level: 'info' | 'error', message: string, payload: Record<string, any>): void => {
   logWithDesktopStyle(level, message, payload)
   emitNetworkLog(level, message, payload)
+}
+
+const shouldSuppressPanelInfoLog = (url: string): boolean => {
+  const normalizedUrl = normalizeString(url)
+  return Boolean(normalizedUrl) && PANEL_INFO_LOG_SUPPRESSED_URL_PATTERNS.some((pattern) => normalizedUrl.includes(pattern))
 }
 
 const getGatewayByChannel = (channel: string): string => {
@@ -153,6 +239,27 @@ const getAuthFromUrl = (): RuntimeAuthState | null => {
   }
 }
 
+const clearAuthParamsFromUrl = (): void => {
+  try {
+    const url = new URL(window.location.href)
+    let changed = false
+
+    ;[URL_TOKEN_PARAM, URL_TOKEN_NAME_PARAM, URL_DEVICE_ID_PARAM].forEach((key) => {
+      if (url.searchParams.has(key)) {
+        url.searchParams.delete(key)
+        changed = true
+      }
+    })
+
+    if (!changed) return
+
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`
+    window.history.replaceState(window.history.state, '', nextUrl)
+  } catch (_error) {
+    // ignore invalid URL or restricted history access
+  }
+}
+
 const invokeDesktopChannel = async (channel: string, ...args: any[]): Promise<any> => {
   const typedInvoke = (window as any).ipc?.invoke as IPCInvoke | undefined
   if (typeof typedInvoke === 'function') {
@@ -178,26 +285,7 @@ const invokeDesktopChannel = async (channel: string, ...args: any[]): Promise<an
 const loadAuthState = async (): Promise<RuntimeAuthState> => {
   const urlAuth = getAuthFromUrl()
   if (urlAuth) {
-    return persistAuthState(urlAuth)
-  }
-
-  try {
-    const runtimeAuth = await invokeDesktopChannel(APP_GET_RUNTIME_AUTH_CHANNEL)
-    const runtimeData = runtimeAuth?.data
-    const runtimeToken = normalizeString(runtimeData?.token)
-    const runtimeDeviceId = normalizeString(runtimeData?.deviceId)
-    const runtimeTokenName = normalizeString(runtimeData?.tokenName) || TOKEN_HEADER_KEY
-
-    if (runtimeAuth?.success && (runtimeToken || runtimeDeviceId)) {
-      return persistAuthState({
-        token: runtimeToken,
-        deviceId: runtimeDeviceId,
-        tokenName: runtimeTokenName,
-        source: 'runtime-auth'
-      })
-    }
-  } catch (_error) {
-    // ignore and continue fallbacks
+    clearAuthParamsFromUrl()
   }
 
   try {
@@ -211,6 +299,9 @@ const loadAuthState = async (): Promise<RuntimeAuthState> => {
     }
   } catch (_error) {
     // ignore and continue fallbacks
+  }
+  if (urlAuth) {
+    return persistAuthState(urlAuth)
   }
 
   const storageToken = getFromStorage(TOKEN_HEADER_KEY)
@@ -262,20 +353,24 @@ httpClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =
   }
   config.headers = headers
 
-  logWithPanel('info', '[Request]', {
-    requestId,
-    method: normalizeString(config.method).toUpperCase() || 'GET',
-    url: resolveRequestUrl(config),
-    auth: {
-      source: auth.source,
-      hasToken: Boolean(auth.token),
-      tokenName: auth.tokenName || TOKEN_HEADER_KEY,
-      hasDeviceId: Boolean(auth.deviceId)
-    },
-    params: config.params,
-    headers: toPlainHeaders(config.headers),
-    data: config.data
-  })
+  const requestUrl = resolveRequestUrl(config)
+
+  if (!shouldSuppressPanelInfoLog(requestUrl)) {
+    logWithPanel('info', '[Request]', {
+      requestId,
+      method: normalizeString(config.method).toUpperCase() || 'GET',
+      url: requestUrl,
+      auth: {
+        source: auth.source,
+        hasToken: Boolean(auth.token),
+        tokenName: auth.tokenName || TOKEN_HEADER_KEY,
+        hasDeviceId: Boolean(auth.deviceId)
+      },
+      params: config.params,
+      headers: toLogHeaders(config.headers),
+      data: config.data
+    })
+  }
 
   return config
 })
@@ -285,16 +380,19 @@ httpClient.interceptors.response.use(
     const config = response.config as RequestConfigWithMeta
     const requestId = config.metadata?.requestId || ''
     const durationMs = config.metadata?.startAt ? Date.now() - config.metadata.startAt : undefined
+    const requestUrl = resolveRequestUrl(config)
 
-    logWithPanel('info', '[Response]', {
-      requestId,
-      method: normalizeString(config.method).toUpperCase() || 'GET',
-      url: resolveRequestUrl(config),
-      status: response.status,
-      durationMs,
-      headers: toPlainHeaders(response.headers),
-      data: response.data
-    })
+    if (!shouldSuppressPanelInfoLog(requestUrl)) {
+      logWithPanel('info', '[Response]', {
+        requestId,
+        method: normalizeString(config.method).toUpperCase() || 'GET',
+        url: requestUrl,
+        status: response.status,
+        durationMs,
+        headers: toLogHeaders(response.headers),
+        data: summarizeResponseData(response.data)
+      })
+    }
 
     return response
   },
@@ -311,9 +409,9 @@ httpClient.interceptors.response.use(
         url: requestUrl,
         status: error.response.status,
         durationMs,
-        requestHeaders: toPlainHeaders(config.headers),
+        requestHeaders: toLogHeaders(config.headers),
         data: error.response.data,
-        headers: toPlainHeaders(error.response.headers)
+        headers: toLogHeaders(error.response.headers)
       })
     } else {
       logWithPanel('error', `Embed 网络错误或请求超时 [${requestUrl}]: ${error.message}`, {
@@ -321,7 +419,7 @@ httpClient.interceptors.response.use(
         method: normalizeString(config.method).toUpperCase() || 'GET',
         url: requestUrl,
         durationMs,
-        requestHeaders: toPlainHeaders(config.headers)
+        requestHeaders: toLogHeaders(config.headers)
       })
     }
 

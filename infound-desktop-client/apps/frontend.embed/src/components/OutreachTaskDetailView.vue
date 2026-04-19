@@ -1,6 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { getOutreachTaskDetail } from '../api/outreach-task.api'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { NAlert, NButton, NCard, NDataTable, NDescriptions, NDescriptionsItem, NList, NListItem, NPagination, type DataTableColumns } from 'naive-ui'
+import { getOutreachTaskDetail, getOutreachTaskRecords } from '../api/outreach-task.api'
+import {
+  OUTREACH_AVG_COMMISSION_RATE_OPTIONS,
+  OUTREACH_AVG_COMMISSION_RATE_LABEL_MAP,
+  OUTREACH_CONTENT_TYPE_OPTIONS,
+  OUTREACH_CONTENT_TYPE_LABEL_MAP,
+  OUTREACH_CREATOR_AGENCY_OPTIONS,
+  OUTREACH_CREATOR_AGENCY_LABEL_MAP,
+  OUTREACH_CREATOR_TYPE_LABEL_MAP,
+  OUTREACH_FOLLOWER_GENDER_OPTIONS,
+  OUTREACH_FOLLOWER_GENDER_LABEL_MAP,
+  OUTREACH_PRODUCT_CATEGORY_LABEL_MAP,
+  OUTREACH_SORT_LABEL_MAP
+} from '../constants/outreach-task-display'
 
 type TaskStatus = '运行中' | '未启动' | '已结束' | '已完成' | '已取消'
 
@@ -57,75 +71,65 @@ const emit = defineEmits<{
   (event: 'end'): void
 }>()
 
-const PRODUCT_CATEGORY_LABEL_MAP: Record<string, string> = {
-  '600001': 'Home Supplies',
-  '600024': 'Kitchenware',
-  '600154': 'Textiles & Soft Furnishings',
-  '600942': 'Household Appliances',
-  '601152': 'Womenswear & Underwear',
-  '601303': 'Modest Fashion',
-  '601352': 'Shoes',
-  '601450': 'Beauty & Personal Care',
-  '601739': 'Phones & Electronics',
-  '601755': 'Computers & Office Equipment',
-  '602118': 'Pet Supplies',
-  '603014': 'Sports & Outdoor',
-  '604453': 'Furniture',
-  '604579': 'Tools & Hardware',
-  '604968': 'Home Improvement',
-  '605196': 'Automotive & Motorcycle',
-  '605248': 'Fashion Accessories',
-  '700645': 'Health',
-  '801928': 'Books, Magazines & Audio',
-  '802184': "Kids' Fashion",
-  '824328': 'Menswear & Underwear',
-  '824584': 'Luggage & Bags',
-  '951432': 'Collections'
-}
-
-const AVG_COMMISSION_RATE_LABELS = ['All', 'Less than 20%', 'Less than 15%', 'Less than 10%', 'Less than 5%']
-const CONTENT_TYPE_LABELS = ['All', 'Video', 'LIVE']
-const CREATOR_AGENCY_LABELS = ['All', 'Managed by agency', 'Independent creators']
-const FOLLOWER_GENDER_LABELS = ['All', 'Female', 'Male']
-const SORT_LABEL_MAP: Record<string, string> = {
-  OFFICIAL_DEFAULT: '官方默认值',
-  GMV_DESC: '达人GMV降序',
-  FOLLOWERS_DESC: '达人粉丝数降序',
-  COMMISSION_DESC: '达人佣金率降序',
-  '0': 'Relevancy',
-  '1': 'GMV',
-  '2': 'Units sold',
-  '3': 'Follower',
-  '4': 'Avg. video views',
-  '5': 'Engagement rate'
-}
-
-const OUTREACH_CREATOR_TYPE_LABEL_MAP: Record<string, string> = {
-  ALL: '建联所有达人',
-  NEW_ONLY: '只建联新达人',
-  NEW_AND_NOT_REPLIED: '建联新达人和未回复达人'
-}
+const PRODUCT_CATEGORY_LABEL_MAP = OUTREACH_PRODUCT_CATEGORY_LABEL_MAP
+const AVG_COMMISSION_RATE_LABELS = OUTREACH_AVG_COMMISSION_RATE_OPTIONS
+const CONTENT_TYPE_LABELS = OUTREACH_CONTENT_TYPE_OPTIONS
+const CREATOR_AGENCY_LABELS = OUTREACH_CREATOR_AGENCY_OPTIONS
+const FOLLOWER_GENDER_LABELS = OUTREACH_FOLLOWER_GENDER_OPTIONS
+const SORT_LABEL_MAP = OUTREACH_SORT_LABEL_MAP
 
 const isLoading = ref(false)
 const errorMessage = ref('')
 const detail = ref<TaskDetailData | null>(null)
+const runtimeRows = ref<RuntimeRow[]>([])
+const runtimeTotal = ref(0)
+const isRuntimeLoading = ref(false)
 const runtimePage = ref(1)
 const runtimePageSize = ref(10)
 const runtimePageSizeOptions = [10, 20, 50]
+let detailPollTimer: ReturnType<typeof window.setInterval> | null = null
 
 const runtimeTotalPages = computed(() => {
-  const total = detail.value?.runtimeRows.length || 0
-  return Math.max(1, Math.ceil(total / runtimePageSize.value))
+  return Math.max(1, Math.ceil(runtimeTotal.value / runtimePageSize.value))
 })
+const runtimeTableEmptyText = computed(() => (isRuntimeLoading.value ? '' : '暂无数据'))
 
-const pagedRuntimeRows = computed(() => {
-  const source = detail.value?.runtimeRows || []
-  const start = (runtimePage.value - 1) * runtimePageSize.value
-  return source.slice(start, start + runtimePageSize.value)
+const pagedRuntimeRows = computed(() => runtimeRows.value)
+const currentTaskId = computed(() => String(props.taskId || props.task?.id || '').trim())
+const shouldPollTaskDetail = computed(() => {
+  const currentStatus = detail.value?.status || props.task?.status
+  return Boolean(currentTaskId.value) && currentStatus === '运行中'
 })
 
 const canEdit = computed(() => detail.value?.status === '未启动')
 const canEnd = computed(() => detail.value?.status === '运行中')
+const runtimeTableColumns: DataTableColumns<RuntimeRow> = [
+  {
+    title: '达人',
+    key: 'creatorName',
+    minWidth: 160
+  },
+  {
+    title: '粉丝数量',
+    key: 'followers',
+    width: 120
+  },
+  {
+    title: 'GMV',
+    key: 'gmv',
+    width: 120
+  },
+  {
+    title: '建联任务',
+    key: 'outreachTask',
+    minWidth: 160
+  },
+  {
+    title: '消息发送时间',
+    key: 'messageTime',
+    minWidth: 180
+  }
+]
 
 const toNumber = (value: unknown, fallback: number = 0): number => {
   const numberValue = Number(value)
@@ -154,6 +158,16 @@ const getIndexedLabel = (value: unknown, labels: string[], fallback: string): st
   return text || fallback
 }
 
+const getMappedLabel = (
+  value: unknown,
+  labels: string[],
+  fallback: string,
+  labelMap: Record<string, string>
+): string => {
+  const rawLabel = getIndexedLabel(value, labels, fallback)
+  return labelMap[rawLabel] || rawLabel
+}
+
 const formatDateTime = (value: unknown): string => {
   const text = String(value || '').trim()
   if (!text) return '-'
@@ -167,32 +181,6 @@ const formatDateTime = (value: unknown): string => {
   const minute = String(parsed.getMinutes()).padStart(2, '0')
   const second = String(parsed.getSeconds()).padStart(2, '0')
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`
-}
-
-const createHardcodedRuntimeRows = (taskId: string): RuntimeRow[] => {
-  const creators: Array<[string, string, string, string, string]> = [
-    ['@fashion_luna', '132K', '$42.1K', '首次建联', '2026-03-26 09:10'],
-    ['@daily_home_amy', '89K', '$18.6K', '首次建联', '2026-03-26 09:13'],
-    ['@tech_mike', '205K', '$57.2K', '首次建联', '2026-03-26 09:20'],
-    ['@beauty_nina', '176K', '$48.3K', '回复达人消息', '2026-03-26 09:31'],
-    ['@pet_jason', '61K', '$12.0K', '首次建联', '2026-03-26 09:36'],
-    ['@toy_story_zoe', '73K', '$9.7K', '首次建联', '2026-03-26 09:41'],
-    ['@kitchen_anna', '114K', '$21.4K', '回复达人消息', '2026-03-26 09:48'],
-    ['@sports_tom', '250K', '$68.1K', '首次建联', '2026-03-26 09:52'],
-    ['@book_bella', '58K', '$7.6K', '首次建联', '2026-03-26 10:03'],
-    ['@bags_john', '96K', '$16.8K', '回复达人消息', '2026-03-26 10:10'],
-    ['@auto_eric', '184K', '$32.3K', '首次建联', '2026-03-26 10:16'],
-    ['@health_ruby', '142K', '$27.5K', '首次建联', '2026-03-26 10:24']
-  ]
-
-  return creators.map((item, index) => ({
-    id: `${taskId}-runtime-${index + 1}`,
-    creatorName: item[0],
-    followers: item[1],
-    gmv: item[2],
-    outreachTask: item[3],
-    messageTime: item[4]
-  }))
 }
 
 const buildDefaultMessageTemplate = (): TaskDetailData['messageTemplate'] => {
@@ -236,10 +224,9 @@ const normalizeProductCategoryLabels = (value: unknown): string => {
   return labels.join(', ') || '（空）'
 }
 
-const normalizeRuntimeRows = (source: Record<string, any>, taskId: string): RuntimeRow[] => {
-  const rawList = [source.runtimeRows, source.runtimeList, source.records, source.items, source.creatorList].find((item) => Array.isArray(item))
+const normalizeRuntimeRows = (rawList: unknown, taskId: string): RuntimeRow[] => {
   if (!Array.isArray(rawList) || rawList.length === 0) {
-    return createHardcodedRuntimeRows(taskId)
+    return []
   }
 
   return rawList.map((item: any, index: number) => ({
@@ -247,8 +234,8 @@ const normalizeRuntimeRows = (source: Record<string, any>, taskId: string): Runt
     creatorName: String(item?.creatorName ?? item?.name ?? item?.nickname ?? '-'),
     followers: String(item?.followers ?? item?.fansCount ?? item?.followerCount ?? '-'),
     gmv: String(item?.gmv ?? item?.gmvRange ?? '-'),
-    outreachTask: String(item?.outreachTask ?? item?.taskAction ?? item?.messageType ?? '-'),
-    messageTime: String(item?.messageTime ?? item?.sentAt ?? item?.createdAt ?? '-')
+    outreachTask: String(item?.taskName ?? item?.outreachTask ?? item?.taskAction ?? item?.messageType ?? '-'),
+    messageTime: formatDateTime(item?.sendTime ?? item?.messageTime ?? item?.sentAt ?? item?.createdAt ?? '-')
   }))
 }
 
@@ -264,10 +251,30 @@ const buildDetailFromSource = (source: Record<string, any>, fallbackTask?: TaskI
     ? normalizeProductCategoryLabels(creatorFilters.productCategorySelections)
     : normalizeProductCategoryLabels(creatorFilter.productCategories)
 
-  const avgCommissionRateLabel = getIndexedLabel(creatorFilter.avgCommissionRate ?? creatorFilters.avgCommissionRate, AVG_COMMISSION_RATE_LABELS, 'All')
-  const contentTypeLabel = getIndexedLabel(creatorFilter.contentTypes ?? creatorFilters.contentType, CONTENT_TYPE_LABELS, 'All')
-  const creatorAgencyLabel = getIndexedLabel(creatorFilter.creatorAgency ?? creatorFilters.creatorAgency, CREATOR_AGENCY_LABELS, 'All')
-  const fansGenderLabel = getIndexedLabel(creatorFilter.fansGender ?? followerFilters.followerGender, FOLLOWER_GENDER_LABELS, 'All')
+  const avgCommissionRateLabel = getMappedLabel(
+    creatorFilter.avgCommissionRate ?? creatorFilters.avgCommissionRate,
+    AVG_COMMISSION_RATE_LABELS,
+    'All',
+    OUTREACH_AVG_COMMISSION_RATE_LABEL_MAP
+  )
+  const contentTypeLabel = getMappedLabel(
+    creatorFilter.contentTypes ?? creatorFilters.contentType,
+    CONTENT_TYPE_LABELS,
+    'All',
+    OUTREACH_CONTENT_TYPE_LABEL_MAP
+  )
+  const creatorAgencyLabel = getMappedLabel(
+    creatorFilter.creatorAgency ?? creatorFilters.creatorAgency,
+    CREATOR_AGENCY_LABELS,
+    'All',
+    OUTREACH_CREATOR_AGENCY_LABEL_MAP
+  )
+  const fansGenderLabel = getMappedLabel(
+    creatorFilter.fansGender ?? followerFilters.followerGender,
+    FOLLOWER_GENDER_LABELS,
+    'All',
+    OUTREACH_FOLLOWER_GENDER_LABEL_MAP
+  )
   const fansAgeRange = Array.isArray(creatorFilter.fansAgeRange)
     ? creatorFilter.fansAgeRange.join(', ')
     : Array.isArray(followerFilters.followerAgeSelections)
@@ -289,21 +296,21 @@ const buildDetailFromSource = (source: Record<string, any>, fallbackTask?: TaskI
 
   const filterSummary = [
     `关键词：${searchKeyword || '（空）'}`,
-    `Product category：${productCategories}`,
-    `Avg. commission rate：${avgCommissionRateLabel}`,
-    `Content type：${contentTypeLabel}`,
-    `Creator agency：${creatorAgencyLabel}`,
-    `Fast growing：${creatorFilter.fastGrowing ? '是' : '否'}`,
-    `Not invited in past 90 days：${creatorFilter.notInvitedInPast90Days ? '是' : '否'}`,
-    `Follower age：${fansAgeRange || '（空）'}`,
-    `Follower gender：${fansGenderLabel}`,
-    `Follower count：${fansCountMin} - ${fansCountMax}`,
+    `商品类目：${productCategories}`,
+    `平均佣金率：${avgCommissionRateLabel}`,
+    `内容类型：${contentTypeLabel}`,
+    `达人机构：${creatorAgencyLabel}`,
+    `快速成长榜：${creatorFilter.fastGrowing ? '是' : '否'}`,
+    `过去 90 天内未获邀请的达人：${creatorFilter.notInvitedInPast90Days ? '是' : '否'}`,
+    `粉丝年龄：${fansAgeRange || '（空）'}`,
+    `粉丝性别：${fansGenderLabel}`,
+    `粉丝数：${fansCountMin} - ${fansCountMax}`,
     `GMV：${gmvRange || '（空）'}`,
-    `Items sold：${salesCountRange || '（空）'}`,
-    `Average views per video min：${String(creatorFilter.minAvgVideoViews ?? performanceFilters.averageViewsPerVideoMin ?? '0')}`,
-    `Average viewers per LIVE min：${String(creatorFilter.minAvgLiveViews ?? performanceFilters.averageViewersPerLiveMin ?? '0')}`,
-    `Engagement rate min (%)：${String(creatorFilter.minEngagementRate ?? performanceFilters.engagementRateMinPercent ?? '0')}`,
-    `Brand collaborations：${coBranding || '（空）'}`
+    `成交件数：${salesCountRange || '（空）'}`,
+    `平均每个视频的播放量：${String(creatorFilter.minAvgVideoViews ?? performanceFilters.averageViewsPerVideoMin ?? '0')}`,
+    `平均每场直播的观看人数：${String(creatorFilter.minAvgLiveViews ?? performanceFilters.averageViewersPerLiveMin ?? '0')}`,
+    `互动率 (%)：${String(creatorFilter.minEngagementRate ?? performanceFilters.engagementRateMinPercent ?? '0')}`,
+    `品牌合作：${coBranding || '（空）'}`
   ]
 
   const sourceMessageTemplate =
@@ -365,12 +372,13 @@ const buildDetailFromSource = (source: Record<string, any>, fallbackTask?: TaskI
     creatorSortLabel:
       SORT_LABEL_MAP[String(source.creatorSort ?? source.creatorFilter?.sortBy ?? 'OFFICIAL_DEFAULT')] ||
       String(source.creatorSort ?? source.creatorFilter?.sortBy ?? '官方默认值'),
-    outreachCreatorTypeLabel: OUTREACH_CREATOR_TYPE_LABEL_MAP[creatorType] || '建联所有达人',
+    outreachCreatorTypeLabel:
+      OUTREACH_CREATOR_TYPE_LABEL_MAP[creatorType as keyof typeof OUTREACH_CREATOR_TYPE_LABEL_MAP] || '建联所有达人',
     messageTemplate: {
       firstMessage,
       replyMessage
     },
-    runtimeRows: normalizeRuntimeRows(source, String(source.id || source.taskId || fallbackTask?.id || 'task'))
+    runtimeRows: []
   }
 }
 
@@ -378,11 +386,37 @@ const buildDetailFromTask = (task: TaskInfo): TaskDetailData => {
   return buildDetailFromSource(task.raw || {}, task)
 }
 
+const fetchRuntimeRows = async (): Promise<void> => {
+  const taskId = currentTaskId.value
+  if (!taskId) {
+    runtimeRows.value = []
+    runtimeTotal.value = 0
+    return
+  }
+
+  isRuntimeLoading.value = true
+  try {
+    const result = await getOutreachTaskRecords(taskId, {
+      page: runtimePage.value,
+      pageSize: runtimePageSize.value
+    })
+    runtimeRows.value = normalizeRuntimeRows(result.list, taskId)
+    runtimeTotal.value = Number(result.total || 0)
+  } catch (_error) {
+    runtimeRows.value = []
+    runtimeTotal.value = 0
+  } finally {
+    isRuntimeLoading.value = false
+  }
+}
+
 const fetchTaskDetail = async (): Promise<void> => {
-  const taskId = String(props.taskId || props.task?.id || '').trim()
+  const taskId = currentTaskId.value
   if (!taskId && !props.task) {
     detail.value = null
     errorMessage.value = '未找到任务详情，请返回列表后重试'
+    runtimeRows.value = []
+    runtimeTotal.value = 0
     return
   }
 
@@ -400,7 +434,6 @@ const fetchTaskDetail = async (): Promise<void> => {
       detail.value = null
       errorMessage.value = '未找到任务详情，请返回列表后重试'
     }
-    runtimePage.value = 1
   } catch (_error) {
     if (props.task) {
       detail.value = buildDetailFromTask(props.task)
@@ -414,87 +447,125 @@ const fetchTaskDetail = async (): Promise<void> => {
   }
 }
 
+const stopDetailPolling = (): void => {
+  if (!detailPollTimer) return
+  window.clearInterval(detailPollTimer)
+  detailPollTimer = null
+}
+
+const startDetailPolling = (): void => {
+  if (detailPollTimer) return
+  detailPollTimer = window.setInterval(() => {
+    if (!shouldPollTaskDetail.value || isLoading.value || isRuntimeLoading.value) return
+    void fetchTaskDetail()
+    void fetchRuntimeRows()
+  }, 3000)
+}
+
 const changeRuntimePage = (nextPage: number): void => {
   if (nextPage < 1 || nextPage > runtimeTotalPages.value) return
   runtimePage.value = nextPage
 }
 
-const handleRuntimePageSizeChange = (): void => {
+const handleRuntimePageSizeChange = (nextPageSize: number): void => {
+  runtimePageSize.value = nextPageSize
   runtimePage.value = 1
 }
 
 watch(
-  () => `${props.taskId || ''}-${props.task?.id || ''}`,
+  currentTaskId,
   () => {
+    runtimePage.value = 1
     void fetchTaskDetail()
+    void fetchRuntimeRows()
   },
   { immediate: true }
 )
+
+watch([runtimePage, runtimePageSize], () => {
+  if (!currentTaskId.value) return
+  void fetchRuntimeRows()
+})
 
 watch(runtimeTotalPages, (value) => {
   if (runtimePage.value > value) {
     runtimePage.value = value
   }
 })
+
+watch(
+  shouldPollTaskDetail,
+  (value) => {
+    if (value) {
+      startDetailPolling()
+      return
+    }
+    stopDetailPolling()
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  stopDetailPolling()
+})
 </script>
 
 <template>
   <section class="detail-shell">
-    <div v-if="isLoading" class="detail-loading">加载详情中...</div>
-    <div v-else-if="errorMessage" class="detail-error">{{ errorMessage }}</div>
+    <NAlert v-if="isLoading" class="detail-alert" type="info" :show-icon="false">加载详情中...</NAlert>
+    <NAlert v-else-if="errorMessage" class="detail-alert" type="error" :show-icon="false">{{ errorMessage }}</NAlert>
     <template v-else-if="detail">
       <header class="detail-header">
         <h2>{{ detail.taskName }}</h2>
         <div class="header-actions">
-          <button
+          <NButton
             v-if="canEdit"
-            class="header-btn"
-            title="编辑"
-            type="button"
+            size="small"
+            tertiary
             @click="emit('edit')"
           >
-            <span aria-hidden="true">✎</span>
             <span>编辑</span>
-          </button>
-          <button
+          </NButton>
+          <NButton
             v-if="canEnd"
-            class="header-btn danger"
-            title="结束"
-            type="button"
+            size="small"
+            tertiary
+            type="error"
             @click="emit('end')"
           >
-            <span aria-hidden="true">⏸</span>
             <span>结束</span>
-          </button>
+          </NButton>
         </div>
       </header>
 
-      <section class="info-block">
-        <h3>任务信息</h3>
-        <div class="top-row">
-          <span>启动时间：{{ detail.startTime }}</span>
-          <span>建联状态：{{ detail.status }}</span>
-        </div>
-        <div class="progress-row">建联进度：{{ detail.progress.linked }} / {{ detail.progress.total }}</div>
-      </section>
+      <NCard class="detail-section-card" :bordered="false" size="small" title="任务信息">
+        <NDescriptions label-placement="left" :column="2" size="small">
+          <NDescriptionsItem label="启动时间">{{ detail.startTime }}</NDescriptionsItem>
+          <NDescriptionsItem label="建联状态">{{ detail.status }}</NDescriptionsItem>
+          <NDescriptionsItem label="建联进度" :span="2">{{ detail.progress.linked }} / {{ detail.progress.total }}</NDescriptionsItem>
+        </NDescriptions>
+      </NCard>
 
-      <section class="info-block">
-        <h3>筛选达人</h3>
-        <ul class="summary-list">
-          <li v-for="(item, index) in detail.filterSummary" :key="index">{{ item }}</li>
-        </ul>
-      </section>
+      <NCard class="detail-section-card" :bordered="false" size="small" title="筛选达人">
+        <NList class="summary-list" :bordered="false" hoverable>
+          <NListItem v-for="(item, index) in detail.filterSummary" :key="index" class="summary-list-item">
+            {{ item }}
+          </NListItem>
+        </NList>
+      </NCard>
 
-      <section class="info-block">
-        <h3>达人排序</h3>
-        <p class="plain-text">{{ detail.creatorSortLabel }}</p>
-      </section>
+      <NCard class="detail-section-card" :bordered="false" size="small" title="达人排序">
+        <NDescriptions label-placement="left" :column="1" size="small">
+          <NDescriptionsItem label="排序方式">{{ detail.creatorSortLabel }}</NDescriptionsItem>
+        </NDescriptions>
+      </NCard>
 
-      <section class="info-block">
-        <h3>消息模板</h3>
-        <p class="plain-text">建联达人：{{ detail.outreachCreatorTypeLabel }}</p>
+      <NCard class="detail-section-card" :bordered="false" size="small" title="消息模板">
+        <NDescriptions label-placement="left" :column="1" size="small">
+          <NDescriptionsItem label="建联达人">{{ detail.outreachCreatorTypeLabel }}</NDescriptionsItem>
+        </NDescriptions>
 
-        <article class="message-card">
+        <NCard class="message-card" size="small" embedded :bordered="false">
           <h4>首次消息</h4>
           <p>{{ detail.messageTemplate.firstMessage.content }}</p>
           <p class="message-meta">
@@ -503,9 +574,9 @@ watch(runtimeTotalPages, (value) => {
               （商品ID：{{ detail.messageTemplate.firstMessage.productIds.join('、') || '无' }}）
             </template>
           </p>
-        </article>
+        </NCard>
 
-        <article v-if="detail.messageTemplate.replyMessage" class="message-card">
+        <NCard v-if="detail.messageTemplate.replyMessage" class="message-card" size="small" embedded :bordered="false">
           <h4>回复达人消息</h4>
           <p>{{ detail.messageTemplate.replyMessage.content }}</p>
           <p class="message-meta">
@@ -514,53 +585,40 @@ watch(runtimeTotalPages, (value) => {
               （商品ID：{{ detail.messageTemplate.replyMessage.productIds.join('、') || '无' }}）
             </template>
           </p>
-        </article>
-      </section>
+        </NCard>
+      </NCard>
 
-      <section class="runtime-block">
-        <h3>任务运行情况</h3>
+      <NCard class="detail-section-card runtime-section-card" :bordered="false" size="small" title="任务运行情况">
         <div class="table-wrap">
-          <table class="runtime-table">
-            <thead>
-              <tr>
-                <th>达人</th>
-                <th>粉丝数量</th>
-                <th>GMV</th>
-                <th>建联任务</th>
-                <th>消息发送时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="pagedRuntimeRows.length === 0">
-                <td colspan="5" class="empty-row">暂无数据</td>
-              </tr>
-              <tr v-for="item in pagedRuntimeRows" :key="item.id">
-                <td>{{ item.creatorName }}</td>
-                <td>{{ item.followers }}</td>
-                <td>{{ item.gmv }}</td>
-                <td>{{ item.outreachTask }}</td>
-                <td>{{ item.messageTime }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <NDataTable
+            class="runtime-data-table"
+            :columns="runtimeTableColumns"
+            :data="isRuntimeLoading ? [] : pagedRuntimeRows"
+            :loading="isRuntimeLoading"
+            :bordered="false"
+            :single-line="false"
+            :row-key="(row) => row.id"
+            :scroll-x="760"
+          >
+            <template #empty>
+              <div class="table-empty">{{ runtimeTableEmptyText }}</div>
+            </template>
+          </NDataTable>
         </div>
 
         <footer class="pagination-row">
-          <span class="total-text">共 {{ detail.runtimeRows.length }} 条</span>
-          <div class="pager">
-            <label class="page-size-label">
-              每页
-              <select v-model.number="runtimePageSize" @change="handleRuntimePageSizeChange">
-                <option v-for="size in runtimePageSizeOptions" :key="size" :value="size">{{ size }}</option>
-              </select>
-              条
-            </label>
-            <button :disabled="runtimePage <= 1" type="button" @click="changeRuntimePage(runtimePage - 1)">上一页</button>
-            <span class="page-index">{{ runtimePage }} / {{ runtimeTotalPages }}</span>
-            <button :disabled="runtimePage >= runtimeTotalPages" type="button" @click="changeRuntimePage(runtimePage + 1)">下一页</button>
-          </div>
+          <span class="total-text">共 {{ runtimeTotal }} 条</span>
+          <NPagination
+            :page="runtimePage"
+            :page-size="runtimePageSize"
+            :item-count="runtimeTotal"
+            :page-sizes="runtimePageSizeOptions"
+            show-size-picker
+            @update:page="changeRuntimePage"
+            @update:page-size="handleRuntimePageSizeChange"
+          />
         </footer>
-      </section>
+      </NCard>
     </template>
   </section>
 </template>
@@ -572,18 +630,12 @@ watch(runtimeTotalPages, (value) => {
   gap: 12px;
 }
 
-.detail-loading,
-.detail-error {
-  border: 1px solid #dbe5f3;
+.detail-alert {
   border-radius: 10px;
-  background: #fff;
-  padding: 14px;
-  color: #5b6d83;
 }
 
 .detail-header,
-.info-block,
-.runtime-block {
+.detail-section-card {
   border: 1px solid #dbe5f3;
   border-radius: 10px;
   background: #fff;
@@ -608,54 +660,40 @@ watch(runtimeTotalPages, (value) => {
   gap: 8px;
 }
 
-.header-btn {
-  border: 1px solid #cfd8e8;
-  border-radius: 8px;
-  background: #fff;
-  color: #2f3f53;
-  padding: 6px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 13px;
+.detail-section-card {
+  padding: 0;
 }
 
-.header-btn.danger {
-  border-color: #e8c3c7;
-  color: #b42318;
+.detail-section-card:deep(.n-card-header) {
+  padding: 14px 14px 0;
 }
 
-.info-block h3,
-.runtime-block h3 {
-  margin: 0 0 10px;
+.detail-section-card:deep(.n-card-header__main) {
   color: #1f2d3d;
   font-size: 16px;
+  font-weight: 600;
 }
 
-.top-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  color: #334155;
-  font-size: 14px;
+.detail-section-card:deep(.n-card__content) {
+  padding: 10px 14px 14px;
 }
 
-.progress-row,
-.plain-text {
+.detail-section-card :deep(.n-descriptions) {
   color: #334155;
+}
+
+.detail-section-card :deep(.n-descriptions-table-header),
+.detail-section-card :deep(.n-descriptions-table-content) {
   font-size: 14px;
 }
 
 .summary-list {
-  margin: 0;
-  padding-left: 18px;
   color: #334155;
   font-size: 14px;
-  display: grid;
-  gap: 5px;
+}
+
+.summary-list-item {
+  padding: 8px 0;
 }
 
 .message-card {
@@ -690,30 +728,20 @@ watch(runtimeTotalPages, (value) => {
   overflow-x: auto;
 }
 
-.runtime-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 760px;
-}
-
-.runtime-table th,
-.runtime-table td {
-  text-align: left;
-  padding: 11px 12px;
-  border-bottom: 1px solid #edf2f9;
-  color: #334155;
-  font-size: 13px;
-}
-
-.runtime-table th {
-  font-weight: 600;
-  color: #4b5c71;
+.runtime-data-table:deep(.n-data-table-th) {
   background: #f8fafc;
+  color: #4b5c71;
+  font-weight: 600;
 }
 
-.empty-row {
-  text-align: center !important;
-  color: #6b7f95 !important;
+.runtime-data-table:deep(.n-data-table-td) {
+  color: #334155;
+}
+
+.table-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #6b7f95;
 }
 
 .pagination-row {
@@ -729,46 +757,8 @@ watch(runtimeTotalPages, (value) => {
   font-size: 13px;
 }
 
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.page-size-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #5b6a7a;
-}
-
-.page-size-label select {
-  height: 28px;
-  border: 1px solid #d0d9e6;
-  border-radius: 6px;
-  padding: 0 8px;
-}
-
-.pager button {
-  min-width: 64px;
-  height: 30px;
-  border: 1px solid #d0d9e6;
-  border-radius: 6px;
-  background: #fff;
-  color: #2b3a4a;
-  cursor: pointer;
-  padding: 0 8px;
-}
-
-.pager button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.page-index {
-  color: #5b6a7a;
-  font-size: 13px;
+.pagination-row :deep(.n-pagination) {
+  margin-left: auto;
 }
 
 @media (max-width: 900px) {
@@ -776,12 +766,6 @@ watch(runtimeTotalPages, (value) => {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
-  }
-
-  .top-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
   }
 
   .pagination-row {

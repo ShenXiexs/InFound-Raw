@@ -18,7 +18,7 @@ const tooltipThemeOverrides = {
 <template>
   <span class="field-label-row">
     <span class="field-label-text">{{ label }}</span>
-    <NTooltip placement="top" :show-arrow="true" :delay="80" :theme-overrides="tooltipThemeOverrides">
+    <NTooltip placement="top" to="body" :show-arrow="true" :delay="80" :theme-overrides="tooltipThemeOverrides">
       <template #trigger>
         <NButton quaternary circle size="tiny" class="filter-help-btn" :focusable="false" tabindex="-1">
           <template #icon>
@@ -61,9 +61,11 @@ const tooltipThemeOverrides = {
 }
 
 .filter-help-tooltip-inner {
-  max-width: 360px;
+  max-width: 280px;
   font-size: 13px;
   line-height: 1.55;
   text-align: left;
+  white-space: normal;
+  word-break: break-word;
 }
 </style>

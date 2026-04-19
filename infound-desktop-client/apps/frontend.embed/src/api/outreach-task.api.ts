@@ -192,6 +192,15 @@ export interface TaskActionPayload {
   shopId: string
 }
 
+export interface OutreachTaskRecordItem {
+  [key: string]: any
+}
+
+export interface OutreachTaskRecordListResult {
+  total: number
+  list: OutreachTaskRecordItem[]
+}
+
 export const getOutreachTaskList = async (params: OutreachTaskListParams, body: OutreachTaskListBody): Promise<OutreachTaskListResult> => {
   const shopId = body.shopId?.trim() || ''
   if (!shopId) {
@@ -262,6 +271,44 @@ export const getOutreachTaskDetail = async (taskId: string): Promise<OutreachTas
     url: `${OUTREACH_TASK_DETAIL_BASE_URL}/${encodeURIComponent(normalizedTaskId)}`,
     method: 'GET'
   })
+}
+
+export const getOutreachTaskRecords = async (
+  taskId: string,
+  params: {
+    page: number
+    pageSize: number
+  }
+): Promise<OutreachTaskRecordListResult> => {
+  const normalizedTaskId = taskId.trim()
+  if (!normalizedTaskId) {
+    throw new Error('taskId is required')
+  }
+
+  const result = await request<any>({
+    url: `${OUTREACH_TASK_DETAIL_BASE_URL}/${encodeURIComponent(normalizedTaskId)}/records`,
+    method: 'GET',
+    params: {
+      page: String(params.page),
+      pageSize: String(params.pageSize)
+    }
+  })
+
+  const payload = result?.data ?? result ?? {}
+  const dataPayload = payload?.data ?? payload ?? {}
+  const list = Array.isArray(dataPayload?.list)
+    ? dataPayload.list
+    : Array.isArray(dataPayload?.items)
+      ? dataPayload.items
+      : Array.isArray(dataPayload?.records)
+        ? dataPayload.records
+        : []
+  const total = toNumber(dataPayload?.total ?? dataPayload?.totalCount ?? list.length, list.length)
+
+  return {
+    total,
+    list
+  }
 }
 
 export const updateOutreachTask = async (taskId: string, payload: UpdateOutreachTaskPayload): Promise<OutreachTaskItem> => {
