@@ -22,6 +22,28 @@ from shared_seller_application_services.current_user_info import CurrentUserInfo
 
 router = APIRouter(tags=["店铺"])
 
+CROSS_BORDER_LOGIN_URL = "https://seller.tiktokshopglobalselling.com/account/login?"
+
+
+def _normalize_platform_urls(
+        *,
+        shop_type: str | None,
+        region_code: str | None,
+        login_url: str | None,
+        home_url: str | None,
+) -> tuple[str, str]:
+    normalized_shop_type = str(shop_type or "").strip().upper()
+    normalized_region = str(region_code or "").strip().upper()
+    if normalized_shop_type != "CROSS_BORDER":
+        return str(login_url or ""), str(home_url or "")
+
+    origin = (
+        "https://seller.eu.tiktokshopglobalselling.com"
+        if normalized_region == "FR"
+        else "https://seller.tiktokshopglobalselling.com"
+    )
+    return CROSS_BORDER_LOGIN_URL, f"{origin}/homepage?shop_region={normalized_region}"
+
 
 @router.post(
     "/shop/add",
@@ -86,17 +108,22 @@ async def list_shop_entries(
     result = await db.execute(stmt)
     entries = result.scalars().all()
 
-    data = [
-        ShopEntry(
+    data = []
+    for entry in entries:
+        login_url, home_url = _normalize_platform_urls(
+            shop_type=entry.shop_type,
+            region_code=entry.region_code,
+            login_url=entry.login_url,
+            home_url=entry.home_url,
+        )
+        data.append(ShopEntry(
             entryId=entry.id,
             regionCode=entry.region_code,
             regionName=entry.region_name,
             shopType=entry.shop_type,
-            loginUrl=entry.login_url,
-            homeUrl=entry.home_url,
-        )
-        for entry in entries
-    ]
+            loginUrl=login_url,
+            homeUrl=home_url,
+        ))
 
     return success_response(data=data)
 
@@ -141,20 +168,25 @@ async def list_shops(
     result = await db.execute(stmt)
     rows = result.all()
 
-    data: list[ShopListItem] = [
-        ShopListItem(
+    data: list[ShopListItem] = []
+    for row in rows:
+        login_url, home_url = _normalize_platform_urls(
+            shop_type=row.shop_type,
+            region_code=row.shop_region_code,
+            login_url=row.login_url,
+            home_url=row.home_url,
+        )
+        data.append(ShopListItem(
             id=row.id,
             name=row.shop_name,
             regionCode=row.shop_region_code,
             regionName=row.region_name or "",
             shopType=row.shop_type,
-            loginUrl=row.login_url or "",
-            homeUrl=row.home_url or "",
+            loginUrl=login_url,
+            homeUrl=home_url,
             remark=row.shop_remark or "",
             shopLastOpen=row.shop_last_open_at,
-        )
-        for row in rows
-    ]
+        ))
 
     return success_response(data=data)
 

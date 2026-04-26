@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy import and_, select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,9 +81,9 @@ def _get_max_outreach_count_per_day(permission_setting: dict[str, Any]) -> int |
     response_model_by_alias=True,
 )
 async def get_outreach_creator_filter_items(
-        shop_id: str,
         db: Annotated[AsyncSession, Depends(get_db_session)],
         current_user_info: CurrentUserInfo = Depends(get_current_user_info),
+        shop_id: str = Query(alias="shopId"),
 ) -> APIResponse[dict]:
     """
     返回前端筛选列表所需的达人过滤配置（creator_filter_items）。
@@ -177,7 +177,7 @@ async def get_outreach_creator_filter_items(
         "minAvgVideoViews": "averageViewsPerVideoMin",
         "minAvgLiveViews": "averageViewersPerLiveMin",
         "minEngagementRate": "engagementRateMinPercent",
-        "creatorEstimatedPublishRate": "estPostRate",
+        "estPostRate": "estPostRate",
         "coBranding": "brandCollaborationSelections",
     }
 
@@ -302,7 +302,7 @@ async def get_outreach_creator_filter_items(
         "minAvgVideoViews",
         "minAvgLiveViews",
         "minEngagementRate",
-        "creatorEstimatedPublishRate",
+        "estPostRate",
         "coBranding",
         "sortBy",
     }
@@ -690,6 +690,7 @@ def _build_outreach_task_playload(
     platform_shop_id = str(shop.platform_shop_code or "").strip()
     session_node = {
         "region": str(shop.shop_region_code or "").strip().upper(),
+        "shopType": str(shop.shop_type or "").strip().upper(),
         "headless": False,
     }
     if platform_shop_id:
@@ -714,6 +715,7 @@ def _build_outreach_task_playload(
         "taskStatus": task_status,
         "taskName": task.task_name,
         "shopId": shop.id,
+        "shopType": str(shop.shop_type or "").strip().upper(),
         "shopRegionCode": str(shop.shop_region_code or "").strip().upper(),
         "searchKeyword": filter_payload["searchKeyword"],
         "searchKeywords": filter_payload["searchKeyword"],
@@ -746,6 +748,7 @@ def _build_outreach_task_playload(
             "taskStatus": task_status,
             "userId": str(user_id or "").strip(),
             "shopId": shop.id,
+            "shopType": str(shop.shop_type or "").strip().upper(),
             "shopRegionCode": str(shop.shop_region_code or "").strip().upper(),
             "scheduledTime": scheduled_time.isoformat(),
             "creatorId": task.creator_id,
@@ -1255,6 +1258,7 @@ async def list_outreach_task_run_records(
             SellerTkOutreachTaskLogs.last_modification_time,
             IfTkCreators.platform_creator_username,
             IfTkCreators.platform_creator_display_name,
+            IfTkCreators.avatar,
             IfTkCreators.followers,
             IfTkCreators.sales_revenue,
         )
@@ -1277,12 +1281,18 @@ async def list_outreach_task_run_records(
     rows = (await db.execute(stmt)).all()
     items = [
         OutreachTaskRunRecordItem(
-            creatorId=row.platform_creator_id,
-            creatorName=(
-                    row.platform_creator_display_name
-                    or row.platform_creator_username
-                    or row.platform_creator_id
+            platformCreatorId=row.platform_creator_id,
+            platformCreatorUsername=(
+                (row.platform_creator_username.strip() or None)
+                if row.platform_creator_username
+                else None
             ),
+            platformCreatorDisplayName=(
+                (row.platform_creator_display_name.strip() or None)
+                if row.platform_creator_display_name
+                else None
+            ),
+            avatar=(row.avatar.strip() or None) if row.avatar else None,
             followers=int(row.followers) if row.followers is not None else None,
             gmv=float(row.sales_revenue) if row.sales_revenue is not None else None,
             taskName=task_row.task_name,

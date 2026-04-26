@@ -622,6 +622,14 @@ class SellerRpaTaskOrchestrationService:
         parent_session_node = self._ensure_record(parent_input_node.get("session"))
         parent_report_node = self._ensure_record(parent_input_node.get("report"))
         parent_executor_node = self._ensure_record(parent_payload.get("executor"))
+        shop_type = clean_text(
+            parent_session_node.get("shopType")
+            or parent_session_node.get("shop_type")
+            or parent_task_node.get("shopType")
+        )
+        child_session_node = deepcopy(parent_session_node)
+        if shop_type and not clean_text(child_session_node.get("shopType")):
+            child_session_node["shopType"] = shop_type
 
         return {
             "task": {
@@ -633,11 +641,12 @@ class SellerRpaTaskOrchestrationService:
                 "rootTaskId": root_task_id,
                 "chainStage": chain_stage,
                 "shopId": shop_id,
+                "shopType": shop_type,
                 "shopRegionCode": shop_region_code,
                 "scheduledTime": scheduled_time.isoformat(),
             },
             "input": {
-                "session": deepcopy(parent_session_node),
+                "session": child_session_node,
                 "payload": {
                     "taskId": task_id,
                     "taskType": task_type,
@@ -648,6 +657,7 @@ class SellerRpaTaskOrchestrationService:
                     "parentTaskId": parent_task_id,
                     "rootTaskId": root_task_id,
                     "chainStage": chain_stage,
+                    "shopType": shop_type,
                 },
                 "report": deepcopy(parent_report_node),
             },

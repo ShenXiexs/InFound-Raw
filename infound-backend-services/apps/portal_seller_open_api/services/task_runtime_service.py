@@ -502,11 +502,11 @@ class SellerRpaTaskRuntimeService:
             result.close()
 
     async def _get_next_outreach_task_log(
-        self,
-        session: AsyncSession,
-        *,
-        task_id: str,
-        current_log_id: int | None,
+            self,
+            session: AsyncSession,
+            *,
+            task_id: str,
+            current_log_id: int | None,
     ) -> SellerTkOutreachTaskLogs | None:
         if current_log_id is None:
             return None
@@ -578,7 +578,17 @@ class SellerRpaTaskRuntimeService:
     def _duration_seconds(started_at: datetime | None, finished_at: datetime | None) -> int:
         if started_at is None or finished_at is None:
             return 0
-        return max(0, int((finished_at - started_at).total_seconds()))
+
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=timezone.utc)
+        if finished_at.tzinfo is None:
+            finished_at = finished_at.replace(tzinfo=timezone.utc)
+
+        if started_at is None or finished_at is None:
+            return 0
+        
+        delta = finished_at - started_at
+        return max(0, int(delta.total_seconds()))
 
     @staticmethod
     def _coerce_payload(value: Any) -> dict[str, Any]:

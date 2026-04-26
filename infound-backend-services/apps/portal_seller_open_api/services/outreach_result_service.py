@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.portal_seller_open_api.core.config import Settings
@@ -563,18 +563,12 @@ class OutreachResultIngestionService:
             brand_names: Iterable[str],
     ) -> set[str]:
         creator_id_list = [item for item in platform_creator_ids if item]
-        brand_name_list = [
-            normalized
-            for item in brand_names
-            if (normalized := clean_text(item))
-        ]
+        brand_name_list = [item for item in brand_names if item]
         if not creator_id_list or not brand_name_list:
             return set()
 
         stmt = select(IfTkCreators.platform_creator_id).where(
             IfTkCreators.platform_creator_id.in_(creator_id_list),
-            IfTkCreators.brand_name.is_not(None),
-            func.trim(IfTkCreators.brand_name) != "",
             IfTkCreators.brand_name.in_(brand_name_list),
         )
         rows = (await self.db_session.execute(stmt)).scalars().all()

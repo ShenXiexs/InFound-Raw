@@ -74,9 +74,9 @@ class CreatorFilterDTO(BaseDTO):
     @field_validator("sortBy")
     @classmethod
     def _validate_sort_by(cls, value: int) -> int:
-        # 0-相关性, 1-GMV, 2-成交件数, 3-粉丝数, 4-平均视频播放量, 5-互动率
-        if value not in {0, 1, 2, 3, 4, 5}:
-            raise ValueError("sortBy 仅支持 0~5")
+        # 兼容历史 0-based 和筛选脚本 1-based 排序值。
+        if value not in {0, 1, 2, 3, 4, 5, 6}:
+            raise ValueError("sortBy 仅支持 0~6")
         return value
 
 
@@ -387,8 +387,25 @@ class OutreachTaskListData(BaseDTO):
 
 
 class OutreachTaskRunRecordItem(BaseDTO):
-    creatorId: str = Field(validation_alias=AliasChoices("creatorId"), serialization_alias="creatorId")
-    creatorName: str = Field(validation_alias=AliasChoices("creatorName"), serialization_alias="creatorName")
+    platformCreatorId: str = Field(
+        validation_alias=AliasChoices("platformCreatorId"),
+        serialization_alias="platformCreatorId",
+    )
+    platformCreatorUsername: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("platformCreatorUsername"),
+        serialization_alias="platformCreatorUsername",
+    )
+    platformCreatorDisplayName: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("platformCreatorDisplayName"),
+        serialization_alias="platformCreatorDisplayName",
+    )
+    avatar: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("avatar"),
+        serialization_alias="avatar",
+    )
     followers: int | None = Field(
         default=None,
         validation_alias=AliasChoices("followers"),

@@ -54,6 +54,7 @@ def parse_args() -> argparse.Namespace:
 def _build_session_node(shop: SellerTkShops) -> dict:
     session_node = {
         "region": str(shop.shop_region_code or "").strip().upper(),
+        "shopType": str(shop.shop_type or "").strip().upper(),
         "headless": True,
     }
     platform_shop_id = str(shop.platform_shop_code or "").strip()
@@ -82,6 +83,7 @@ def _build_base_payload(
             "rootTaskId": task_id,
             "chainStage": task_type,
             "shopId": shop.id,
+            "shopType": str(shop.shop_type or "").strip().upper(),
             "shopRegionCode": str(shop.shop_region_code or "").strip().upper(),
             "scheduledTime": scheduled_time.isoformat(),
         },
@@ -92,6 +94,7 @@ def _build_base_payload(
                 "taskType": task_type,
                 "taskName": task_name,
                 "shopId": shop.id,
+                "shopType": str(shop.shop_type or "").strip().upper(),
                 "shopRegionCode": str(shop.shop_region_code or "").strip().upper(),
                 "scheduledTime": scheduled_time.isoformat(),
                 "parentTaskId": "",

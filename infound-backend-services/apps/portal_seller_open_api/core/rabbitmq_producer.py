@@ -6,6 +6,7 @@ from typing import Any, Optional, Tuple
 from uuid import uuid4
 
 import aio_pika
+from aiormq.exceptions import ChannelInvalidStateError
 from aio_pika import Message
 from aio_pika.abc import (
     AbstractRobustChannel,
@@ -35,7 +36,7 @@ class RabbitMQProducer:
 
     @classmethod
     async def initialize(cls, settings: IFRabbitMQWebSTOMPSettings) -> None:
-        if cls._initialized and cls._connection and cls._exchange:
+        if cls.is_initialized():
             return
 
         if not settings.host or not settings.exchange_name:
@@ -47,6 +48,7 @@ class RabbitMQProducer:
             return
 
         cls._settings = settings
+        await cls._close_connection()
         cls._connection = await aio_pika.connect_robust(
             host=settings.host,
             port=settings.port,
@@ -68,27 +70,55 @@ class RabbitMQProducer:
 
     @classmethod
     async def close(cls) -> None:
+        await cls._close_connection()
+        cls._settings = None
+        cls._declared_queues.clear()
+
+    @classmethod
+    async def _close_connection(cls) -> None:
         if cls._connection and not cls._connection.is_closed:
             await cls._connection.close()
         cls._connection = None
         cls._channel = None
         cls._exchange = None
-        cls._settings = None
         cls._initialized = False
-        cls._declared_queues.clear()
+
+    @classmethod
+    def _connection_alive(cls) -> bool:
+        return bool(
+            cls._connection
+            and not cls._connection.is_closed
+            and cls._channel
+            and not cls._channel.is_closed
+            and cls._exchange
+        )
 
     @classmethod
     def is_initialized(cls) -> bool:
-        return bool(cls._initialized and cls._connection and cls._exchange)
+        return bool(cls._initialized and cls._connection_alive())
+
+    @classmethod
+    async def _ensure_initialized(cls) -> None:
+        if cls.is_initialized():
+            return
+        if cls._settings is None:
+            raise RuntimeError("RabbitMQProducer is not initialized")
+
+        cls._logger.warning("Seller producer channel closed, reconnecting RabbitMQ")
+        settings = cls._settings
+        cls._declared_queues.clear()
+        await cls.initialize(settings)
 
     @classmethod
     async def _get_exchange(cls) -> AbstractRobustExchange:
+        await cls._ensure_initialized()
         if not cls._exchange:
             raise RuntimeError("RabbitMQProducer is not initialized")
         return cls._exchange
 
     @classmethod
     async def _get_channel(cls) -> AbstractRobustChannel:
+        await cls._ensure_initialized()
         if not cls._channel:
             raise RuntimeError("RabbitMQProducer channel is not initialized")
         return cls._channel
@@ -177,6 +207,29 @@ class RabbitMQProducer:
         return queue_name, binding_key, publish_routing_key
 
     @classmethod
+    async def _publish_with_reconnect(
+        cls,
+        message: Message,
+        *,
+        routing_key: str,
+    ) -> None:
+        for attempt in range(2):
+            try:
+                exchange = await cls._get_exchange()
+                await exchange.publish(message, routing_key=routing_key)
+                return
+            except ChannelInvalidStateError:
+                if attempt > 0:
+                    raise
+                cls._logger.warning(
+                    "Seller producer channel invalid, reconnecting before retry",
+                    routing_key=routing_key,
+                )
+                await cls._close_connection()
+                cls._declared_queues.clear()
+                await cls._ensure_initialized()
+
+    @classmethod
     async def publish_user_task_message(
         cls,
         *,
@@ -191,7 +244,6 @@ class RabbitMQProducer:
         queue_name, binding_key, publish_routing_key = (
             await cls.ensure_user_notification_queue(user_id=user_id)
         )
-        exchange = await cls._get_exchange()
 
         message_id = str(uuid4()).upper()
         now = datetime.now(timezone.utc)
@@ -230,7 +282,7 @@ class RabbitMQProducer:
                 "payload_version": "2026-03-26",
             },
         )
-        await exchange.publish(message, routing_key=publish_routing_key)
+        await cls._publish_with_reconnect(message, routing_key=publish_routing_key)
         cls._logger.info(
             "Seller RPA 任务消息已发送到用户通知队列",
             queue_name=queue_name,
@@ -267,7 +319,6 @@ class RabbitMQProducer:
         queue_name, binding_key, publish_routing_key = (
             await cls.ensure_user_notification_queue(user_id=user_id)
         )
-        exchange = await cls._get_exchange()
 
         message_id = str(uuid4()).upper()
         now = datetime.now(timezone.utc)
@@ -313,7 +364,7 @@ class RabbitMQProducer:
                 "binding_key": binding_key,
             },
         )
-        await exchange.publish(message, routing_key=publish_routing_key)
+        await cls._publish_with_reconnect(message, routing_key=publish_routing_key)
         cls._logger.info(
             "Seller RPA 事件消息已发送到用户通知队列",
             event_type=normalized_event_type,
@@ -346,7 +397,6 @@ class RabbitMQProducer:
         queue_name, binding_key, publish_routing_key = (
             await cls.ensure_user_notification_queue(user_id=user_id)
         )
-        exchange = await cls._get_exchange()
 
         message_id = f"msg-{uuid4()}"
         timestamp = datetime.now(timezone.utc)
@@ -377,7 +427,7 @@ class RabbitMQProducer:
                 "binding_key": binding_key,
             },
         )
-        await exchange.publish(message, routing_key=publish_routing_key)
+        await cls._publish_with_reconnect(message, routing_key=publish_routing_key)
         cls._logger.info(
             "通用用户通知消息已发送到用户通知队列",
             queue_name=queue_name,
