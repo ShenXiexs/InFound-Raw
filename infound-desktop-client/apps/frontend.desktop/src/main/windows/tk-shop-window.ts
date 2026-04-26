@@ -15,8 +15,8 @@ export class TkShopWindow {
     const primaryDisplay = screen.getPrimaryDisplay()
     const { workArea } = primaryDisplay
 
-    const width = 960
-    const height = 678
+    const width = 1280
+    const height = 800
     const x = (workArea.width - width) / 2
     const y = (workArea.height - height) / 2
 
@@ -25,8 +25,8 @@ export class TkShopWindow {
       title: shopSetting.name,
       width: width,
       height: height,
-      minHeight: 300,
-      minWidth: 600,
+      minWidth: 800,
+      minHeight: 600,
       icon: ResourceFactory.getTrayIcon(),
       x: x,
       y: y,
@@ -59,7 +59,7 @@ export class TkShopWindow {
     //todo: 有关是否真正的关闭？我认为应该真关，如果只是隐藏，正在执行的脚本和流文件依然占据内存，只要保证tab状态持久化，加载也不太影响用户体验
     this.baseWindow.on('close', (e) => {
       e.preventDefault()
-      this.tabItemManager!.saveTabItemSettings() //关闭时保存Tab页状态
+
       this.tabItemManager!.closeTabItems()
       this.tabItemManager!.dispose()
       this.baseWindow?.hide()

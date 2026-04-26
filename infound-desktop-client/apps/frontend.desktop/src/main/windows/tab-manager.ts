@@ -7,7 +7,7 @@
 import * as path from 'path'
 import * as fs from 'fs'
 import { randomUUID } from 'crypto'
-import { BrowserWindow, dialog, Rectangle, WebContentsView, WebPreferences } from 'electron'
+import { app, BrowserWindow, dialog, Rectangle, WebContentsView, WebPreferences } from 'electron'
 import { AppConfig } from '@common/app-config'
 import { TAB_MAX_COUNT, TAB_TYPES } from '@common/app-constants'
 import { Tab } from '@common/types/tab-type'
@@ -33,19 +33,6 @@ export class TabManager {
 
   constructor(private mainWindow: BrowserWindow) {
     this.setupListeners()
-  }
-
-  private getDefaultTabFavicon(type: string): string | undefined {
-    if (type !== TAB_TYPES.XUNDA) {
-      return undefined
-    }
-
-    const resourcesPath = globalState.currentState.appSetting?.resourcesPath?.trim() || ''
-    if (resourcesPath) {
-      return `file://${path.join(resourcesPath, 'icons', 'common', 'icon.png').replace(/\\/g, '/')}`
-    }
-
-    return undefined
   }
 
   // 创建新标签页，返回生成的 id，失败返回 null
@@ -91,15 +78,14 @@ export class TabManager {
     }
 
     if (type == TAB_TYPES.XUNDA) {
+      logger.info('创建XUNDA tab:' + newId + ':' + url)
       baseWebPreferences.preload = path.join(getFilePath(), '../preload/index.cjs')
     }
 
     const view = new WebContentsView({ webPreferences: baseWebPreferences })
 
-    // view.setVisible(false)
-    // const userAgent = getCleanUserAgent() || AppConfig.USER_AGENT
     const userAgent = AppConfig.USER_AGENT
-    logger.debug('设置UA:' + userAgent)
+    logger.debug('原始 UA:' + app.userAgentFallback + ',设置UA:' + userAgent)
     view.webContents.setUserAgent(userAgent)
 
     // 监听页面标题更新
@@ -210,9 +196,9 @@ export class TabManager {
   // 激活指定标签页
   public activateTab(id: string): void {
     // for testing logger.info(`TabManager.activateTab called with id=${id}`)
-    this.views.forEach((view, vid) => {
+    /*this.views.forEach((view, vid) => {
       logger.info(`View ${vid} bounds:`, view.getBounds())
-    })
+    })*/
 
     if (this.activeTabId === id || !this.views.has(id)) return
     // logger.info(`TabManager.activateTab called with id=${id}`)
@@ -249,7 +235,9 @@ export class TabManager {
   public closeTab(id: string, notReservedOne: boolean = false): boolean {
     if (!this.views.has(id)) return false
 
-    if (!notReservedOne && this.tabs.length === 1) {
+    const tkTab = this.tabs.find((t) => t.id === id)
+    const tkTabs = this.tabs.filter((t) => t.type === TAB_TYPES.TIKTOK)
+    if (tkTab?.type === TAB_TYPES.TIKTOK && !notReservedOne && tkTabs.length === 1) {
       // 可以提示用户，或者直接返回
       dialog
         .showMessageBox(this.mainWindow, {
@@ -322,21 +310,6 @@ export class TabManager {
     }
   }
 
-  //todo:保留【Phoenix】
-  public navigateTo(url: string): void {
-    const view = this.getCurrentView()
-    if (view) {
-      view.webContents.loadURL(url).then(() => {})
-      // 可选：更新标签的url属性
-      const tab = this.tabs.find((t) => t.id === this.activeTabId)
-      if (tab) {
-        tab.url = url
-        // 如果页面加载后标题更新，会通过page-title-updated事件更新标题，但url可能未更新，这里手动更新url并发送更新通知
-        this.sendTabsToRenderer()
-      }
-    }
-  }
-
   public reorderTabs(orderedIds: string[]): void {
     const newTabs: Tab[] = []
     orderedIds.forEach((id) => {
@@ -363,6 +336,14 @@ export class TabManager {
     return this.views.get(id)
   }
 
+  public updateTabTitle(id: string, title: string): void {
+    const tab = this.tabs.find((t) => t.id === id)
+    if (tab && tab.title !== title) {
+      tab.title = title
+      this.sendTabsToRenderer()
+    }
+  }
+
   /*public showTabsMenu(x: number, y: number): void {
     const menuTemplate: MenuItemConstructorOptions[] = this.tabs.map((tab) => ({
       label: tab.title.length > 30 ? tab.title.substring(0, 30) + '…' : tab.title,
@@ -377,14 +358,6 @@ export class TabManager {
       y: Math.round(y)
     })
   }*/
-
-  public updateTabTitle(id: string, title: string): void {
-    const tab = this.tabs.find((t) => t.id === id)
-    if (tab && tab.title !== title) {
-      tab.title = title
-      this.sendTabsToRenderer()
-    }
-  }
 
   public exportCookiesToFile(filePath: string, cookies: Electron.Cookie[]): void {
     try {
@@ -427,8 +400,8 @@ export class TabManager {
       resizable: false,
       show: false,
       webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
+        webSecurity: false,
+        sandbox: false,
         //preload: path.join(getFilePath(), '../preload/tab-menu-preload.cjs')
         devTools: !AppConfig.IS_PRO,
         preload: path.join(getFilePath(), '../preload/index.cjs')
@@ -444,10 +417,16 @@ export class TabManager {
     ;(this.menuWindow as any).tabManager = this
 
     // 注入数据
-    this.menuWindow.webContents.once('dom-ready', () => {
-      this.menuWindow?.webContents.executeJavaScript(`
-        if (typeof initTabs === 'function') initTabs('${activeId || ''}', ${JSON.stringify(tabs)});
-      `)
+    this.menuWindow.webContents.once('did-finish-load', () => {
+      setTimeout(() => {
+        this.menuWindow?.webContents.executeJavaScript(`
+          if (typeof window['initTabs'] === 'function') {
+            window['initTabs']('${activeId || ''}', ${JSON.stringify(tabs)});
+          } else {
+            console.error('initTabs 未找到，window 上的函数:', Object.keys(window).filter(k => typeof window[k] === 'function').slice(0, 10))
+          }
+        `)
+      }, 100)
     })
 
     // 失去焦点时自动关闭
@@ -486,6 +465,19 @@ export class TabManager {
       this.menuWindow.close()
     }
     // 清理其他资源（如全局监听器）
+  }
+
+  private getDefaultTabFavicon(type: string): string | undefined {
+    if (type !== TAB_TYPES.XUNDA) {
+      return undefined
+    }
+
+    const resourcesPath = globalState.currentState.appSetting?.resourcesPath?.trim() || ''
+    if (resourcesPath) {
+      return `file://${path.join(resourcesPath, 'icons', 'common', 'icon.png').replace(/\\/g, '/')}`
+    }
+
+    return undefined
   }
 
   // 监听窗口大小变化，更新当前激活视图的边界

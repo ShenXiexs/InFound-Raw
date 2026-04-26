@@ -1,6 +1,7 @@
-import { BaseWindow, session, WebContentsView } from 'electron'
+import { app, BaseWindow, session, WebContentsView } from 'electron'
 import { logger } from '../utils/logger'
 import { AppConfig } from '@common/app-config'
+import { getCleanUserAgent } from '@infound/desktop-electron'
 import path from 'path'
 import { getFilePath } from '../utils/path-helper'
 
@@ -44,7 +45,9 @@ export class TkWcv {
       }
     })
 
-    this.tkWCV.webContents.setUserAgent(AppConfig.USER_AGENT)
+    const userAgent = getCleanUserAgent() || AppConfig.USER_AGENT
+    logger.debug('原始 UA:' + app.userAgentFallback + ',设置UA:' + userAgent)
+    this.tkWCV.webContents.setUserAgent(userAgent)
 
     //monitorNavigation(logger, this.tkWCV.webContents)
     ;(this.tkWCV.webContents as any).on('will-frame-navigate', (event, url) => {

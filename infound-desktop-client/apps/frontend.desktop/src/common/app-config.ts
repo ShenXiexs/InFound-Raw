@@ -2,8 +2,10 @@ const ENV = import.meta.env
 
 export class AppConfig {
   public static readonly IS_PRO: boolean = ENV.MODE === 'pro'
+  public static readonly IS_DEV: boolean = ENV.MODE === 'dev'
   public static readonly LOG_LEVEL: string = ENV.VITE_LOG_LEVEL
   public static readonly LOG_ENABLE: boolean = ENV.VITE_LOG_ENABLE === 'true'
+  public static readonly LOG_REQUEST_ENABLE: boolean = ENV.VITE_LOG_REQUEST_ENABLE === 'true'
   public static readonly APP_PROTOCOL: string = ENV.VITE_APP_PROTOCOL
   public static readonly APP_HARDCODED_SALT: string = ENV.VITE_APP_HARDCODED_SALT
   public static readonly OPENAPI_BASE_URL: string = ENV.VITE_OPENAPI_BASE_URL
@@ -13,5 +15,5 @@ export class AppConfig {
   public static readonly DOWNLOAD_BASE_URL: string = ENV.VITE_DOWNLOAD_BASE_URL
   public static readonly OFFICIAL_WEBSITE_BASE_URL: string = ENV.VITE_OFFICIAL_WEBSITE_BASE_URL
   public static readonly EMBED_BASE_URL: string = ENV.VITE_EMBED_BASE_URL
-  public static readonly USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36'
+  public static readonly USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.7680.166 Safari/537.36'
 }

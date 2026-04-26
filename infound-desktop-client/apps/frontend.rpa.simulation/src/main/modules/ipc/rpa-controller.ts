@@ -8,9 +8,8 @@ import type {
   SampleManagementPayloadInput,
   SellerChatbotPayloadInput,
   SellerCreatorDetailPayloadInput
-} from '@desktop-rpa'
+} from '@infound/desktop-rpa'
 import {
-  PlaywrightSimulationService,
   createDemoOutreachFilterConfig,
   createDemoSellerChatbotPayload,
   createDemoSellerCreatorDetailPayload,
@@ -18,14 +17,16 @@ import {
   isPlaywrightSimulationPayloadInput,
   isSampleManagementPayloadInput,
   isSellerChatbotPayloadInput,
-  isSellerCreatorDetailPayloadInput
-} from '@desktop-rpa'
+  isSellerCreatorDetailPayloadInput,
+  PlaywrightSimulationService
+} from '@infound/desktop-rpa'
+import { AppConfig } from '@common/app-config'
 
 const SELLER_LOGIN_URL = 'https://seller-mx.tiktok.com/'
 
 class RPAController {
   public getSimulationService(): PlaywrightSimulationService {
-    return PlaywrightSimulationService.getInstance(logger)
+    return PlaywrightSimulationService.getInstance(logger, AppConfig.USER_AGENT, AppConfig.IS_PRO)
   }
 
   @IPCHandle(IPC_CHANNELS.RPA_SELLER_LOGIN, IPCType.SEND)

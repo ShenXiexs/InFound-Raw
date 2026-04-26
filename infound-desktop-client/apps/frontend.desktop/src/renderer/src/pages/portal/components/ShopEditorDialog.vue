@@ -407,118 +407,220 @@ watch(
 
 <template>
   <n-modal v-model:show="modalVisible" :mask-closable="true">
-    <n-card :bordered="false" class="shop-form-card" role="dialog">
-      <template #header>
-        <div class="page-header">
-          <n-h2 class="page-title">{{ dialogTitle }}</n-h2>
-          <n-button circle class="close-btn" quaternary @click="onClose">
-            <span class="close-icon">×</span>
-          </n-button>
-        </div>
-      </template>
+    <n-card
+      :bordered="false"
+      class="shop-form-card"
+      content-style="padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden;"
+      role="dialog"
+    >
+      <div class="shop-modal-header">
+        <h2 class="page-title">{{ dialogTitle }}</h2>
+        <n-button circle class="modal-close-btn" quaternary @click="onClose">
+          <span class="close-symbol">×</span>
+        </n-button>
+      </div>
 
-      <n-form ref="formRef" :model="formValue" :rules="rules" label-placement="top" size="large">
-        <n-form-item label="店铺名称" path="storeName" required>
-          <n-input v-model:value="formValue.storeName" clearable maxlength="50" placeholder="请输入店铺名称" show-count />
-        </n-form-item>
+      <div class="shop-modal-body">
+        <n-form ref="formRef" :model="formValue" :rules="rules" class="shop-form" label-placement="top" size="large">
+          <section class="form-section">
+            <n-form-item label="店铺名称" path="storeName" required>
+              <n-input v-model:value="formValue.storeName" clearable maxlength="50" placeholder="请输入店铺名称" show-count />
+            </n-form-item>
+          </section>
 
-        <n-form-item label="店铺类型" path="shopType" required>
-          <n-radio-group :disabled="isEditMode" :value="formValue.shopType" @update:value="onTypeChange">
-            <n-space>
-              <n-radio-button value="cross-border">跨境店铺</n-radio-button>
-              <n-radio-button value="local">本土店铺</n-radio-button>
-            </n-space>
-          </n-radio-group>
-        </n-form-item>
+          <section class="form-section">
+            <n-form-item label="店铺类型" path="shopType" required>
+              <n-radio-group :disabled="isEditMode" :value="formValue.shopType" @update:value="onTypeChange">
+                <n-space>
+                  <n-radio-button value="cross-border">跨境店铺</n-radio-button>
+                  <n-radio-button value="local">本土店铺</n-radio-button>
+                </n-space>
+              </n-radio-group>
+            </n-form-item>
+          </section>
 
-        <n-form-item label="选择国家" path="countryCode" required>
-          <n-spin :show="isLoadingEntries">
-            <n-space :size="10" class="country-grid">
-              <n-button
-                v-for="country in countryOptions"
-                :key="country.regionCode"
-                :color="formValue.countryCode === country.regionCode ? '#8142f6' : undefined"
-                :disabled="isEditMode"
-                :secondary="formValue.countryCode === country.regionCode"
-                :text-color="formValue.countryCode === country.regionCode ? '#ffffff' : undefined"
-                :type="formValue.countryCode === country.regionCode ? 'primary' : 'default'"
-                class="country-btn"
-                @click="onSelectCountry(country.regionCode)"
-              >
-                <template #icon>
-                  <n-icon size="20">
-                    <component :is="getFlagComponent(country.regionCode)" />
-                  </n-icon>
-                </template>
-                <span>{{ country.regionName }}</span>
-              </n-button>
-            </n-space>
-          </n-spin>
-        </n-form-item>
+          <section class="form-section">
+            <n-form-item label="选择国家" path="countryCode" required>
+              <n-spin :show="isLoadingEntries">
+                <n-space :size="10" class="country-grid">
+                  <n-button
+                    v-for="country in countryOptions"
+                    :key="country.regionCode"
+                    :color="formValue.countryCode === country.regionCode ? '#8142f6' : undefined"
+                    :disabled="isEditMode"
+                    :secondary="formValue.countryCode === country.regionCode"
+                    :text-color="formValue.countryCode === country.regionCode ? '#ffffff' : undefined"
+                    :type="formValue.countryCode === country.regionCode ? 'primary' : 'default'"
+                    class="country-btn"
+                    @click="onSelectCountry(country.regionCode)"
+                  >
+                    <template #icon>
+                      <n-icon size="20">
+                        <component :is="getFlagComponent(country.regionCode)" />
+                      </n-icon>
+                    </template>
+                    <span>{{ country.regionName }}</span>
+                  </n-button>
+                </n-space>
+              </n-spin>
+            </n-form-item>
+          </section>
 
-        <n-form-item label="备注" path="remark">
-          <n-input v-model:value="formValue.remark" :autosize="{ minRows: 3, maxRows: 4 }" maxlength="200" placeholder="请输入备注（选填，200字内）" show-count type="textarea" />
-        </n-form-item>
+          <section class="form-section">
+            <n-form-item label="备注" path="remark">
+              <div class="remark-field">
+                <n-input
+                  v-model:value="formValue.remark"
+                  :autosize="{ minRows: 1, maxRows: 3 }"
+                  class="remark-textarea"
+                  maxlength="200"
+                  placeholder="请输入备注（选填，200字内）"
+                  type="textarea"
+                />
+                <div class="remark-count">{{ formValue.remark.length }}/200</div>
+              </div>
+            </n-form-item>
+          </section>
 
-        <n-form-item class="agreement-check-item" path="agreementAccepted" required>
-          <n-checkbox v-model:checked="formValue.agreementAccepted">我已阅读并同意授权协议</n-checkbox>
-        </n-form-item>
+          <section class="form-section agreement-section">
+            <n-form-item label="授权协议正文">
+              <div class="agreement-wrap">
+                <textarea :value="AGREEMENT_TEXT" class="agreement-text" readonly rows="5" />
+              </div>
+            </n-form-item>
 
-        <n-form-item label="授权协议正文">
-          <div class="agreement-wrap">
-            <textarea :value="AGREEMENT_TEXT" class="agreement-text" readonly rows="5" />
-          </div>
-        </n-form-item>
+            <n-form-item class="agreement-check-item" path="agreementAccepted" required>
+              <n-checkbox v-model:checked="formValue.agreementAccepted">我已阅读并同意授权协议</n-checkbox>
+            </n-form-item>
+          </section>
+        </n-form>
+      </div>
 
-        <div class="action-row">
-          <n-button :loading="isSubmitting" color="#8142f6" text-color="#ffffff" type="primary" @click="onSubmit">{{ submitBtnText }}</n-button>
-          <n-button @click="onClose">取消</n-button>
-        </div>
-      </n-form>
+      <footer class="shop-modal-footer">
+        <n-button :disabled="isSubmitting" tertiary @click="onClose">取消</n-button>
+        <n-button :loading="isSubmitting" type="primary" @click="onSubmit">{{ submitBtnText }}</n-button>
+      </footer>
     </n-card>
   </n-modal>
 </template>
 
 <style lang="scss" scoped>
 .shop-form-card {
-  width: min(860px, calc(100vw - 32px));
-  max-height: 80vh;
-  border-radius: 14px;
+  width: 720px;
+  max-width: calc(100vw - 32px);
+  height: min(760px, calc(100vh - 40px));
+  max-height: calc(100vh - 40px);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(11, 27, 52, 0.35);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .shop-form-card :deep(.n-card__content) {
-  overflow-y: auto;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .page-title {
   margin: 0;
+  color: #1f2d3d;
+  font-size: 18px;
+  font-weight: 700;
 }
 
-.page-header {
+.shop-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #ecf1f7;
+  background: #fff;
 }
 
-.close-btn {
+.shop-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px;
+  background: #f4f7fb;
+}
+
+.shop-form {
+  padding: 0;
+}
+
+.form-section {
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.agreement-section {
+  margin-bottom: 0;
+}
+
+.agreement-check-item {
+  margin-top: -12px;
+}
+
+.modal-close-btn {
   flex-shrink: 0;
+  color: #6b7b90;
+  --n-color-focus: transparent !important;
 }
 
-.close-icon {
+.modal-close-btn:deep(.n-button__content) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-symbol {
   font-size: 20px;
+  display: block;
   line-height: 1;
+  transform: translateY(-1px);
 }
 
 .country-grid {
   width: 100%;
 }
 
+.country-grid :deep(.n-spin-content) {
+  width: 100%;
+}
+
 .country-btn {
   min-width: 132px;
   justify-content: flex-start;
+  border-radius: 8px;
+}
+
+.remark-textarea:deep(.n-input-wrapper) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.remark-textarea:deep(textarea) {
+  line-height: 1.25;
+}
+
+.remark-field {
+  width: 100%;
+}
+
+.remark-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1;
+  color: #6b7280;
 }
 
 .flag {
@@ -551,17 +653,53 @@ watch(
   color: #3f4856;
 }
 
-.action-row {
+.shop-modal-footer {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #ecf1f7;
+  padding: 12px 18px;
+  background: #fff;
 }
 
-:deep(.agreement-check-item) {
-  margin-top: -40px;
+.shop-modal-footer :deep(.n-button) {
+  min-width: 88px;
+  border-radius: 8px;
+}
+
+.shop-modal-footer :deep(.n-button__content) {
+  font-size: 14px;
+}
+
+:deep(.shop-form .n-form-item) {
+  margin-bottom: 0;
+}
+
+:deep(.shop-form .n-form-item-label) {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+:deep(.shop-form .n-input-wrapper),
+:deep(.shop-form .n-base-selection) {
+  border-radius: 8px;
+}
+
+:deep(.agreement-check-item .n-form-item-blank) {
+  min-height: auto;
 }
 
 @media (max-width: 760px) {
+  .shop-modal-body {
+    padding: 14px;
+  }
+
+  .shop-modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .country-btn {
     min-width: 120px;
   }

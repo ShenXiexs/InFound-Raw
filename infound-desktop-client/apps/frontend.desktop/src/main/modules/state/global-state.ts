@@ -80,7 +80,7 @@ class GlobalState {
    */
   public async init(): Promise<void> {
     const userInfo = await this.getCurrentUser() // 改为 await
-    const userEnableDebug = userInfo?.enableDebug ?? userInfo?.permission?.enableDebug ?? false
+    const userEnableDebug = userInfo?.permission?.enableDebug ?? false
     const hasValidSession = hasValidCurrentUserSession(userInfo)
 
     this.state = {
@@ -90,7 +90,7 @@ class GlobalState {
       isUpdating: false,
       isLogin: hasValidSession,
       isQuitting: false,
-      enableDebug: !AppConfig.IS_PRO || userEnableDebug,
+      enableDebug: AppConfig.IS_DEV || userEnableDebug,
       currentUser: userInfo
     } as AppState
   }

@@ -18,6 +18,7 @@ import { logger } from '../../utils/logger'
 
 const DEFAULT_REGION = 'MX'
 const DEFAULT_AUTH_HEADER = 'INFoundSellerAuth'
+const LOGIN_STATE_POLL_INTERVAL_MS = 5000
 
 type JsonRecord = Record<string, unknown>
 
@@ -82,6 +83,14 @@ const toBoolean = (value: unknown): boolean | undefined => {
     return false
   }
   return undefined
+}
+
+const normalizeShopType = (value: unknown): 'LOCAL' | 'CROSS_BORDER' => {
+  const normalized = toText(value).toUpperCase().replace(/-/g, '_')
+  if (['CROSS_BORDER', 'CROSSBORDER', 'CROSS_BORDER_SHOP'].includes(normalized)) {
+    return 'CROSS_BORDER'
+  }
+  return 'LOCAL'
 }
 
 const expandUserDataPath = (inputPath: string): string => {
@@ -161,7 +170,19 @@ const logResolvedLoginStatePath = (session: PlaywrightSimulationPayloadInput): v
     return
   }
 
-  logger.warn('本次实际使用的登录态路径: 未找到，将回退为手动登录')
+  logger.warn('本次实际使用的登录态路径: 未找到，将等待可用登录态')
+}
+
+const sleep = async (ms: number): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+const hasAvailableLoginState = (sessionNode: JsonRecord, taskNode: JsonRecord, payloadNode: JsonRecord): boolean => {
+  const loginStatePath = resolveEffectiveLoginStatePath(sessionNode, taskNode, payloadNode)
+  if (loginStatePath) {
+    return true
+  }
+  return Array.isArray(sessionNode.loginState) && sessionNode.loginState.length > 0
 }
 
 const hasEnvelopeShape = (value: JsonRecord): boolean => 'input' in value || 'task' in value || 'executor' in value
@@ -242,12 +263,16 @@ const buildReportConfig = (reportNode: JsonRecord): SellerRpaReportConfigInput |
 
 const buildSimulationSession = (sessionNode: JsonRecord, taskNode: JsonRecord, payloadNode: JsonRecord): PlaywrightSimulationPayloadInput => {
   const session: PlaywrightSimulationPayloadInput = {
-    region: toText(sessionNode.region) || toText(taskNode.shopRegionCode) || toText(payloadNode.shopRegionCode) || DEFAULT_REGION
-  }
-
-  const headless = toBoolean(sessionNode.headless)
-  if (headless !== undefined) {
-    session.headless = headless
+    region: toText(sessionNode.region) || toText(taskNode.shopRegionCode) || toText(payloadNode.shopRegionCode) || DEFAULT_REGION,
+    shopType: normalizeShopType(
+      sessionNode.shopType ||
+        sessionNode.shop_type ||
+        taskNode.shopType ||
+        taskNode.shop_type ||
+        payloadNode.shopType ||
+        payloadNode.shop_type
+    ),
+    headless: true
   }
 
   const storageStatePath = toText(sessionNode.storageStatePath)
@@ -375,5 +400,40 @@ export const resolveSampleTaskInput = (
   return {
     session,
     payload: buildTaskContext(task, envelope.taskNode, envelope.payloadNode, envelope.reportNode) as SampleManagementPayloadInput
+  }
+}
+
+export const waitForTaskLoginState = async (
+  task: TaskInfo,
+  options?: {
+    isCancelled?: () => boolean
+    pollIntervalMs?: number
+  }
+): Promise<void> => {
+  const pollIntervalMs = Math.max(options?.pollIntervalMs ?? LOGIN_STATE_POLL_INTERVAL_MS, 1000)
+  let waitingLogged = false
+
+  while (true) {
+    if (options?.isCancelled?.()) {
+      throw new Error('任务在等待登录态期间已取消')
+    }
+
+    const envelope = resolveTaskEnvelope(task)
+    if (hasAvailableLoginState(envelope.sessionNode, envelope.taskNode, envelope.payloadNode)) {
+      if (waitingLogged) {
+        logger.info(`检测到可用登录态，继续执行任务(类型: ${task.task_type}): ${task.id}`)
+      }
+      return
+    }
+
+    if (!waitingLogged) {
+      const shopId = resolveTaskShopId(envelope.taskNode, envelope.payloadNode)
+      logger.warn(
+        `任务缺少可用登录态，暂停执行并等待登录态(类型: ${task.task_type}): ${task.id}${shopId ? ` shopId=${shopId}` : ''}`
+      )
+      waitingLogged = true
+    }
+
+    await sleep(pollIntervalMs)
   }
 }

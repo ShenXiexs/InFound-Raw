@@ -39,6 +39,14 @@ export class TkShopWindowManager {
     return this.tkShopSettings[tkShopSettingId]
   }
 
+  public getOpenShopIds(): string[] {
+    return Object.keys(this.tkShopWindows).filter((id) => {
+      const shopWindow = this.tkShopWindows[id]
+      const baseWindow = shopWindow?.baseWindow
+      return Boolean(baseWindow && !baseWindow.isDestroyed() && baseWindow.isVisible())
+    })
+  }
+
   /**
    * 在任意已打开的店铺窗口中打开 embed 标签（用于主窗口无 TkTabItemManager 时的回退）
    */

@@ -6,7 +6,6 @@
     "baseUrl": ".",
     "paths": {
       "@common/*": ["src/common/*"],
-      "@desktop-rpa/*": ["../../packages/frontend.desktop.rpa/src/*"],
       "@renderer/*": ["src/renderer/src/*"]
     },
     "types": ["unplugin-icons/types/vue"]

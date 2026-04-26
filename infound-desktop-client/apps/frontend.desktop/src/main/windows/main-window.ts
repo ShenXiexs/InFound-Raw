@@ -18,8 +18,8 @@ export class MainWindow {
     const primaryDisplay = screen.getPrimaryDisplay()
     const { workArea } = primaryDisplay
 
-    const width = 960
-    const height = 678
+    const width = 1280
+    const height = 800
     const x = (workArea.width - width) / 2
     const y = (workArea.height - height) / 2
 

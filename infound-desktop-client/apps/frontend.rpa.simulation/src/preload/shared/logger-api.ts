@@ -1,6 +1,6 @@
 import { ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
-import { LoggerAPI, LoggerLevel } from '@infound/desktop-electron'
+import { LoggerAPI, LoggerLevel } from '@infound/desktop-electron/types'
 
 const logAction = (level: LoggerLevel, message: string, ...args: any[]): void => {
   ipcRenderer.send(IPC_CHANNELS.APP_LOGGER, level, message, ...args)

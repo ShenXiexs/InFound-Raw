@@ -41,6 +41,7 @@ const isLoadingShops = ref(false)
 const isSavingRemark = ref(false)
 const isDeletingShop = ref(false)
 const entryIdMap = ref<Map<string, number>>(new Map())
+const openShopIds = ref<Set<string>>(new Set())
 const shopEditorVisible = ref(false)
 const shopEditorMode = ref<'add' | 'edit'>('add')
 const editingShopForDialog = ref<ShopRow | null>(null)
@@ -178,6 +179,26 @@ const onPageChange = (page: number): void => {
   currentPage.value = page
 }
 
+const loadOpenShopIds = async (): Promise<void> => {
+  try {
+    const result = await window.ipc.invoke(IPC_CHANNELS.TK_SHOP_GET_OPEN_IDS)
+    if (!result?.success) {
+      return
+    }
+    openShopIds.value = new Set(result.data || [])
+  } catch (error) {
+    window.logger.error('获取已打开店铺列表失败', error)
+  }
+}
+
+const isShopOpen = (shopId: string): boolean => {
+  return openShopIds.value.has(shopId)
+}
+
+const handleWindowFocus = (): void => {
+  void loadOpenShopIds()
+}
+
 const openRemarkModal = (row: ShopRow): void => {
   editingShopId.value = row.id
   editingRemark.value = row.remark || ''
@@ -247,6 +268,7 @@ const onOpenShop = async (row: ShopRow): Promise<void> => {
 
   window.logger.info('打开店铺参数', payload)
   window.ipc.send(IPC_CHANNELS.TK_SHOP_OPEN_WINDOW, payload)
+  openShopIds.value = new Set([...openShopIds.value, row.id])
   message.success(`已打开店铺：${row.name}`)
 }
 
@@ -278,6 +300,11 @@ const confirmDeleteShop = async (): Promise<void> => {
   if (!deletingShop.value || isDeletingShop.value) return
 
   const target = deletingShop.value
+  if (isShopOpen(target.id)) {
+    message.warning('请关闭店铺窗口后再删除')
+    closeDeleteModal()
+    return
+  }
   isDeletingShop.value = true
   try {
     const result = await window.ipc.invoke(IPC_CHANNELS.TK_SHOP_DELETE, { id: target.id })
@@ -300,15 +327,23 @@ const onShopEditorSuccess = async (): Promise<void> => {
   await loadShopList()
 }
 
+const checkTokenTimer = setInterval(checkTokenOnHome, 60 * 60 * 1000)
+
 onMounted(() => {
   void checkTokenOnHome()
   void loadShopList()
+  void loadOpenShopIds()
   window.ipc.send(IPC_CHANNELS.WEBSOCKET_CONNECT)
   window.ipc.send(IPC_CHANNELS.RPA_TASK_START)
+  window.addEventListener('focus', handleWindowFocus)
 })
 
 onUnmounted(async () => {
+  if (checkTokenTimer) {
+    clearInterval(checkTokenTimer)
+  }
   window.ipc.send(IPC_CHANNELS.WEBSOCKET_DISCONNECT)
+  window.removeEventListener('focus', handleWindowFocus)
 })
 </script>
 
@@ -342,7 +377,7 @@ onUnmounted(async () => {
                 <n-icon size="24">
                   <component :is="getFlagComponent(row.regionCode)" />
                 </n-icon>
-                <span>{{ row.name }}</span>
+                <span class="name-text ellipsis-2">{{ row.name }}</span>
               </div>
             </td>
             <td class="td-type">{{ formatType(row.shopType) }}</td>
@@ -363,7 +398,15 @@ onUnmounted(async () => {
             <td class="td-time">{{ row.lastOpenTime }}</td>
             <td class="td-actions">
               <div class="manage-actions">
-                <n-button secondary size="small" @click="onOpenShop(row)">
+                <n-button v-if="isShopOpen(row.id)" class="open-shop-btn is-opened" disabled secondary size="small">
+                  <template #icon>
+                    <n-icon class="opened-icon">
+                      <i-hugeicons-ai-browser />
+                    </n-icon>
+                  </template>
+                  <span class="opened-text">打开</span>
+                </n-button>
+                <n-button v-else class="open-shop-btn" secondary size="small" @click="onOpenShop(row)">
                   <template #icon>
                     <n-icon>
                       <i-hugeicons-browser />
@@ -379,7 +422,22 @@ onUnmounted(async () => {
                   </template>
                   编辑
                 </n-button>
-                <n-button secondary size="small" type="error" @click="openDeleteModal(row)">
+                <n-tooltip v-if="isShopOpen(row.id)" trigger="hover">
+                  <template #trigger>
+                    <div class="disabled-delete-wrap">
+                      <n-button disabled secondary size="small" type="error">
+                        <template #icon>
+                          <n-icon>
+                            <i-hugeicons-delete-02 />
+                          </n-icon>
+                        </template>
+                        删除
+                      </n-button>
+                    </div>
+                  </template>
+                  请关闭店铺窗口后再删除
+                </n-tooltip>
+                <n-button v-else secondary size="small" type="error" @click="openDeleteModal(row)">
                   <template #icon>
                     <n-icon>
                       <i-hugeicons-delete-02 />
@@ -484,6 +542,7 @@ onUnmounted(async () => {
 }
 
 .col-name {
+  width: 200px;
 }
 
 .col-type {
@@ -506,6 +565,9 @@ onUnmounted(async () => {
 }
 
 .td-name {
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
 }
 
 .td-type {
@@ -515,6 +577,10 @@ onUnmounted(async () => {
 }
 
 .td-time {
+  width: 150px;
+  min-width: 150px;
+  max-width: 150px;
+  white-space: nowrap;
 }
 
 .td-actions {
@@ -524,6 +590,15 @@ onUnmounted(async () => {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.name-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 20px;
+  word-break: break-word;
 }
 
 .remark-cell {
@@ -543,6 +618,7 @@ onUnmounted(async () => {
 
 .ellipsis-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -556,6 +632,28 @@ onUnmounted(async () => {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.disabled-delete-wrap {
+  display: inline-flex;
+}
+
+.open-shop-btn.is-opened {
+  --n-color-disabled: #dcf8e5 !important;
+  --n-border-disabled: 1px solid transparent !important;
+  --n-text-color-disabled: #667285 !important;
+}
+
+.open-shop-btn.is-opened:deep(.n-button__content) {
+  font-weight: 600;
+}
+
+.open-shop-btn.is-opened:deep(.opened-text) {
+  color: #98a2b3;
+}
+
+.open-shop-btn.is-opened:deep(.opened-icon) {
+  color: #065f46;
 }
 
 .empty-row {

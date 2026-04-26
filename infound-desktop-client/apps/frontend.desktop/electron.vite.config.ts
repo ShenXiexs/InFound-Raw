@@ -33,14 +33,12 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/preload/index.ts'),
-          tabMenu: resolve(__dirname, 'src/preload/tab-menu-preload.ts') // 新增入口
+          index: resolve(__dirname, 'src/preload/index.ts')
         },
         output: {
           format: 'cjs',
           entryFileNames: (chunkInfo) => {
             if (chunkInfo.name === 'index') return 'index.cjs'
-            if (chunkInfo.name === 'tabMenu') return 'tab-menu-preload.cjs'
             return '[name].cjs'
           }
         }
@@ -50,8 +48,7 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@common': resolve(__dirname, 'src/common'),
-        '@infound/desktop-electron': resolve(__dirname, '../../packages/frontend.desktop.electron/src/index.ts')
+        '@common': resolve(__dirname, 'src/common')
       }
     }
   },
@@ -59,8 +56,7 @@ export default defineConfig({
     resolve: {
       alias: {
         '@common': resolve(__dirname, 'src/common'),
-        '@renderer': resolve('src/renderer/src'),
-        '@infound/desktop-electron': resolve(__dirname, '../../packages/frontend.desktop.electron/src/index.ts')
+        '@renderer': resolve('src/renderer/src')
       }
     },
     build: {
@@ -73,7 +69,6 @@ export default defineConfig({
           tkshop: resolve(__dirname, 'src/renderer/tkshop.html'),
           universal: resolve(__dirname, 'src/renderer/universal.html'),
           tabMenu: resolve(__dirname, 'src/renderer/tab-menu.html'),
-          tabMenuTemplate: resolve(__dirname, 'src/renderer/tab-menu-template.html'),
           updater: resolve(__dirname, 'src/renderer/updater.html')
           //login: resolve(__dirname, 'src/renderer/login.html')
         }

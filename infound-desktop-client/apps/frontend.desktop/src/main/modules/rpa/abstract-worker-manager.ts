@@ -1,25 +1,34 @@
-import { claimTaskAsync, heartbeatAsync, reportAsync, TaskInfo, TaskStatus, TaskType } from '../../services/task-service'
+import { claimTaskAsync, heartbeatAsync, TaskInfo, TaskStatus, TaskType } from '../../services/task-service'
 import { logger } from '../../utils/logger'
 import { WorkerStatus } from './task-type'
+import { taskReportRetryService } from './task-report-retry-service'
 
 export abstract class AbstractWorkerManager {
+  private static readonly HEARTBEAT_INTERVAL_MS = 30000
   protected status: WorkerStatus = WorkerStatus.IDLE
   private currentTask: TaskInfo | undefined
   private currentCancelled = false
+  private currentAbortRequested = false
   private currentCancelReason: string | undefined
 
-  // 抽象属性：子类必须提供其对应的任务类型
   protected abstract get taskType(): TaskType
+
+  protected get taskTimeoutMs(): number | null {
+    return null
+  }
+
+  protected get faultMonitorReminderIntervalMs(): number | null {
+    const timeoutMs = this.getTaskTimeoutMs()
+    if (!timeoutMs) {
+      return null
+    }
+    return timeoutMs <= 10 * 60 * 1000 ? 5 * 60 * 1000 : 10 * 60 * 1000
+  }
 
   public isIdle(): boolean {
     return this.status === WorkerStatus.IDLE
   }
 
-  public async wakeUp(): Promise<void> {
-    await this.requestNextTask()
-  }
-
-  // 1. 宣告空闲并拉取
   public async declareIdle(): Promise<void> {
     if (this.status === WorkerStatus.EXECUTING) {
       return
@@ -44,6 +53,7 @@ export abstract class AbstractWorkerManager {
 
     if (this.currentTask && !this.currentCancelled && this.matchesCancellation(this.currentTask, normalizedTaskId, normalizedRootTaskId, normalizedCancelScope)) {
       this.currentCancelled = true
+      this.currentAbortRequested = true
       this.currentCancelReason = normalizedTaskId || normalizedRootTaskId || `cancel_scope=${normalizedCancelScope || 'TASK'}`
 
       try {
@@ -54,11 +64,14 @@ export abstract class AbstractWorkerManager {
     }
   }
 
-  // 子类必须实现具体的任务执行逻辑
   protected abstract run(task: TaskInfo): Promise<void>
 
   protected async abortCurrentTask(): Promise<void> {
-    // 子类按需覆盖，默认不执行额外中断逻辑
+    // 子类按需覆盖
+  }
+
+  protected isCancellationRequested(): boolean {
+    return this.currentCancelled || this.currentAbortRequested
   }
 
   protected async requestNextTask(): Promise<void> {
@@ -76,7 +89,7 @@ export abstract class AbstractWorkerManager {
       }
 
       if (!result.data) {
-        logger.info(`没有可 CLAIM 的任务(类型: ${this.taskType})`)
+        logger.debug(`没有可 CLAIM 的任务(类型: ${this.taskType})`)
         return
       }
 
@@ -91,24 +104,41 @@ export abstract class AbstractWorkerManager {
     }
   }
 
-  // 2. 执行引擎
   protected async runEngine(task: TaskInfo): Promise<void> {
     this.status = WorkerStatus.EXECUTING
     this.currentTask = task
     this.currentCancelled = false
+    this.currentAbortRequested = false
     this.currentCancelReason = undefined
     let taskError: Error | undefined
+    const startedAt = Date.now()
+    const timeoutMs = this.getTaskTimeoutMs()
 
-    // 开启心跳上报定时器 (每30秒)
-    const heartbeatTimer = this.currentCancelled
-      ? null
-      : setInterval(() => {
-          void this.sendHeartbeat(task.id)
-        }, 30000)
+    if (timeoutMs > 0) {
+      logger.info(
+        `容错监控已启用: type=${this.taskType} taskId=${task.id} timeout=${this.formatDuration(timeoutMs)}`
+      )
+    }
+
+    const heartbeatTimer = setInterval(() => {
+      void this.sendHeartbeat(task.id)
+    }, AbstractWorkerManager.HEARTBEAT_INTERVAL_MS)
+    const reminderIntervalMs = Math.max(Number(this.faultMonitorReminderIntervalMs || 0) || 0, 0)
+    const faultMonitorTimer =
+      timeoutMs > 0 && reminderIntervalMs > 0
+        ? setInterval(() => {
+            logger.info(
+              `容错监控中: type=${this.taskType} taskId=${task.id} elapsed=${this.formatDuration(
+                Date.now() - startedAt
+              )} timeout=${this.formatDuration(timeoutMs)}`
+            )
+          }, reminderIntervalMs)
+        : null
+    faultMonitorTimer?.unref?.()
 
     try {
-      if (!taskError && !this.currentCancelled) {
-        await this.run(task)
+      if (!this.currentCancelled) {
+        await this.executeTaskWithWatchdog(task)
       }
     } catch (e) {
       taskError = e as Error
@@ -121,12 +151,16 @@ export abstract class AbstractWorkerManager {
       if (heartbeatTimer) {
         clearInterval(heartbeatTimer)
       }
+      if (faultMonitorTimer) {
+        clearInterval(faultMonitorTimer)
+      }
       await this.finalizeTaskExecution(task, taskError)
     }
   }
 
   private async sendHeartbeat(taskId: string): Promise<void> {
     try {
+      logger.debug(`发送任务心跳：${taskId}`)
       await heartbeatAsync(taskId)
     } catch (error) {
       logger.warn(`任务心跳上报失败: taskId=${taskId} error=${(error as Error)?.message || error}`)
@@ -135,7 +169,8 @@ export abstract class AbstractWorkerManager {
 
   private async sendReport(taskId: string, taskStatus: TaskStatus, error?: string): Promise<void> {
     try {
-      await reportAsync(taskId, taskStatus, error)
+      logger.debug(`发送任务状态：${taskId} status=${taskStatus}`)
+      await taskReportRetryService.reportTaskStatus(taskId, taskStatus, error)
     } catch (reportError) {
       logger.error(`任务状态上报失败: taskId=${taskId} status=${taskStatus} error=${(reportError as Error)?.message || reportError}`)
     }
@@ -153,12 +188,68 @@ export abstract class AbstractWorkerManager {
         await this.sendReport(task.id, TaskStatus.Completed)
       }
     } finally {
-      this.currentTask = undefined
-      this.currentCancelled = false
-      this.currentCancelReason = undefined
+      this.resetCurrentExecutionState()
       this.status = WorkerStatus.IDLE
       await this.requestNextTask()
     }
+  }
+
+  private async executeTaskWithWatchdog(task: TaskInfo): Promise<void> {
+    const timeoutMs = this.getTaskTimeoutMs()
+    if (!timeoutMs) {
+      await this.run(task)
+      return
+    }
+
+    let timeoutId: NodeJS.Timeout | null = null
+    let timedOut = false
+    const taskPromise = this.run(task).catch((error) => {
+      if (timedOut) {
+        logger.warn(`任务超时后的后台执行已结束: type=${this.taskType} taskId=${task.id}`)
+        return
+      }
+      throw error
+    })
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true
+        this.currentAbortRequested = true
+        reject(new Error(`${this.taskType} task execution timeout after ${timeoutMs}ms`))
+      }, timeoutMs)
+      timeoutId.unref?.()
+    })
+
+    try {
+      await Promise.race([taskPromise, timeoutPromise])
+    } catch (error) {
+      if (timedOut) {
+        logger.error(`任务执行超时: type=${this.taskType} taskId=${task.id} timeoutMs=${timeoutMs}`)
+        try {
+          await this.abortCurrentTask()
+        } catch (abortError) {
+          logger.error(
+            `任务超时后中断失败: type=${this.taskType} taskId=${task.id} error=${(abortError as Error)?.message || abortError}`
+          )
+        }
+      }
+      throw error
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }
+
+  private getTaskTimeoutMs(): number {
+    return Math.max(Number(this.taskTimeoutMs || 0) || 0, 0)
+  }
+
+  private resetCurrentExecutionState(): void {
+    this.currentTask = undefined
+    this.currentCancelled = false
+    this.currentAbortRequested = false
+    this.currentCancelReason = undefined
   }
 
   private matchesCancellation(task: TaskInfo, taskId: string, rootTaskId: string, cancelScope: string): boolean {
@@ -210,5 +301,16 @@ export abstract class AbstractWorkerManager {
       return String(value).trim()
     }
     return ''
+  }
+
+  private formatDuration(durationMs: number): string {
+    const totalSeconds = Math.max(Math.floor(durationMs / 1000), 0)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+
+    if (hours > 0) {
+      return `${hours}h${minutes > 0 ? `${minutes}m` : ''}`
+    }
+    return `${Math.max(minutes, 1)}m`
   }
 }

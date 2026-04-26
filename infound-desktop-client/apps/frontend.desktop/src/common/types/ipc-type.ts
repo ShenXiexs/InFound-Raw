@@ -1,5 +1,5 @@
 import { AppReleaseInfo, AppState } from '@infound/desktop-base'
-import { LoggerLevel } from '@infound/desktop-electron'
+import { LoggerLevel } from '@infound/desktop-electron/types'
 import { TkShopOpenWindowPayload, TkShopSetting } from '@common/types/tk-type'
 import { Tab } from '@common/types/tab-type'
 
@@ -53,6 +53,7 @@ export const IPC_CHANNELS = {
 
   TK_SHOP_OPEN_WINDOW: 'tk-shop-open-window',
   TK_SHOP_GET_TKSHOP_SETTING: 'tk-shop-get-tk-shop-setting',
+  TK_SHOP_GET_OPEN_IDS: 'tk-shop-get-open-ids',
   TK_SHOP_GET_ENTRIES: 'tk-shop-get-entries',
   TK_SHOP_ADD: 'tk-shop-add',
   TK_SHOP_LIST: 'tk-shop-list',
@@ -134,6 +135,7 @@ export interface AppProtocol {
 
   [IPC_CHANNELS.TK_SHOP_OPEN_WINDOW]: { params: [TkShopOpenWindowPayload]; return: void }
   [IPC_CHANNELS.TK_SHOP_GET_TKSHOP_SETTING]: { params: [number]; return: { success: boolean; data: TkShopSetting } }
+  [IPC_CHANNELS.TK_SHOP_GET_OPEN_IDS]: { params: []; return: { success: boolean; data?: string[]; error?: string } }
   [IPC_CHANNELS.TK_SHOP_GET_ENTRIES]: {
     params: []
     return: {

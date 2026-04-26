@@ -1,5 +1,5 @@
 import path from 'path'
-import { BrowserWindow, type WebContents, shell } from 'electron'
+import { BrowserWindow, shell, type WebContents } from 'electron'
 import { AppConfig } from '@common/app-config'
 import { buildEmbedPageUrl } from '../services/embed-page-url'
 import { getFilePath } from '../utils/path-helper'
@@ -52,9 +52,10 @@ export class EmbedModalWindowManager {
           show: false,
           center: true,
           icon: ResourceFactory.getTrayIcon(),
-          frame: true,
+          frame: false,
           autoHideMenuBar: true,
           backgroundColor: '#FFFFFF',
+          movable: true,
           maximizable: true,
           minimizable: true,
           resizable: true,
@@ -63,7 +64,7 @@ export class EmbedModalWindowManager {
             webSecurity: false,
             sandbox: false,
             devTools: !AppConfig.IS_PRO,
-            partition: 'persist:main'
+            partition: 'persist:embed'
           }
         })
 

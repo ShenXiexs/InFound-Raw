@@ -1,11 +1,11 @@
-import { LoggerLevel } from '@infound/desktop-electron'
 import {
   OutreachFilterConfigInput,
   PlaywrightSimulationPayloadInput,
   SampleManagementPayloadInput,
   SellerChatbotPayloadInput,
   SellerCreatorDetailPayloadInput
-} from '@desktop-rpa'
+} from '@infound/desktop-rpa'
+import { LoggerLevel } from '@infound/desktop-electron/types'
 
 export const IPC_CHANNELS = {
   APP_LOGGER: 'app-logger',

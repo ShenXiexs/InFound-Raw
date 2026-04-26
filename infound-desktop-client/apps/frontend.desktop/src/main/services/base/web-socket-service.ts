@@ -167,6 +167,14 @@ export class WebSocketService {
     return true
   }
 
+  public async disconnect(): Promise<void> {
+    if (this.client) {
+      logger.info('断开 websocket 连接')
+      await this.client.deactivate()
+      this.client = null
+    }
+  }
+
   private createClient(options: { serverUrl: string; onConnect: (client: Client) => void }): Client {
     const auth = resolveWsAuthHeader()
     if (!auth) {
@@ -212,14 +220,6 @@ export class WebSocketService {
       reconnectDelay: 3000
     })
     return client
-  }
-
-  public async disconnect(): Promise<void> {
-    if (this.client) {
-      logger.info('断开 websocket 连接')
-      await this.client.deactivate()
-      this.client = null
-    }
   }
 
   private subscribeUserNotifications(client: Client, userId: string): void {
@@ -301,10 +301,10 @@ export class WebSocketService {
 
       if (eventType === 'NEW_TASK_READY' && taskType) {
         logger.info(`收到新任务触发通知，立即尝试 claim: eventType=${eventType} taskType=${taskType} taskId=${toText(payload.taskId) || '(empty)'}`)
-        await taskWorkersManager.wakeUp(taskType)
+        await taskWorkersManager.declareIdle(taskType)
       } else if (eventType === 'NEW_TASK_READY') {
         logger.info(`收到新任务触发通知但未携带 taskType，唤醒全部 worker 竞争 claim`)
-        await taskWorkersManager.wakeUp()
+        await taskWorkersManager.declareIdle()
       }
     } catch (error) {
       logger.error(`RPA 任务通知处理失败: ${(error as Error)?.message || error}`)

@@ -22,11 +22,13 @@ export const TAB_TYPES = {
 
 export const TK_CONTENTS = {
   KEY: 'tk',
-  BASE_DOMAIN: '.tiktok.com',
+  BASE_DOMAINS: ['.tiktok.com', '.tiktokshopglobalselling.com'],
   LOGIN_PAGE_URL_FLAG: '/login',
   DEFAULT_TITLE: '商家中心',
+  URL_PATTERNS: ['https://*.tiktok.com/*', 'https://*.tiktokshopglobalselling.com/*'],
   LOGIN_STATE_COOKIE_KEY: 'sid_guard_tiktokseller',
-  PLATFORM_SHOP_ID_COOKIE_KEYS: ['SHOP_ID', 'oec_seller_id_unified_seller_env', 'global_seller_id_unified_seller_env']
+  ATLAS_LANG_COOKIE_KEY: 'atlas_lang',
+  PLATFORM_SELLER_ID_COOKIE_KEYS: ['oec_seller_id_unified_seller_env', 'global_seller_id_unified_seller_env']
 } as const
 
 export const TAB_MAX_COUNT = 20
@@ -38,3 +40,15 @@ export const REGEX = {
   //密码长度范围 8 ~ 16，字母、数字、特殊符号 三选二，不允许中间有空格
   PASSWORD: /^(?![a-zA-Z]+$)(?!\d+$)(?![!@#$%^&*]+$)(?![a-zA-Z\d]+$)(?![a-zA-Z!@#$%^&*]+$)(?![\d!@#$%^&*]+$)[a-zA-Z\d!@#$%^&*]{8,16}$/
 } as const
+
+//todo：暂时放这，应放util类似的方法类
+export function isTikTokDomain(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    return TK_CONTENTS.BASE_DOMAINS.some((domain) => {
+      return host === domain.slice(1) || host.endsWith(domain)
+    })
+  } catch {
+    return false
+  }
+}

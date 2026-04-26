@@ -1,11 +1,8 @@
-import { BaseWindow, session, WebContentsView } from 'electron'
+import { app, BaseWindow, session, WebContentsView } from 'electron'
 import { join } from 'path'
 import { logger } from '../utils/logger'
 import { AppConfig } from '@common/app-config'
-import type {
-  BrowserPaginationResult,
-  BrowserSelectorState
-} from '@desktop-rpa/seller-rpa/task-dsl/browser-actions'
+import { BrowserPaginationResult, BrowserSelectorState } from '@infound/desktop-rpa'
 
 interface JsonResponseCaptureSession {
   captureKey: string
@@ -59,7 +56,7 @@ export class TkWcv {
     this.tkWCV = new WebContentsView({
       webPreferences: {
         partition: persistKey,
-        preload: join(__dirname, '../preload/index.js'),
+        preload: join(__dirname, '../preload/index.cjs'),
         session: sess,
         devTools: !AppConfig.IS_PRO,
         contextIsolation: true, // 强制开启，防止网页 JS 访问主进程模块
@@ -73,6 +70,7 @@ export class TkWcv {
       }
     })
 
+    logger.debug('原始 UA:' + app.userAgentFallback + ',设置UA:' + AppConfig.USER_AGENT)
     this.tkWCV.webContents.setUserAgent(AppConfig.USER_AGENT)
 
     //monitorNavigation(logger, this.tkWCV.webContents)
@@ -143,57 +141,11 @@ export class TkWcv {
     this.loginMonitorStartedAt = 0
   }
 
-  private async checkSellerLoginSuccess(): Promise<void> {
-    if (this.loginMonitorInProgress) return
-
-    if (this.loginMonitorStartedAt && Date.now() - this.loginMonitorStartedAt > this.loginDetectTimeoutMs) {
-      logger.warn('登录成功检测超时，停止轮询')
-      this.stopSellerLoginSuccessMonitor()
-      return
-    }
-
-    const wc = this.tkWCV?.webContents
-    if (!wc || wc.isDestroyed()) {
-      this.stopSellerLoginSuccessMonitor()
-      return
-    }
-
-    this.loginMonitorInProgress = true
-    try {
-      const result = await wc.executeJavaScript(
-        `(() => {
-          const bodyText = document?.body?.innerText || ''
-          const hasSuccessText = bodyText.includes(${JSON.stringify(this.loginSuccessText)})
-          return { hasSuccessText, href: location.href }
-        })()`
-      )
-
-      if (!result?.hasSuccessText) return
-
-      const href = String(result?.href || '')
-      const region = this.extractShopRegion(href)
-      if (!region) {
-        logger.warn(`检测到登录成功文案，但无法从 URL 提取 shop_region: ${href}`)
-        return
-      }
-      logger.info(`检测到登录成功，保持当前页面不跳转: ${href}`)
-      logger.info(`已记录登录态与店铺区域: shop_region=${region}，等待后续任务指令`)
-      this.stopSellerLoginSuccessMonitor()
-    } catch (err) {
-      logger.warn(`登录检测执行失败: ${(err as Error)?.message || err}`)
-    } finally {
-      this.loginMonitorInProgress = false
-    }
-  }
-
   public async waitForBodyText(text: string, timeoutMs = 30000, intervalMs = 500): Promise<boolean> {
     return this.waitUntilBodyContainsText(text, timeoutMs, intervalMs)
   }
 
-  public async waitForSelector(
-    selector: string,
-    options?: { state?: BrowserSelectorState; timeoutMs?: number; intervalMs?: number }
-  ): Promise<boolean> {
+  public async waitForSelector(selector: string, options?: { state?: BrowserSelectorState; timeoutMs?: number; intervalMs?: number }): Promise<boolean> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       return false
@@ -239,63 +191,6 @@ export class TkWcv {
     )
 
     return Boolean(result)
-  }
-
-  private async resolveClickablePoint(selector: string): Promise<{ x: number; y: number } | null> {
-    const wc = this.tkWCV?.webContents
-    if (!wc || wc.isDestroyed()) {
-      return null
-    }
-
-    const point = await wc.executeJavaScript(
-      `(() => {
-        const selector = ${JSON.stringify(selector)}
-        const isVisible = (element) => {
-          if (!(element instanceof HTMLElement)) return false
-          const style = window.getComputedStyle(element)
-          if (style.display === 'none' || style.visibility === 'hidden') return false
-          const rect = element.getBoundingClientRect()
-          return rect.width > 0 && rect.height > 0 && (element.offsetParent !== null || style.position === 'fixed')
-        }
-
-        return (async () => {
-          const candidates = Array.from(document.querySelectorAll(selector))
-          const node = candidates.find((candidate) => isVisible(candidate)) || candidates[0] || null
-          if (!(node instanceof HTMLElement)) return null
-
-          node.scrollIntoView({ block: 'center', inline: 'center' })
-          if (typeof node.focus === 'function') {
-            node.focus({ preventScroll: true })
-          }
-
-          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-
-          const rect = node.getBoundingClientRect()
-          if (!rect.width || !rect.height) return null
-
-          const x = Math.round(rect.left + rect.width / 2)
-          const y = Math.round(rect.top + rect.height / 2)
-          const topNode = document.elementFromPoint(x, y)
-          if (!topNode) return { x, y }
-
-          if (topNode === node || node.contains(topNode) || topNode.contains(node)) {
-            return { x, y }
-          }
-
-          return { x, y }
-        })()
-      })()`,
-      true
-    )
-
-    if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
-      return null
-    }
-
-    return {
-      x: Math.max(1, Math.round(point.x)),
-      y: Math.max(1, Math.round(point.y))
-    }
   }
 
   public async clickSelector(selector: string, options?: { native?: boolean }): Promise<void> {
@@ -497,11 +392,7 @@ export class TkWcv {
     }
   }
 
-  public async fillSelector(
-    selector: string,
-    value: string,
-    options?: { clearBeforeFill?: boolean; timeoutMs?: number; intervalMs?: number }
-  ): Promise<void> {
+  public async fillSelector(selector: string, value: string, options?: { clearBeforeFill?: boolean; timeoutMs?: number; intervalMs?: number }): Promise<void> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       throw new Error('WebContents 不可用，无法执行 fillSelector')
@@ -770,10 +661,7 @@ export class TkWcv {
     }
   }
 
-  public async selectTab(
-    label: string,
-    options?: { tabSelector?: string; labelSelector?: string; timeoutMs?: number; intervalMs?: number }
-  ): Promise<boolean> {
+  public async selectTab(label: string, options?: { tabSelector?: string; labelSelector?: string; timeoutMs?: number; intervalMs?: number }): Promise<boolean> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       return false
@@ -840,10 +728,7 @@ export class TkWcv {
     return Boolean(ok)
   }
 
-  public async waitForElementCount(
-    selector: string,
-    options?: { minCount?: number; timeoutMs?: number; intervalMs?: number }
-  ): Promise<number> {
+  public async waitForElementCount(selector: string, options?: { minCount?: number; timeoutMs?: number; intervalMs?: number }): Promise<number> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       return 0
@@ -879,12 +764,7 @@ export class TkWcv {
     return Number.isFinite(parsed) ? parsed : 0
   }
 
-  public async clickPaginationNext(options?: {
-    nextSelector?: string
-    disabledClassContains?: string
-    timeoutMs?: number
-    intervalMs?: number
-  }): Promise<BrowserPaginationResult> {
+  public async clickPaginationNext(options?: { nextSelector?: string; disabledClassContains?: string; timeoutMs?: number; intervalMs?: number }): Promise<BrowserPaginationResult> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       return 'no_more_pages'
@@ -932,12 +812,7 @@ export class TkWcv {
     return result === 'moved' ? 'moved' : 'no_more_pages'
   }
 
-  public async closeDrawer(options?: {
-    drawerSelector?: string
-    closeSelector?: string
-    timeoutMs?: number
-    intervalMs?: number
-  }): Promise<boolean> {
+  public async closeDrawer(options?: { drawerSelector?: string; closeSelector?: string; timeoutMs?: number; intervalMs?: number }): Promise<boolean> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       return false
@@ -1022,12 +897,7 @@ export class TkWcv {
     return Boolean(closed)
   }
 
-  public async startJsonResponseCapture(options: {
-    captureKey: string
-    urlIncludes: string
-    method?: string
-    reset?: boolean
-  }): Promise<void> {
+  public async startJsonResponseCapture(options: { captureKey: string; urlIncludes: string; method?: string; reset?: boolean }): Promise<void> {
     const wc = this.tkWCV?.webContents
     if (!wc || wc.isDestroyed()) {
       throw new Error('WebContents 不可用，无法启动 JSON 响应捕获')
@@ -1107,9 +977,7 @@ export class TkWcv {
               requestId
             })) as { body?: string; base64Encoded?: boolean }
 
-            const rawBody = responseBody.base64Encoded
-              ? Buffer.from(String(responseBody.body || ''), 'base64').toString('utf8')
-              : String(responseBody.body || '')
+            const rawBody = responseBody.base64Encoded ? Buffer.from(String(responseBody.body || ''), 'base64').toString('utf8') : String(responseBody.body || '')
             if (!rawBody) return
 
             const parsedBody = JSON.parse(rawBody)
@@ -1133,9 +1001,7 @@ export class TkWcv {
 
     wc.debugger.on('message', session.listener)
     this.jsonResponseCaptures.set(captureKey, session)
-    logger.info(
-      `启动 JSON 响应捕获: key=${captureKey} urlIncludes=${urlIncludes}${session.requestMethod ? ` method=${session.requestMethod}` : ''}`
-    )
+    logger.info(`启动 JSON 响应捕获: key=${captureKey} urlIncludes=${urlIncludes}${session.requestMethod ? ` method=${session.requestMethod}` : ''}`)
   }
 
   public async collectJsonResponsesByScrolling(options: {
@@ -1286,6 +1152,125 @@ export class TkWcv {
 
   public async waitForDelay(ms: number): Promise<void> {
     await this.sleep(ms)
+  }
+
+  public getWebContentsView(): WebContentsView {
+    return this.tkWCV!
+  }
+
+  public resize(): void {
+    const [contentWidth, contentHeight] = this.baseWindow!.getContentSize()
+
+    this.tkWCV!.setBounds({
+      x: 0,
+      y: 120,
+      width: contentWidth,
+      height: contentHeight - 120
+    })
+
+    if (!this.tkWCV!.getVisible()) {
+      this.tkWCV!.setVisible(true)
+    }
+  }
+
+  private async checkSellerLoginSuccess(): Promise<void> {
+    if (this.loginMonitorInProgress) return
+
+    if (this.loginMonitorStartedAt && Date.now() - this.loginMonitorStartedAt > this.loginDetectTimeoutMs) {
+      logger.warn('登录成功检测超时，停止轮询')
+      this.stopSellerLoginSuccessMonitor()
+      return
+    }
+
+    const wc = this.tkWCV?.webContents
+    if (!wc || wc.isDestroyed()) {
+      this.stopSellerLoginSuccessMonitor()
+      return
+    }
+
+    this.loginMonitorInProgress = true
+    try {
+      const result = await wc.executeJavaScript(
+        `(() => {
+          const bodyText = document?.body?.innerText || ''
+          const hasSuccessText = bodyText.includes(${JSON.stringify(this.loginSuccessText)})
+          return { hasSuccessText, href: location.href }
+        })()`
+      )
+
+      if (!result?.hasSuccessText) return
+
+      const href = String(result?.href || '')
+      const region = this.extractShopRegion(href)
+      if (!region) {
+        logger.warn(`检测到登录成功文案，但无法从 URL 提取 shop_region: ${href}`)
+        return
+      }
+      logger.info(`检测到登录成功，保持当前页面不跳转: ${href}`)
+      logger.info(`已记录登录态与店铺区域: shop_region=${region}，等待后续任务指令`)
+      this.stopSellerLoginSuccessMonitor()
+    } catch (err) {
+      logger.warn(`登录检测执行失败: ${(err as Error)?.message || err}`)
+    } finally {
+      this.loginMonitorInProgress = false
+    }
+  }
+
+  private async resolveClickablePoint(selector: string): Promise<{ x: number; y: number } | null> {
+    const wc = this.tkWCV?.webContents
+    if (!wc || wc.isDestroyed()) {
+      return null
+    }
+
+    const point = await wc.executeJavaScript(
+      `(() => {
+        const selector = ${JSON.stringify(selector)}
+        const isVisible = (element) => {
+          if (!(element instanceof HTMLElement)) return false
+          const style = window.getComputedStyle(element)
+          if (style.display === 'none' || style.visibility === 'hidden') return false
+          const rect = element.getBoundingClientRect()
+          return rect.width > 0 && rect.height > 0 && (element.offsetParent !== null || style.position === 'fixed')
+        }
+
+        return (async () => {
+          const candidates = Array.from(document.querySelectorAll(selector))
+          const node = candidates.find((candidate) => isVisible(candidate)) || candidates[0] || null
+          if (!(node instanceof HTMLElement)) return null
+
+          node.scrollIntoView({ block: 'center', inline: 'center' })
+          if (typeof node.focus === 'function') {
+            node.focus({ preventScroll: true })
+          }
+
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+          const rect = node.getBoundingClientRect()
+          if (!rect.width || !rect.height) return null
+
+          const x = Math.round(rect.left + rect.width / 2)
+          const y = Math.round(rect.top + rect.height / 2)
+          const topNode = document.elementFromPoint(x, y)
+          if (!topNode) return { x, y }
+
+          if (topNode === node || node.contains(topNode) || topNode.contains(node)) {
+            return { x, y }
+          }
+
+          return { x, y }
+        })()
+      })()`,
+      true
+    )
+
+    if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
+      return null
+    }
+
+    return {
+      x: Math.max(1, Math.round(point.x)),
+      y: Math.max(1, Math.round(point.y))
+    }
   }
 
   private async ensureNetworkDebuggerReady(wc: Electron.WebContents): Promise<void> {
@@ -1442,7 +1427,9 @@ export class TkWcv {
   }
 
   private async waitUntilBodyContainsText(text: string, timeoutMs: number, intervalMs: number): Promise<boolean> {
-    const expected = String(text || '').trim().toLowerCase()
+    const expected = String(text || '')
+      .trim()
+      .toLowerCase()
     if (!expected) return false
 
     const wc = this.tkWCV?.webContents
@@ -1475,24 +1462,5 @@ export class TkWcv {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms))
-  }
-
-  public getWebContentsView(): WebContentsView {
-    return this.tkWCV!
-  }
-
-  public resize(): void {
-    const [contentWidth, contentHeight] = this.baseWindow!.getContentSize()
-
-    this.tkWCV!.setBounds({
-      x: 0,
-      y: 120,
-      width: contentWidth,
-      height: contentHeight - 120
-    })
-
-    if (!this.tkWCV!.getVisible()) {
-      this.tkWCV!.setVisible(true)
-    }
   }
 }

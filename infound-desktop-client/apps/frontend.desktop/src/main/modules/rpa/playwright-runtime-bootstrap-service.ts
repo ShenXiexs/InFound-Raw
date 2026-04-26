@@ -24,10 +24,7 @@ class PlaywrightRuntimeBootstrapService {
     }
 
     logger.info('开始预热 Playwright 浏览器资源')
-    const results = await Promise.allSettled([
-      getPlaywrightBrowserPath(false),
-      getPlaywrightBrowserPath(true)
-    ])
+    const results = await Promise.allSettled([getPlaywrightBrowserPath(false, logger), getPlaywrightBrowserPath(true, logger)])
 
     const fullResult = results[0]
     const headlessResult = results[1]
@@ -42,9 +39,7 @@ class PlaywrightRuntimeBootstrapService {
 
     const fullPath = fullResult.status === 'fulfilled' ? fullResult.value : ''
     const headlessPath = headlessResult.status === 'fulfilled' ? headlessResult.value : ''
-    logger.info(
-      `Playwright 浏览器资源预热完成: full=${fullPath || '(empty)'} headless=${headlessPath || '(empty)'}`
-    )
+    logger.info(`Playwright 浏览器资源预热完成: full=${fullPath || '(empty)'} headless=${headlessPath || '(empty)'}`)
   }
 }
 

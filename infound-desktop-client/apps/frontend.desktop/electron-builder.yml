@@ -7,31 +7,14 @@ files:
   - 'out/**/*'
   - 'package.json'
   - "node_modules/**/*"
-  #  - 'node_modules/@infound/*/dist/**/*'
-  #  - 'node_modules/@infound/*/package.json'
-  #  - 'node_modules/electron-log/**/*'
-  #  - 'node_modules/electron-log/src/**/*'
-  #  - 'node_modules/electron-store/**/*'
-  #  - 'node_modules/electron-updater/**/*'
-  #  - 'node_modules/keytar/**/*'
-  #  - 'node_modules/node-machine-id/**/*'
-  #  - 'node_modules/playwright-core/**/*'
-  #  - 'node_modules/playwright-extra/**/*'
-  #  - 'node_modules/puppeteer-extra-plugin-stealth/**/*'
-  #  - 'node_modules/pino/**/*'
-  #  - "node_modules/pino-roll/**/*"
-  #  - 'node_modules/radash/**/*'
-  #  - 'node_modules/reflect-metadata/**/*'
-  #  - 'node_modules/@stomp/**/*'
-  #  - 'node_modules/vfonts/**/*'
-  #  - 'node_modules/ws/**/*'
-  - '!node_modules/**/{src,test,tests,__tests__}/**'     # 排除所有源码目录
+  - '!node_modules/**/{test,tests,__tests__}/**'
   - '!node_modules/**/*.{md,ts,tsx,map}'                 # 排除所有文档和源码文件
   - '!node_modules/**/tsconfig*.json'                    # 排除 TS 配置
   - '!node_modules/**/.gitignore'                        # 排除 Git 配置
   - '!node_modules/playwright-core/.local-browsers/**/*'
   - '!node_modules/@playwright/browser-chromium/**/*'
   - '!node_modules/@types/**'
+# asar: false
 asarUnpack:
   - "**/*.node"
 extraResources:
@@ -48,20 +31,24 @@ win:
       arch:
         - x64
   extraResources:
-    - from: ./build/chrome-headless-shell-win64.zip
-      to: ./browser/chrome-headless-shell.zip
+    #    - from: ./build/chrome-headless-shell-win64.zip
+    #      to: ./browser/chrome-headless-shell.zip
+    - from: ./build/chrome-win64.zip
+      to: ./browser/chrome.zip
 nsis:
-  allowToChangeInstallationDirectory: true  # 允许用户自定义安装路径
-  artifactName: xunda-${version}-${arch}.${ext}  # 安装包命名格式
-  createDesktopShortcut: always  # 始终创建桌面快捷方式
-  createStartMenuShortcut: true  # 创建开始菜单快捷方式
-  oneClick: false  # 非一键安装模式（显示安装向导）
-  runAfterFinish: true  # 安装完成后自动运行应用
-  shortcutName: 寻达  # 快捷方式名称
-  uninstallDisplayName: 寻达  # 卸载程序中显示的名称
+  allowElevation: true                                # 重点：安装时请求管理员权限
+  allowToChangeInstallationDirectory: true            # 允许用户自定义安装路径
+  artifactName: xunda-${version}-win-${arch}.${ext}   # 安装包命名格式
+  createDesktopShortcut: always                       # 始终创建桌面快捷方式
+  createStartMenuShortcut: true                       # 创建开始菜单快捷方式
+  oneClick: false                                     # 非一键安装模式（显示安装向导）
+  perMachine: true                                    # 重点：设为 true 默认安装到 Program Files
+  runAfterFinish: true                                # 安装完成后自动运行应用
+  shortcutName: 寻达                                   # 快捷方式名称
+  uninstallDisplayName: 寻达                           # 卸载程序中显示的名称
 mac:
   icon: "build/icon.icns"
-  artifactName: xunda-${version}-${arch}.${ext}
+  artifactName: xunda-${version}-mac-${arch}.${ext}
   category: "public.app-category.utilities"
   identity: null
   extendInfo:
@@ -72,11 +59,17 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
   target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
     - target: zip
       arch:
         - x64
-  #        - arm64
+        - arm64
   extraResources:
+    - from: ./build/chrome-mac-${arch}.zip
+      to: ./browser/chrome.zip
     - from: ./build/chrome-headless-shell-mac-${arch}.zip
       to: ./browser/chrome-headless-shell.zip
 dmg:
@@ -89,8 +82,6 @@ dmg:
       y: 150
       type: "link"
       path: "/Applications"
-npmArgs:
-  - --omit=dev
 npmRebuild: true
 publish:
   provider: generic
@@ -99,4 +90,4 @@ electronDownload:
   mirror: https://mirrors.huaweicloud.com/electron/
 releaseInfo:
   releaseNotesFile: release-notes.md
-electronVersion: 40.8.4
+electronVersion: 41.1.1

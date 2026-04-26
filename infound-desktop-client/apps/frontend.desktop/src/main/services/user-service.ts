@@ -2,29 +2,19 @@ import { AuthenticationException } from '../modules/exception/exception-types'
 import { BaseApiResponse } from '../utils/net-request'
 import openapiRequest from './base/open-api-service'
 import { API_ENDPOINTS } from './endpoints'
+import { UserPermissionInfo } from '@infound/desktop-base'
 
 export interface UserInfoResponse {
   userId: string
   username: string
-  nickname?: string
-  avatar?: string
+  phoneNumber: string
+  userType: string
   email?: string
-  phoneNumber?: string
-  enableDebug?: boolean
-  permission: PermissionSetting
-  updateTime?: number
+  avatar?: string
+  nickname?: string
   inviteCode?: string
-  menuItemCount?: number
-}
-
-export interface PermissionSetting {
-  availableCount?: number
-  availableStartDate?: string
-  availableEndDate?: string
-  enableDebug: boolean
-  startTime?: string
-  endTime?: string
-  maxTabs?: number
+  updateTime: string
+  permission?: UserPermissionInfo
 }
 
 export interface LoginResult {
@@ -100,6 +90,6 @@ export async function getCurrentUserAsync(): Promise<BaseApiResponse<UserInfoRes
   return await openapiRequest.get<BaseApiResponse<UserInfoResponse>>(API_ENDPOINTS.user.current)
 }
 
-export async function checkTokenAsync(): Promise<BaseApiResponse<Record<string, any>>> {
-  return await openapiRequest.get<BaseApiResponse<Record<string, any>>>(API_ENDPOINTS.user.checkToken)
+export async function checkTokenAsync(): Promise<BaseApiResponse<UserInfoResponse>> {
+  return await openapiRequest.get<BaseApiResponse<UserInfoResponse>>(API_ENDPOINTS.user.checkToken)
 }

@@ -18,12 +18,23 @@ const allTabs = ref<Tab[]>([])
 const searchKeyword = ref('')
 const dragSourceId = ref<string | null>(null)
 
-const filterTabs = (query: string): void => {
-  query = query.trim().toLowerCase()
-  if (!query) {
+const syncVisibleTabs = (query: string = searchKeyword.value): void => {
+  const normalizedQuery = query.trim().toLowerCase()
+  if (!normalizedQuery) {
+    allTabs.value = currentTabs
     return
   }
-  allTabs.value = currentTabs.filter((tab) => (tab.title && tab.title.toLowerCase().includes(query)) || (tab.url && tab.url.toLowerCase().includes(query)))
+
+  allTabs.value = currentTabs.filter((tab) => (tab.title && tab.title.toLowerCase().includes(normalizedQuery)) || (tab.url && tab.url.toLowerCase().includes(normalizedQuery)))
+}
+
+const filterTabs = (query: string): void => {
+  syncVisibleTabs(query)
+}
+
+const handleClearSearch = (): void => {
+  searchKeyword.value = ''
+  syncVisibleTabs('')
 }
 
 const handleDragStart = (e: DragEvent, tabId: string): void => {
@@ -72,17 +83,20 @@ const handleCloseTab = (tabId: string): void => {
   window.ipc.invoke(IPC_CHANNELS.TABS_MENU_CLOSE_TAB, tabId)
 }
 
-window.initTabs = (activeId: string, tabs: Tab[]) => {
+const handleSwitchTab = (tabId: string): void => {
+  window.ipc.invoke(IPC_CHANNELS.TABS_MENU_SWITCH_TAB, tabId)
+}
+
+window['initTabs'] = (activeId: string, tabs: Tab[]) => {
   currentActiveId = activeId
   currentTabs = tabs
-  allTabs.value = tabs
+  syncVisibleTabs()
 }
 
 window.ipc.on(IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED, (data: { activeId: string; tabs: Tab[] }) => {
-  window.logger.info('标签页更新:')
   currentActiveId = data.activeId
   currentTabs = data.tabs
-  allTabs.value = data.tabs
+  syncVisibleTabs()
 })
 </script>
 
@@ -92,19 +106,7 @@ window.ipc.on(IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED, (data: { activeId: str
     <n-message-provider>
       <n-flex class="app-container" vertical>
         <div class="search-box">
-          <n-input
-            v-model:value="searchKeyword"
-            clearable
-            placeholder="搜索标签页"
-            round
-            type="text"
-            @clear="
-              () => {
-                allTabs = currentTabs
-              }
-            "
-            @input="filterTabs"
-          />
+          <n-input v-model:value="searchKeyword" clearable placeholder="搜索标签页" round type="text" @clear="handleClearSearch" @input="filterTabs" />
         </div>
         <div id="tabList" class="tab-list">
           <div
@@ -118,7 +120,7 @@ window.ipc.on(IPC_CHANNELS.RENDERER_MONITOR_TABS_UPDATED, (data: { activeId: str
             @drop="(e) => handleDrop(e, tab.id)"
           >
             <n-space>
-              <n-button text>
+              <n-button text @click.stop="handleSwitchTab(tab.id)">
                 <template #icon>
                   <n-image :src="tab.favicon" height="16" width="16" />
                 </template>

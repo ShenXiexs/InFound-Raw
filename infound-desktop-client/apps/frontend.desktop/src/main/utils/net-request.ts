@@ -40,6 +40,15 @@ export interface NetResponse<T = any> {
   config: NetRequestConfig
 }
 
+const SUPPRESSED_SUCCESS_REQUEST_LOG_PATTERNS = ['/heartbeat']
+
+const shouldSuppressSuccessRequestLog = (url: string, statusCode?: number): boolean => {
+  if (!statusCode || statusCode >= 400) {
+    return false
+  }
+  return SUPPRESSED_SUCCESS_REQUEST_LOG_PATTERNS.some((pattern) => String(url || '').includes(pattern))
+}
+
 export default class NetRequest {
   private _axiosApiCookie: string | undefined
   private _interceptorHooks?: InterceptorHooks
@@ -111,7 +120,9 @@ export default class NetRequest {
         request.on('response', (response: IncomingMessage) => {
           const chunks: Buffer[] = []
           // 记录请求日志
-          logger.info(`Request: ${finalConfig.method || 'GET'} ${finalConfig.url} - Status: ${response.statusCode}`)
+          if (!shouldSuppressSuccessRequestLog(finalConfig.url, response.statusCode)) {
+            logger.debug(`Request: ${finalConfig.method || 'GET'} ${finalConfig.url} - Status: ${response.statusCode}`)
+          }
           response.on('data', (chunk: Buffer) => chunks.push(chunk))
           response.on('end', async () => {
             if (timeoutId) clearTimeout(timeoutId)
@@ -132,7 +143,7 @@ export default class NetRequest {
             if (setCookie) {
               this._axiosApiCookie = setCookie as string
               appStore.set('apiCookie', this._axiosApiCookie)
-              logger.info('Set-Cookie: ' + this._axiosApiCookie)
+              logger.debug('Set-Cookie: ' + this._axiosApiCookie)
             }
 
             const netResponse: NetResponse<T> = {

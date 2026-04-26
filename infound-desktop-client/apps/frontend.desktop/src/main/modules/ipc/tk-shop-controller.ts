@@ -34,6 +34,16 @@ export class TkShopController {
     throw new Error('未找到 TK 店铺设置')
   }
 
+  @IPCHandle(IPCGateway.TK, IPC_CHANNELS.TK_SHOP_GET_OPEN_IDS, IPCType.INVOKE)
+  async getOpenShopIds(): Promise<{ success: boolean; data?: string[]; error?: string }> {
+    try {
+      return { success: true, data: appWindowsAndViewsManager.tkShopWindowManager.getOpenShopIds() }
+    } catch (error: any) {
+      logger.error('获取已打开店铺列表失败', error)
+      return { success: false, error: error?.message || '获取已打开店铺列表失败' }
+    }
+  }
+
   @IPCHandle(IPCGateway.TK, IPC_CHANNELS.TK_SHOP_GET_ENTRIES, IPCType.INVOKE)
   async getShopEntries(): Promise<{ success: boolean; data?: Record<string, any>[]; error?: string }> {
     try {

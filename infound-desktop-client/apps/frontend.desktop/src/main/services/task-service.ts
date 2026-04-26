@@ -40,11 +40,21 @@ export async function heartbeatAsync(taskId: string): Promise<BaseApiResponse<Re
   return await openapiRequest.post<BaseApiResponse>(url)
 }
 
-export async function reportAsync(taskId: string, taskStatus: TaskStatus, error?: string): Promise<BaseApiResponse<Record<string, any>>> {
+export async function reportAsync(
+  taskId: string,
+  taskStatus: TaskStatus,
+  error?: string,
+  options?: {
+    timeoutMs?: number
+  }
+): Promise<BaseApiResponse<Record<string, any>>> {
   const url = buildTaskEndpoint(API_ENDPOINTS.task.report, taskId)
   const payload = {
     task_status: taskStatus,
     error
   }
-  return await openapiRequest.post<BaseApiResponse>(url, payload)
+  return await openapiRequest.post<BaseApiResponse>(url, payload, {
+    url,
+    timeout: options?.timeoutMs
+  })
 }

@@ -54,23 +54,25 @@ export class AuthController {
         return { success: false, error: userInfoResult?.msg || '登录成功但获取用户信息失败' }
       }
 
-      const serverUser = userInfoResult.data
-      if (!serverUser.userId?.trim() || !serverUser.username?.trim()) {
+      const userInfo = userInfoResult.data
+      if (!userInfo.userId?.trim() || !userInfo.username?.trim()) {
         return { success: false, error: '登录成功但用户信息不完整' }
       }
 
-      const enableDebug = Boolean(serverUser.permission?.enableDebug ?? serverUser.enableDebug)
+      const enableDebug = Boolean(userInfo.permission?.enableDebug ?? false)
       const currentUser: CurrentUserInfo = {
-        ...serverUser,
-        userId: serverUser.userId,
-        username: serverUser.username,
+        ...userInfo,
+        userId: userInfo.userId,
+        username: userInfo.username,
+        phoneNumber: userInfo.phoneNumber,
+        userType: userInfo.userType,
         tokenName: token.tokenName,
         tokenValue: token.tokenValue,
-        enableDebug: enableDebug
+        updateTime: new Date(userInfo.updateTime).getTime()
       } as CurrentUserInfo
 
       await globalState.saveState('currentUser', currentUser)
-      await globalState.saveState('currentUser.tokenValue', currentUser.tokenValue)
+      //await globalState.saveState('currentUser.tokenValue', currentUser.tokenValue)
       await globalState.saveState('isLogin', true)
       await globalState.saveState('enableDebug', enableDebug)
 
@@ -91,9 +93,8 @@ export class AuthController {
     try {
       appStore.set('apiCookie', null)
       await globalState.saveState('isLogin', false)
-      await globalState.saveState('enableDebug', false)
       await globalState.saveState('currentUser', null)
-      await globalState.saveState('currentUser.tokenValue', '')
+      //await globalState.saveState('currentUser.tokenValue', '')
       return { success: true }
     } catch (error: any) {
       logger.error('退出登录失败', error)
@@ -126,7 +127,26 @@ export class AuthController {
     try {
       const result = await checkTokenAsync()
       if (result?.code === 200) {
-        return { success: true, code: result.code, data: result.data || {} }
+        //logger.debug('校验 token 成功', result.data)
+        const permission = result.data?.permission
+        if (permission) {
+          const dateNow = new Date()
+          const startTime = new Date(permission.availableDateRang.start)
+          const endTime = new Date(permission.availableDateRang.end)
+
+          if (startTime < dateNow && endTime > dateNow) {
+            await globalState.saveState('currentUser.permission', permission)
+
+            /*if (maxTabs != user.maxTabs) {
+              await appWindowsAndViewsManager.waChatTabManager.resetMaxTabs(user.maxTabs)
+            }*/
+
+            return { success: true, code: result.code, data: result.data || {} }
+          }
+        } else {
+          this.logout().then(() => {})
+          return { success: false }
+        }
       }
       return { success: false, code: result?.code, error: result?.msg || '校验 token 失败' }
     } catch (error: any) {

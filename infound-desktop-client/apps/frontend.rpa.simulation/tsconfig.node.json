@@ -7,11 +7,6 @@
     "types": ["electron-vite/node"],
     "paths": {
       "@common/*": ["src/common/*"],
-      "@desktop-rpa": ["../../packages/frontend.desktop.rpa/src/index.ts"],
-      "@desktop-rpa/*": ["../../packages/frontend.desktop.rpa/src/*"],
-      "@infound/desktop-base": ["../../packages/frontend.desktop.base/src/index.ts"],
-      "@infound/desktop-electron": ["../../packages/frontend.desktop.electron/src/index.ts"],
-      "pino-roll": ["../../packages/frontend.desktop.electron/src/types/pino-roll.d.ts"]
     },
     "module": "ESNext",
     "target": "ESNext",

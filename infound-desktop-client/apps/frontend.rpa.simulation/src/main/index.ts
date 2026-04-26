@@ -10,7 +10,7 @@ import type {
   SampleManagementPayloadInput,
   SellerChatbotPayloadInput,
   SellerCreatorDetailPayloadInput
-} from '@desktop-rpa'
+} from '@infound/desktop-rpa'
 import { IPCManager } from './modules/ipc/base/ipc-manager'
 import RPAController from './modules/ipc/rpa-controller'
 import { LoggerController } from './modules/ipc/logger-controller'

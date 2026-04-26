@@ -142,6 +142,10 @@ export class AppStore {
     }
   }
 
+  public delete(path: string): void {
+    ;(this.store as any).delete(path)
+  }
+
   private getDeviceEncryptionKey(): string {
     const salt = AppConfig.APP_HARDCODED_SALT
     const hwid = machineIdSync(true)

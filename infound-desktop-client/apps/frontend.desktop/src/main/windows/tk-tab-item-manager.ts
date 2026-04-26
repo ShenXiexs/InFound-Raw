@@ -5,12 +5,12 @@ import { app, BrowserWindow, session, WebContentsView } from 'electron'
 import { PageLoadStatus, TkShopSetting, TkShopTabItemSetting } from '@common/types/tk-type'
 import { logger } from '../utils/logger'
 import { globalState } from '../modules/state/global-state'
-import { AppState, CurrentUserInfo } from '@infound/desktop-base'
+import { CurrentUserInfo } from '@infound/desktop-base'
 import { resetWCVSize } from '../utils/mcv-helper'
 import { TransitionWcv } from './transition-wcv'
 import { appStore } from '../modules/store/app-store'
 import { TabManager } from './tab-manager'
-import { TAB_TYPES, TK_CONTENTS } from '@common/app-constants'
+import { isTikTokDomain, TAB_TYPES, TK_CONTENTS } from '@common/app-constants'
 
 export class TkTabItemManager {
   private readonly baseWindow: BrowserWindow
@@ -20,7 +20,7 @@ export class TkTabItemManager {
   private readonly tabPersistKey: string
   // private readonly backgroundLoadingCount: number
   private currentTabItemId: string | null = null
-  private currentState: AppState = globalState.currentState
+  //private currentState: AppState = globalState.currentState
   private transitionWcv: TransitionWcv
   private readonly tabManager: TabManager
   private businessData: Map<string, { pageLoadStatus: PageLoadStatus; targetUrl: string }> = new Map() // todo:业务数据
@@ -126,31 +126,9 @@ export class TkTabItemManager {
     }
   }
 
-  public saveTabItemSettings(): void {
-    const tabs = this.tabManager.getTabs()
-    const settings: Record<string, TkShopTabItemSetting> = {}
-    tabs.forEach((tab) => {
-      settings[tab.id] = {
-        id: tab.id,
-        type: tab.type,
-        url: tab.url,
-        focused: tab.id === this.tabManager.getActiveTabId(),
-        enabled: true // 可根据需要决定，目前能显示的就是enabled
-      }
-    })
-    // 写入存储
-    const userId = this.currentState.currentUser?.userId
-    if (userId) {
-      logger.debug(`tabItemSetting will be saved to the user【${userId}】`)
-      //logger.debug(settings)
-      appStore.set(`tkShops.${userId}`, settings)
-      //logger.debug(`TK 店铺${this.shopSetting.name}标签页状态已保存`)
-    } else {
-      logger.debug('当前用户信息为空，店铺信息无法保存')
-    }
-  }
-
   public closeTabItems(): void {
+    this.saveTabItemSettings() //关闭时保存Tab页状态
+
     const tabs = this.tabManager.getTabs()
     tabs.forEach((tab) => {
       this.closeTabItem(tab.id, true)
@@ -165,7 +143,7 @@ export class TkTabItemManager {
 
   private async createTabView(id: string, url: string, type: string, activate: boolean, insertAfterActive: boolean): Promise<string | undefined> {
     const sess = session.fromPartition(this.tabPersistKey)
-    sess.webRequest.onHeadersReceived({ urls: ['https://*.tiktok.com/*'] }, (details, callback) => {
+    sess.webRequest.onHeadersReceived({ urls: [...TK_CONTENTS.URL_PATTERNS] }, (details, callback) => {
       const responseHeaders = { ...details.responseHeaders }
 
       // 删除导致拦截的两个关键头
@@ -256,7 +234,7 @@ export class TkTabItemManager {
 
     //优化处理：TK商家中心单页面切页时，某些功能模块没有title（如订单相关模志），尝试加载后取title，如为空则显示默认标题
     view.webContents.on('did-navigate-in-page', async (_, url, isMainFrame) => {
-      if (isMainFrame && this.isTkContentUrl(url)) {
+      if (isMainFrame && isTikTokDomain(url)) {
         this.scheduleLoginStateExport(id, view, url, 'did-navigate-in-page')
         try {
           const title = await view.webContents.executeJavaScript('document.title')
@@ -277,22 +255,36 @@ export class TkTabItemManager {
   }
 
   private loadTabItemSettings(): Record<string, TkShopTabItemSetting> {
-    let tabItemSettings: Record<string, TkShopTabItemSetting> | null = this.currentUser == null ? null : appStore.get(`tkShops.${this.currentUser!.userId}`)
-    //logger.info(JSON.stringify(tabItemSettings))
-    // tabItemSettings = null // todo: will be removed
-    // 如果设置为空或为空对象，则新建默认 tab 设置
+    const newKey = this.getNewStorageKey()
+    let tabItemSettings: Record<string, TkShopTabItemSetting> | null = appStore.get(newKey)
+
     if (tabItemSettings == null || Object.keys(tabItemSettings).length === 0) {
-      tabItemSettings = {}
-      const key = randomUUID()
-      tabItemSettings[key] = {
-        id: key,
-        type: TAB_TYPES.TIKTOK,
-        url: this.shopSetting.homeUrl,
-        icon: '',
-        focused: true,
-        enabled: true
-      } as TkShopTabItemSetting
+      // 尝试从旧键取配置，如有则迁移
+      const oldKey = this.getOldStorageKey()
+      const oldSettings: Record<string, TkShopTabItemSetting> | null = appStore.get(oldKey)
+
+      if (oldSettings && Object.keys(oldSettings).length > 0) {
+        appStore.set(newKey, oldSettings)
+        console.log(`迁移原来tabItems配置: ${oldKey} -> ${newKey}`)
+        appStore.delete(oldKey)
+        console.log(`迁移并删除旧配置: ${oldKey} -> ${newKey}`)
+
+        tabItemSettings = oldSettings
+      } else {
+        tabItemSettings = {}
+        const key = randomUUID()
+        tabItemSettings[key] = {
+          id: key,
+          type: TAB_TYPES.TIKTOK,
+          url: this.shopSetting.homeUrl,
+          icon: '',
+          focused: true,
+          enabled: true
+        } as TkShopTabItemSetting
+      }
     }
+
+    //logger.info(JSON.stringify(tabItemSettings))
     // todo: remarked for testing
     //这里的逻辑是否是从读取到配置时，再判断一次是否超出tab最大数？如果是，则设置它的enable为false
     // else {
@@ -307,30 +299,39 @@ export class TkTabItemManager {
     return tabItemSettings
   }
 
-  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
+  private saveTabItemSettings(): void {
+    const tabs = this.tabManager.getTabs()
+    const settings: Record<string, TkShopTabItemSetting> = {}
+    tabs.forEach((tab) => {
+      settings[tab.id] = {
+        id: tab.id,
+        type: tab.type,
+        url: tab.url,
+        focused: tab.id === this.tabManager.getActiveTabId(),
+        enabled: true // 可根据需要决定，目前能显示的就是enabled
+      }
+    })
+
+    // 写入存储
+    const newKey = this.getNewStorageKey()
+    appStore.set(newKey, settings)
+    logger.info('用户商铺标签页信息已保存')
+  }
+
+  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台Seller ID}.json
   private getLoginStateCookieFolderPath(): string {
-    const userId = this.currentUser?.userId || '00000000-0000-0000-0000-000000000000'
+    const userId = this.currentUser?.userId || '00000000-0000-0000-0000-000000000001'
     const shopId = this.shopSetting?.id || '000000'
     return path.join(app.getPath('userData'), TK_CONTENTS.KEY, userId, shopId)
   }
 
-  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
-  private getLoginStateCookieFilePath(platformShopId: string): string {
-    return path.join(this.getLoginStateCookieFolderPath(), `${platformShopId}.json`)
-  }
-
-  private isTkContentUrl(url: string): boolean {
-    try {
-      const parsedUrl = new URL(url)
-      const hostname = parsedUrl.hostname.toLowerCase()
-      return hostname === 'tiktok.com' || hostname.endsWith(TK_CONTENTS.BASE_DOMAIN)
-    } catch {
-      return false
-    }
+  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台Seller ID}.json
+  private getLoginStateCookieFilePath(platformSellerId: string): string {
+    return path.join(this.getLoginStateCookieFolderPath(), `${platformSellerId}.json`)
   }
 
   private shouldExportLoginState(url: string): boolean {
-    if (!this.isTkContentUrl(url)) {
+    if (!isTikTokDomain(url)) {
       return false
     }
 
@@ -342,7 +343,7 @@ export class TkTabItemManager {
     }
   }
 
-  private resolvePlatformShopIdFromExistingFile(): string {
+  private resolvePlatformSellerIdFromExistingFile(): string {
     const loginStateFolder = this.getLoginStateCookieFolderPath()
     if (!fs.existsSync(loginStateFolder)) {
       return ''
@@ -355,18 +356,18 @@ export class TkTabItemManager {
         const filePath = path.join(loginStateFolder, entry.name)
         return {
           filePath,
-          platformShopId: path.basename(entry.name, '.json'),
+          platformSellerId: path.basename(entry.name, '.json'),
           mtimeMs: fs.statSync(filePath).mtimeMs
         }
       })
-      .filter((entry) => Boolean(entry.platformShopId))
+      .filter((entry) => Boolean(entry.platformSellerId))
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
 
-    return candidates[0]?.platformShopId || ''
+    return candidates[0]?.platformSellerId || ''
   }
 
-  private resolvePlatformShopIdFromCookies(cookies: Electron.Cookie[]): string {
-    for (const cookieName of TK_CONTENTS.PLATFORM_SHOP_ID_COOKIE_KEYS) {
+  private resolvePlatformSellerIdFromCookies(cookies: Electron.Cookie[]): string {
+    for (const cookieName of TK_CONTENTS.PLATFORM_SELLER_ID_COOKIE_KEYS) {
       const cookieValue = cookies.find((cookie) => cookie.name === cookieName)?.value?.trim()
       if (cookieValue) {
         return cookieValue
@@ -398,9 +399,9 @@ export class TkTabItemManager {
     })
   }
 
-  // 注意：在跳转到登录页时，无法稳定获取平台店铺ID，因此不删除已有登录态文件，由RPA模块在任务启动时判断是否可复用
+  // 注意：在跳转到登录页时，无法稳定获取平台卖家ID，因此不删除已有登录态文件，由RPA模块在任务启动时判断是否可复用
   // 用户重新登录时，新文件会覆盖或新增，旧文件保留不影响使用。
-  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台ShopId}.json
+  // 登录态文件保存规则: %userData%/tk/{系统User ID}/{系统Shop ID}/{平台Seller ID}.json
   private async checkAndExportCookies(view: WebContentsView, trigger: string): Promise<void> {
     const currentUrl = view.webContents.getURL()
     if (!this.shouldExportLoginState(currentUrl)) {
@@ -408,26 +409,32 @@ export class TkTabItemManager {
     }
 
     const cookies = await view.webContents.session.cookies.get({})
-    const currentKeyCookie = cookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null
-    const platformShopId = this.resolvePlatformShopIdFromCookies(cookies) || this.resolvePlatformShopIdFromExistingFile()
+    const currentKeyCookie =
+      (cookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null) +
+      ':' +
+      (cookies.find((c) => c.name.toLowerCase() === TK_CONTENTS.ATLAS_LANG_COOKIE_KEY)?.value || null)
+    const platformSellerId = this.resolvePlatformSellerIdFromCookies(cookies) || this.resolvePlatformSellerIdFromExistingFile()
 
     if (!currentKeyCookie) {
       logger.debug(`[TK登录态] 未找到关键 Cookie，暂不导出: trigger=${trigger} url=${currentUrl}`)
       return
     }
 
-    if (!platformShopId) {
-      logger.debug(`[TK登录态] 未找到平台店铺ID，暂不导出: trigger=${trigger} url=${currentUrl}`)
+    if (!platformSellerId) {
+      logger.debug(`[TK登录态] 未找到平台卖家ID，暂不导出: trigger=${trigger} url=${currentUrl}`)
       return
     }
 
-    const filePath = this.getLoginStateCookieFilePath(platformShopId)
+    const filePath = this.getLoginStateCookieFilePath(platformSellerId)
 
     if (this.lastSavedKeyCookie === null && fs.existsSync(filePath)) {
       try {
         const existingContent = fs.readFileSync(filePath, 'utf-8')
         const existingCookies = JSON.parse(existingContent)
-        this.lastSavedKeyCookie = existingCookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null
+        this.lastSavedKeyCookie =
+          (existingCookies.find((c) => c.name === TK_CONTENTS.LOGIN_STATE_COOKIE_KEY)?.value || null) +
+          ':' +
+          (existingCookies.find((c) => c.name.toLowerCase() === TK_CONTENTS.ATLAS_LANG_COOKIE_KEY)?.value || null)
       } catch (err) {
         console.log(`读取现有 Cookie文件 ${filePath} 失败`, err)
         logger.warn(`读取现有 Cookie文件 ${filePath} 失败`, err)
@@ -435,12 +442,23 @@ export class TkTabItemManager {
     }
 
     if (this.lastSavedKeyCookie === currentKeyCookie && fs.existsSync(filePath)) {
-      logger.debug(`[TK登录态] 关键 Cookie 未变化，跳过导出: ${filePath}`)
+      logger.debug(`[TK登录态] 关键 Cookie 和语言设置均未变化，跳过导出: ${filePath}`)
       return
     }
 
     this.tabManager.exportCookiesToFile(filePath, cookies)
     this.lastSavedKeyCookie = currentKeyCookie
     logger.info(`[TK登录态] 已导出登录态: ${filePath}`)
+  }
+
+  private getNewStorageKey(): string {
+    const userId = this.currentUser?.userId || '00000000-0000-0000-0000-000000000001'
+    const shopId = this.shopSetting?.id || '000000'
+    return `tkShops.${userId}_${shopId}`
+  }
+
+  private getOldStorageKey(): string {
+    const userId = this.currentUser?.userId || '00000000-0000-0000-0000-000000000001'
+    return `tkShops.${userId}`
   }
 }

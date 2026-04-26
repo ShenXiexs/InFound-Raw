@@ -5,7 +5,7 @@ import { RendererState, rendererStore } from '@renderer/store/renderer-store'
 import ButtonGroupOfTitleBar from '@renderer/components/ButtonGroupOfTitleBar.vue'
 import { IPC_CHANNELS } from '@common/types/ipc-type'
 import { TkShopSetting } from '@common/types/tk-type'
-import { TAB_TYPES } from '@common/app-constants'
+import { TAB_TYPES, isTikTokDomain } from '@common/app-constants'
 import { resolveResourceAssetUrl } from '@renderer/utils/asset-url'
 import { Tab } from '@common/types/tab-type'
 import { commonThemeOverrides } from '@infound/desktop-base'
@@ -92,12 +92,6 @@ const openFulfillment = async (): Promise<void> => {
   }
 }
 
-// 下拉菜单
-// const showTabsMenu = async (event: MouseEvent): Promise<void> => {
-//   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-//   await window.ipc.invoke(IPC_CHANNELS.TABS_SHOW_ITEMS_MENU, rect.left, rect.bottom)
-// }
-
 // 拖拽排序
 const dragSourceId = ref<string | null>(null)
 
@@ -130,6 +124,7 @@ const handleDrop = async (e: DragEvent, targetId: string): Promise<void> => {
   // 发送重新排序请求到主进程
   await window.ipc.invoke(IPC_CHANNELS.TABS_REORDER_ITEMS, newOrder)
 }
+
 // 左右滚动逻辑
 const tabListRef = ref<HTMLElement | null>(null)
 const scrollLeft = (): void => {
@@ -158,6 +153,12 @@ const updateScrollButtons = (): void => {
 const MAX_TITLE_LENGTH = 15 //todo:暂定为15个字
 const truncatedTitle = (title: string): string => {
   return title.length > MAX_TITLE_LENGTH ? title.substring(0, MAX_TITLE_LENGTH) + '…' : title
+}
+
+const defaultTikTokIcon = computed(() => resolveResourceAssetUrl(globalState.appSetting.resourcesPath, 'tts.ico'))
+
+const isTikTokPage = (tab: Tab): boolean => {
+  return tab.type === TAB_TYPES.TIKTOK || isTikTokDomain(tab.url)
 }
 
 // 取消监听函数
@@ -244,8 +245,10 @@ onUnmounted(() => {
 })
 
 const onDropdownClick = (event: MouseEvent): void => {
-  const x = event.screenX
-  const y = event.screenY
+  const btn = event.currentTarget as HTMLElement
+  const rect = btn.getBoundingClientRect()
+  const x = rect.left + window.screenX
+  const y = rect.bottom + window.screenY
   window.ipc.send(IPC_CHANNELS.TABS_CREATE_TAB_MENU, x, y)
 }
 </script>
@@ -296,7 +299,21 @@ const onDropdownClick = (event: MouseEvent): void => {
                   @drop="handleDrop($event, tab.id)"
                 >
                   <div class="tab-inner">
-                    <img v-if="tab.favicon" :alt="tab.title" :src="tab.favicon" class="favicon" />
+                    <template v-if="isTikTokPage(tab)">
+                      <img
+                        v-if="tab.favicon"
+                        :alt="tab.title"
+                        :src="tab.favicon"
+                        class="favicon"
+                        @error="
+                          (e) => {
+                            ;(e.target as HTMLImageElement).src = defaultTikTokIcon
+                          }
+                        "
+                      />
+                      <img v-else :src="defaultTikTokIcon" alt="TikTok" class="favicon" />
+                    </template>
+                    <img v-else-if="tab.favicon" :alt="tab.title" :src="tab.favicon" class="favicon" />
                     <span :title="tab.title" class="tab-title">{{ truncatedTitle(tab.title) }}</span>
                     <span class="close" @click.stop="handleClose(tab.id)">×</span>
                   </div>
@@ -310,6 +327,8 @@ const onDropdownClick = (event: MouseEvent): void => {
                   </n-icon>
                 </template>
               </n-button>
+              <!-- 拖拽手柄 -->
+              <div class="drag-handle"></div>
             </div>
           </div>
           <div class="header-right">
@@ -347,19 +366,25 @@ const onDropdownClick = (event: MouseEvent): void => {
           <div class="nav-right">
             <n-button text @click="openOutreach">
               <div class="icon-text-btn">
-                <n-icon><i-hugeicons-connect /></n-icon>
+                <n-icon>
+                  <i-hugeicons-connect />
+                </n-icon>
                 <span class="btn-text">一键建联</span>
               </div>
             </n-button>
             <n-button text @click="openFulfillment">
               <div class="icon-text-btn">
-                <n-icon><i-hugeicons-target-01 /></n-icon>
+                <n-icon>
+                  <i-hugeicons-target-01 />
+                </n-icon>
                 <span class="btn-text">履约管理</span>
               </div>
             </n-button>
             <n-button text>
               <div class="icon-text-btn">
-                <n-icon><i-hugeicons-user-group /></n-icon>
+                <n-icon>
+                  <i-hugeicons-user-group />
+                </n-icon>
                 <span class="btn-text">我的达人库</span>
               </div>
             </n-button>
@@ -379,6 +404,45 @@ const onDropdownClick = (event: MouseEvent): void => {
 <style lang="scss" scoped>
 @use '@renderer/assets/styles/title-bar.scss' as *;
 
+.title-row {
+  -webkit-app-region: drag;
+}
+
+.title-left {
+  -webkit-app-region: drag;
+}
+
+.title-center {
+  -webkit-app-region: drag;
+}
+
+.title-right {
+  -webkit-app-region: drag;
+}
+
+.title-center .n-button,
+.title-center .tab,
+.title-center .close,
+.title-right .n-button,
+.title-right button {
+  -webkit-app-region: no-drag !important;
+}
+
+.tab-list {
+  -webkit-app-region: drag;
+}
+
+.tab-list .tab {
+  -webkit-app-region: no-drag !important;
+}
+
+.drag-handle {
+  -webkit-app-region: drag;
+  width: 20px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
 .app-container {
   height: 100vh;
 }
@@ -392,6 +456,7 @@ const onDropdownClick = (event: MouseEvent): void => {
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
+
     .header-center-inner {
       display: flex !important;
       align-items: center !important;
@@ -408,10 +473,12 @@ const onDropdownClick = (event: MouseEvent): void => {
     width: 28px !important;
     height: 28px !important;
     border-radius: 14px !important;
+
     .n-button__icon {
       font-size: 16px !important;
     }
   }
+
   .n-button--circle {
     padding: 0 !important;
   }
@@ -427,9 +494,11 @@ const onDropdownClick = (event: MouseEvent): void => {
   white-space: nowrap;
   gap: 0;
   scrollbar-width: none;
+
   &::-webkit-scrollbar {
     display: none;
   }
+
   min-width: 0;
 }
 
@@ -518,6 +587,7 @@ const onDropdownClick = (event: MouseEvent): void => {
     margin-left: 6px;
     opacity: 0;
     transition: opacity 0.2s;
+
     &:hover {
       background: rgba(0, 0, 0, 0.1);
     }
@@ -561,16 +631,20 @@ const onDropdownClick = (event: MouseEvent): void => {
     padding: 0 12px;
     min-width: 0;
   }
+
   .nav-center :deep(.n-input.n-input--disabled) {
     --n-text-color: #767c82 !important;
     --n-color-disabled: white !important;
   }
+
   .nav-center :deep(.n-input.n-input--disabled .n-input__input-el) {
     cursor: text !important;
   }
+
   .nav-center :deep(.n-input) {
     cursor: text !important;
   }
+
   .nav-right {
     display: flex;
     align-items: center;

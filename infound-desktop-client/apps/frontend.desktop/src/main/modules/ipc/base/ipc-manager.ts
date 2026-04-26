@@ -21,7 +21,7 @@ export class IPCManager {
       if (type === IPCType.INVOKE || type === IPCType.SEND) {
         if (!this.gatewayHandlers.has(gateway)) {
           this.gatewayHandlers.set(gateway, new Map())
-          logger.info(`[IPC] 注册网关: ${gateway}`)
+          logger.debug(`[IPC] 注册网关: ${gateway}`)
         }
         this.gatewayHandlers.get(gateway)!.set(channel, controller[methodName].bind(controller))
       }
@@ -42,7 +42,7 @@ export class IPCManager {
         this.senders.add(channel)
       }
 
-      logger.info(`[IPC] 注册通道: ${channel} [${type}]`)
+      logger.debug(`[IPC] 注册通道: ${channel} [${type}]`)
     })
   }
 

@@ -25,8 +25,7 @@ export default defineConfig({
     resolve: {
       alias: {
         '@main': resolve(__dirname, 'src/main'),
-        '@common': resolve(__dirname, 'src/common'),
-        '@desktop-rpa': resolve(__dirname, '../../packages/frontend.desktop.rpa/src')
+        '@common': resolve(__dirname, 'src/common')
       }
     }
   },
@@ -44,8 +43,7 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@common': resolve(__dirname, 'src/common'),
-        '@desktop-rpa': resolve(__dirname, '../../packages/frontend.desktop.rpa/src')
+        '@common': resolve(__dirname, 'src/common')
       }
     }
   },
@@ -53,7 +51,6 @@ export default defineConfig({
     resolve: {
       alias: {
         '@common': resolve(__dirname, 'src/common'),
-        '@desktop-rpa': resolve(__dirname, '../../packages/frontend.desktop.rpa/src'),
         '@renderer': resolve('src/renderer/src')
       }
     },

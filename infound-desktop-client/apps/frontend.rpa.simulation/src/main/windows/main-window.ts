@@ -38,7 +38,7 @@ export class MainWindow {
       minimizable: true,
       resizable: true,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: join(__dirname, '../preload/index.cjs'),
         webSecurity: false,
         sandbox: false,
         devTools: !AppConfig.IS_PRO,

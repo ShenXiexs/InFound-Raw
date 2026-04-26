@@ -18,6 +18,7 @@ import { AuthController } from '../modules/ipc/openapi/auth-controller'
 import { TabController } from '../modules/ipc/tab-controller'
 import { WebSocketController } from '../modules/ipc/web-socket-controller'
 import { RPAController } from '../modules/ipc/rpa-controller'
+import { playwrightRuntimeBootstrapService } from '../modules/rpa/playwright-runtime-bootstrap-service'
 import { appStore } from '../modules/store/app-store'
 import { UpdaterController } from '../modules/ipc/updater-controller'
 
@@ -72,6 +73,13 @@ export class AppAdapter {
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.INIT_APP)
 
     appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.LOAD_CORE_MODULES)
+
+    appWindowsAndViewsManager.splashWindow.updateProgress(splashStatusMap.CONFIG_APP_ENV)
+    try {
+      await playwrightRuntimeBootstrapService.ensureBrowserReady()
+    } catch (err) {
+      logger.error('Playwright 浏览器资源预热失败:', err)
+    }
 
     const { autoUpdater } = electronUpdater
 
