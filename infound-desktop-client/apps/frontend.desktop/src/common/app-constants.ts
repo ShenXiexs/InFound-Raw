@@ -28,7 +28,7 @@ export const TK_CONTENTS = {
   URL_PATTERNS: ['https://*.tiktok.com/*', 'https://*.tiktokshopglobalselling.com/*'],
   LOGIN_STATE_COOKIE_KEY: 'sid_guard_tiktokseller',
   ATLAS_LANG_COOKIE_KEY: 'atlas_lang',
-  PLATFORM_SELLER_ID_COOKIE_KEYS: ['oec_seller_id_unified_seller_env', 'global_seller_id_unified_seller_env']
+  PLATFORM_SELLER_ID_COOKIE_KEYS: ['PlatformSellerId', 'oec_seller_id_unified_seller_env', 'global_seller_id_unified_seller_env']
 } as const
 
 export const TAB_MAX_COUNT = 20

@@ -1,20 +1,10 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
-import { NAlert, NButton, NCard, NDataTable, NDescriptions, NDescriptionsItem, NList, NListItem, NPagination, type DataTableColumns } from 'naive-ui'
-import { getOutreachTaskDetail, getOutreachTaskRecords } from '../api/outreach-task.api'
-import {
-  OUTREACH_AVG_COMMISSION_RATE_OPTIONS,
-  OUTREACH_AVG_COMMISSION_RATE_LABEL_MAP,
-  OUTREACH_CONTENT_TYPE_OPTIONS,
-  OUTREACH_CONTENT_TYPE_LABEL_MAP,
-  OUTREACH_CREATOR_AGENCY_OPTIONS,
-  OUTREACH_CREATOR_AGENCY_LABEL_MAP,
-  OUTREACH_CREATOR_TYPE_LABEL_MAP,
-  OUTREACH_FOLLOWER_GENDER_OPTIONS,
-  OUTREACH_FOLLOWER_GENDER_LABEL_MAP,
-  OUTREACH_PRODUCT_CATEGORY_LABEL_MAP,
-  OUTREACH_SORT_LABEL_MAP
-} from '../constants/outreach-task-display'
+import { computed, h, onUnmounted, ref, watch } from 'vue'
+import { NAlert, NAvatar, NButton, NCard, NDataTable, NDescriptions, NDescriptionsItem, NEllipsis, NIcon, NList, NListItem, NPagination, type DataTableColumns } from 'naive-ui'
+import { getOutreachCreatorFilterItems, getOutreachTaskDetail, getOutreachTaskRecords } from '../api/outreach-task.api'
+import type { CreateOutreachTaskFilterOptions, SelectOptionItem } from '../types/outreach-task-form'
+import { formatDateTimeToLocal } from '../utils/date-time'
+import { buildTaskFilterOptions } from '../utils/outreach-creator-filter-items'
 
 type TaskStatus = '运行中' | '未启动' | '已结束' | '已完成' | '已取消'
 
@@ -31,9 +21,9 @@ interface TaskInfo {
 interface RuntimeRow {
   id: string
   creatorName: string
+  creatorAvatar: string
   followers: string
   gmv: string
-  outreachTask: string
   messageTime: string
 }
 
@@ -53,6 +43,7 @@ interface TaskDetailData {
   }
   filterSummary: string[]
   creatorSortLabel: string
+  showCreatorSortSection: boolean
   outreachCreatorTypeLabel: string
   messageTemplate: {
     firstMessage: MessageDetail
@@ -64,6 +55,8 @@ interface TaskDetailData {
 const props = defineProps<{
   task: TaskInfo | null
   taskId?: string
+  shopId?: string
+  filterOptions?: CreateOutreachTaskFilterOptions
 }>()
 
 const emit = defineEmits<{
@@ -71,12 +64,59 @@ const emit = defineEmits<{
   (event: 'end'): void
 }>()
 
-const PRODUCT_CATEGORY_LABEL_MAP = OUTREACH_PRODUCT_CATEGORY_LABEL_MAP
-const AVG_COMMISSION_RATE_LABELS = OUTREACH_AVG_COMMISSION_RATE_OPTIONS
-const CONTENT_TYPE_LABELS = OUTREACH_CONTENT_TYPE_OPTIONS
-const CREATOR_AGENCY_LABELS = OUTREACH_CREATOR_AGENCY_OPTIONS
-const FOLLOWER_GENDER_LABELS = OUTREACH_FOLLOWER_GENDER_OPTIONS
-const SORT_LABEL_MAP = OUTREACH_SORT_LABEL_MAP
+const CREATOR_TYPE_LABEL_MAP: Record<string, string> = {
+  ALL: '建联所有达人',
+  NEW_ONLY: '只建联新达人',
+  NEW_AND_NOT_REPLIED: '建联新达人和未回复达人'
+}
+
+const resolvedFilterOptions = ref<CreateOutreachTaskFilterOptions | undefined>(undefined)
+
+const syncFilterOptionsFromProps = (): void => {
+  if (props.filterOptions) {
+    resolvedFilterOptions.value = props.filterOptions
+    return
+  }
+
+  resolvedFilterOptions.value = undefined
+}
+
+const loadFilterOptions = async (): Promise<void> => {
+  if (props.filterOptions) {
+    resolvedFilterOptions.value = props.filterOptions
+    return
+  }
+
+  const shopId = String(props.shopId || '').trim()
+  if (!shopId) {
+    resolvedFilterOptions.value = undefined
+    return
+  }
+
+  try {
+    const result = await getOutreachCreatorFilterItems(shopId)
+    resolvedFilterOptions.value = buildTaskFilterOptions(result)
+  } catch (_error) {
+    resolvedFilterOptions.value = undefined
+  }
+}
+
+watch(
+  () => props.filterOptions,
+  () => {
+    syncFilterOptionsFromProps()
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  () => String(props.shopId ?? '').trim(),
+  (newShopId, oldShopId) => {
+    if (oldShopId !== undefined && newShopId === oldShopId) return
+    void loadFilterOptions()
+  },
+  { immediate: true }
+)
 
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -84,6 +124,8 @@ const detail = ref<TaskDetailData | null>(null)
 const runtimeRows = ref<RuntimeRow[]>([])
 const runtimeTotal = ref(0)
 const isRuntimeLoading = ref(false)
+const isRuntimePolling = ref(false)
+const isDetailPolling = ref(false)
 const runtimePage = ref(1)
 const runtimePageSize = ref(10)
 const runtimePageSizeOptions = [10, 20, 50]
@@ -103,31 +145,141 @@ const shouldPollTaskDetail = computed(() => {
 
 const canEdit = computed(() => detail.value?.status === '未启动')
 const canEnd = computed(() => detail.value?.status === '运行中')
+const getCreatorAvatarSrc = (avatar: string): string | undefined => {
+  const normalizedAvatar = String(avatar || '').trim()
+  if (!normalizedAvatar) return undefined
+  const lowerCaseAvatar = normalizedAvatar.toLowerCase()
+  if (lowerCaseAvatar === 'null' || lowerCaseAvatar === 'undefined') return undefined
+  return normalizedAvatar
+}
+
+const renderDefaultCreatorAvatarIcon = () =>
+  h(
+    NIcon,
+    {
+      size: 16,
+      style: {
+        color: '#97a3b4'
+      }
+    },
+    {
+      default: () =>
+        h(
+          'svg',
+          {
+            xmlns: 'http://www.w3.org/2000/svg',
+            viewBox: '0 0 24 24',
+            fill: 'none',
+            stroke: 'currentColor',
+            'stroke-width': '2',
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round'
+          },
+          [
+            h('path', { d: 'M20 21a8 8 0 0 0-16 0' }),
+            h('circle', { cx: '12', cy: '7', r: '4' })
+          ]
+        )
+    }
+  )
 const runtimeTableColumns: DataTableColumns<RuntimeRow> = [
   {
     title: '达人',
-    key: 'creatorName',
-    minWidth: 160
+    key: 'creator',
+    render: (row) => {
+      const avatarSrc = getCreatorAvatarSrc(row.creatorAvatar)
+      const avatarNode = avatarSrc
+        ? h(NAvatar, {
+            round: true,
+            size: 28,
+            src: avatarSrc,
+            class: 'creator-avatar',
+            style: {
+              width: '28px',
+              height: '28px',
+              minWidth: '28px',
+              flexShrink: 0
+            }
+          })
+        : h(
+            NAvatar,
+            {
+              round: true,
+              size: 28,
+              class: 'creator-avatar',
+              style: {
+                width: '28px',
+                height: '28px',
+                minWidth: '28px',
+                flexShrink: 0
+              }
+            },
+            {
+              default: () => renderDefaultCreatorAvatarIcon()
+            }
+          )
+
+      return h(
+        'div',
+        {
+          class: 'creator-cell',
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            minHeight: '32px',
+            width: '100%',
+            minWidth: 0
+          }
+        },
+        [
+          avatarNode,
+          h(
+            'div',
+            {
+              class: 'creator-name-wrap',
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                minWidth: 0,
+                flex: 1,
+                minHeight: '28px'
+              }
+            },
+            [
+              h(
+                NEllipsis,
+                {
+                  class: 'creator-name',
+                  tooltip: true,
+                  lineClamp: 1,
+                  style: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    width: '100%',
+                    minHeight: '28px'
+                  }
+                },
+                { default: () => row.creatorName }
+              )
+            ]
+          )
+        ]
+      )
+    }
   },
   {
     title: '粉丝数量',
-    key: 'followers',
-    width: 120
+    key: 'followers'
   },
   {
     title: 'GMV',
-    key: 'gmv',
-    width: 120
-  },
-  {
-    title: '建联任务',
-    key: 'outreachTask',
-    minWidth: 160
+    key: 'gmv'
   },
   {
     title: '消息发送时间',
     key: 'messageTime',
-    minWidth: 180
+    width: 180
   }
 ]
 
@@ -149,38 +301,63 @@ const normalizeStatusToUI = (value: unknown): TaskStatus => {
   return '未启动'
 }
 
-const getIndexedLabel = (value: unknown, labels: string[], fallback: string): string => {
-  const index = Number(value)
-  if (Number.isInteger(index) && index >= 0 && index < labels.length) {
-    return labels[index] || fallback
-  }
-  const text = String(value ?? '').trim()
-  return text || fallback
+const normalizeOptionKey = (value: string): string => String(value || '').replace(/\s+/g, '').toLowerCase()
+
+const buildOptionLabelLookup = <T extends string | number>(options: Array<SelectOptionItem<T>> | undefined): Map<string, string> => {
+  const map = new Map<string, string>()
+  if (!Array.isArray(options)) return map
+
+  options.forEach((option, index) => {
+    const label = String(option?.label ?? '').trim()
+    if (!label) return
+
+    map.set(normalizeOptionKey(String(option.value)), label)
+    map.set(String(index), label)
+  })
+
+  return map
 }
 
-const getMappedLabel = (
+const resolveOptionLabel = <T extends string | number>(
   value: unknown,
-  labels: string[],
-  fallback: string,
-  labelMap: Record<string, string>
+  options: Array<SelectOptionItem<T>> | undefined,
+  fallback: string = ''
 ): string => {
-  const rawLabel = getIndexedLabel(value, labels, fallback)
-  return labelMap[rawLabel] || rawLabel
+  const map = buildOptionLabelLookup(options)
+  const rawText = String(value ?? '').trim()
+  if (!rawText) return fallback
+
+  const direct = map.get(normalizeOptionKey(rawText))
+  if (direct) return direct
+
+  const asNumber = Number(rawText)
+  if (Number.isInteger(asNumber) && asNumber >= 0) {
+    const indexed = map.get(String(asNumber))
+    if (indexed) return indexed
+  }
+
+  return rawText || fallback
 }
 
-const formatDateTime = (value: unknown): string => {
-  const text = String(value || '').trim()
-  if (!text) return '-'
-  const parsed = new Date(text)
-  if (Number.isNaN(parsed.getTime())) return text
+const formatMultiSelectLabels = <T extends string | number>(
+  value: unknown,
+  options: Array<SelectOptionItem<T>> | undefined
+): string => {
+  const map = buildOptionLabelLookup(options)
+  const tokens = Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : String(value || '')
+        .split(/[\s,，]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
 
-  const year = parsed.getFullYear()
-  const month = String(parsed.getMonth() + 1).padStart(2, '0')
-  const day = String(parsed.getDate()).padStart(2, '0')
-  const hour = String(parsed.getHours()).padStart(2, '0')
-  const minute = String(parsed.getMinutes()).padStart(2, '0')
-  const second = String(parsed.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  if (tokens.length === 0) return '（空）'
+
+  const labels = tokens
+    .map((token) => map.get(normalizeOptionKey(token)) || token)
+    .filter(Boolean)
+
+  return labels.join(', ') || '（空）'
 }
 
 const buildDefaultMessageTemplate = (): TaskDetailData['messageTemplate'] => {
@@ -213,15 +390,18 @@ const normalizeProductIds = (value: unknown): string[] => {
   return []
 }
 
-const normalizeProductCategoryLabels = (value: unknown): string => {
-  if (!Array.isArray(value)) return '（空）'
-  const labels = value
-    .map((item) => {
-      const key = String(item || '').trim()
-      return PRODUCT_CATEGORY_LABEL_MAP[key] || key
-    })
-    .filter(Boolean)
-  return labels.join(', ') || '（空）'
+const normalizeProductCategoryLabels = (value: unknown, options: Array<SelectOptionItem<string>> | undefined): string => {
+  return formatMultiSelectLabels(value, options)
+}
+
+const getFirstValidText = (...values: unknown[]): string => {
+  for (const value of values) {
+    const text = String(value ?? '').trim()
+    if (!text) continue
+    if (text.toLowerCase() === 'null' || text.toLowerCase() === 'undefined') continue
+    return text
+  }
+  return ''
 }
 
 const normalizeRuntimeRows = (rawList: unknown, taskId: string): RuntimeRow[] => {
@@ -230,12 +410,16 @@ const normalizeRuntimeRows = (rawList: unknown, taskId: string): RuntimeRow[] =>
   }
 
   return rawList.map((item: any, index: number) => ({
-    id: String(item?.id ?? item?.creatorId ?? `${taskId}-runtime-${index + 1}`),
-    creatorName: String(item?.creatorName ?? item?.name ?? item?.nickname ?? '-'),
+    id: String(item?.id ?? item?.platformCreatorId ?? item?.creatorId ?? `${taskId}-runtime-${index + 1}`),
+    creatorName:
+      getFirstValidText(
+        item?.platformCreatorDisplayName,
+        item?.platformCreatorUsername
+      ) || '-',
+    creatorAvatar: getFirstValidText(item?.avatar),
     followers: String(item?.followers ?? item?.fansCount ?? item?.followerCount ?? '-'),
     gmv: String(item?.gmv ?? item?.gmvRange ?? '-'),
-    outreachTask: String(item?.taskName ?? item?.outreachTask ?? item?.taskAction ?? item?.messageType ?? '-'),
-    messageTime: formatDateTime(item?.sendTime ?? item?.messageTime ?? item?.sentAt ?? item?.createdAt ?? '-')
+    messageTime: formatDateTimeToLocal(item?.sendTime ?? item?.messageTime ?? item?.sentAt ?? item?.createdAt ?? '-')
   }))
 }
 
@@ -245,73 +429,132 @@ const buildDetailFromSource = (source: Record<string, any>, fallbackTask?: TaskI
   const creatorFilters = filterConfig.creatorFilters || {}
   const followerFilters = filterConfig.followerFilters || {}
   const performanceFilters = filterConfig.performanceFilters || {}
+  const filterOptions = resolvedFilterOptions.value
   const searchKeyword = String(filterConfig.searchKeyword ?? creatorFilter.keyword ?? '').trim()
 
   const productCategories = Array.isArray(creatorFilters.productCategorySelections)
-    ? normalizeProductCategoryLabels(creatorFilters.productCategorySelections)
-    : normalizeProductCategoryLabels(creatorFilter.productCategories)
+    ? normalizeProductCategoryLabels(creatorFilters.productCategorySelections, filterOptions?.productCategoryOptions)
+    : normalizeProductCategoryLabels(creatorFilter.productCategories, filterOptions?.productCategoryOptions)
 
-  const avgCommissionRateLabel = getMappedLabel(
+  const avgCommissionRateLabel = resolveOptionLabel(
     creatorFilter.avgCommissionRate ?? creatorFilters.avgCommissionRate,
-    AVG_COMMISSION_RATE_LABELS,
-    'All',
-    OUTREACH_AVG_COMMISSION_RATE_LABEL_MAP
+    filterOptions?.avgCommissionRateOptions,
+    'All'
   )
-  const contentTypeLabel = getMappedLabel(
+  const contentTypeLabel = resolveOptionLabel(
     creatorFilter.contentTypes ?? creatorFilters.contentType,
-    CONTENT_TYPE_LABELS,
-    'All',
-    OUTREACH_CONTENT_TYPE_LABEL_MAP
+    filterOptions?.contentTypeOptions,
+    'All'
   )
-  const creatorAgencyLabel = getMappedLabel(
+  const creatorAgencyLabel = resolveOptionLabel(
     creatorFilter.creatorAgency ?? creatorFilters.creatorAgency,
-    CREATOR_AGENCY_LABELS,
-    'All',
-    OUTREACH_CREATOR_AGENCY_LABEL_MAP
+    filterOptions?.creatorAgencyOptions,
+    'All'
   )
-  const fansGenderLabel = getMappedLabel(
+  const fansGenderLabel = resolveOptionLabel(
     creatorFilter.fansGender ?? followerFilters.followerGender,
-    FOLLOWER_GENDER_LABELS,
-    'All',
-    OUTREACH_FOLLOWER_GENDER_LABEL_MAP
+    filterOptions?.followerGenderOptions,
+    'All'
   )
   const fansAgeRange = Array.isArray(creatorFilter.fansAgeRange)
-    ? creatorFilter.fansAgeRange.join(', ')
+    ? formatMultiSelectLabels(creatorFilter.fansAgeRange, filterOptions?.followerAgeOptions)
     : Array.isArray(followerFilters.followerAgeSelections)
-      ? followerFilters.followerAgeSelections.join(', ')
-      : ''
+      ? formatMultiSelectLabels(followerFilters.followerAgeSelections, filterOptions?.followerAgeOptions)
+      : '（空）'
   const gmvRange = Array.isArray(creatorFilter.gmvRange)
-    ? creatorFilter.gmvRange.join(', ')
+    ? formatMultiSelectLabels(creatorFilter.gmvRange, filterOptions?.gmvOptions)
     : Array.isArray(performanceFilters.gmvSelections)
-      ? performanceFilters.gmvSelections.join(', ')
-      : ''
+      ? formatMultiSelectLabels(performanceFilters.gmvSelections, filterOptions?.gmvOptions)
+      : '（空）'
   const salesCountRange = Array.isArray(creatorFilter.salesCountRange)
-    ? creatorFilter.salesCountRange.join(', ')
+    ? formatMultiSelectLabels(creatorFilter.salesCountRange, filterOptions?.itemsSoldOptions)
     : Array.isArray(performanceFilters.itemsSoldSelections)
-      ? performanceFilters.itemsSoldSelections.join(', ')
-      : ''
+      ? formatMultiSelectLabels(performanceFilters.itemsSoldSelections, filterOptions?.itemsSoldOptions)
+      : '（空）'
   const coBranding = Array.isArray(creatorFilter.coBranding) ? creatorFilter.coBranding.join(', ') : ''
   const fansCountMin = String(followerFilters.followerCountMin ?? creatorFilter.fansCountRange?.min ?? '0')
   const fansCountMax = String(followerFilters.followerCountMax ?? creatorFilter.fansCountRange?.max ?? '10,000,000+')
 
-  const filterSummary = [
-    `关键词：${searchKeyword || '（空）'}`,
-    `商品类目：${productCategories}`,
-    `平均佣金率：${avgCommissionRateLabel}`,
-    `内容类型：${contentTypeLabel}`,
-    `达人机构：${creatorAgencyLabel}`,
-    `快速成长榜：${creatorFilter.fastGrowing ? '是' : '否'}`,
-    `过去 90 天内未获邀请的达人：${creatorFilter.notInvitedInPast90Days ? '是' : '否'}`,
-    `粉丝年龄：${fansAgeRange || '（空）'}`,
-    `粉丝性别：${fansGenderLabel}`,
-    `粉丝数：${fansCountMin} - ${fansCountMax}`,
-    `GMV：${gmvRange || '（空）'}`,
-    `成交件数：${salesCountRange || '（空）'}`,
-    `平均每个视频的播放量：${String(creatorFilter.minAvgVideoViews ?? performanceFilters.averageViewsPerVideoMin ?? '0')}`,
-    `平均每场直播的观看人数：${String(creatorFilter.minAvgLiveViews ?? performanceFilters.averageViewersPerLiveMin ?? '0')}`,
-    `互动率 (%)：${String(creatorFilter.minEngagementRate ?? performanceFilters.engagementRateMinPercent ?? '0')}`,
-    `品牌合作：${coBranding || '（空）'}`
-  ]
+  const averageViewsPerVideoMin = String(creatorFilter.minAvgVideoViews ?? performanceFilters.averageViewsPerVideoMin ?? '0')
+  const averageViewersPerLiveMin = String(creatorFilter.minAvgLiveViews ?? performanceFilters.averageViewersPerLiveMin ?? '0')
+  const engagementRateMinPercent = String(creatorFilter.minEngagementRate ?? performanceFilters.engagementRateMinPercent ?? '0')
+
+  const averageViewsPerVideoLabel = resolveOptionLabel(
+    averageViewsPerVideoMin,
+    filterOptions?.avgVideoViewsPresetOptions,
+    averageViewsPerVideoMin
+  )
+  const averageViewersPerLiveLabel = resolveOptionLabel(
+    averageViewersPerLiveMin,
+    filterOptions?.avgLiveViewsPresetOptions,
+    averageViewersPerLiveMin
+  )
+  const engagementRateLabel = resolveOptionLabel(
+    engagementRateMinPercent,
+    filterOptions?.engagementRatePresetOptions,
+    engagementRateMinPercent
+  )
+
+  const creatorEstimatedPublishRateLabel = resolveOptionLabel(
+    creatorFilter.creatorEstimatedPublishRate ?? performanceFilters.estPostRate,
+    filterOptions?.estPostRateOptions,
+    '（空）'
+  )
+
+  const filterSummary: string[] = []
+  if (filterOptions?.showSearchKeywordFilter) {
+    filterSummary.push(`关键词：${searchKeyword || '（空）'}`)
+  }
+  if (filterOptions?.productCategoryOptions?.length) {
+    filterSummary.push(`商品类目：${productCategories}`)
+  }
+  if (filterOptions?.avgCommissionRateOptions?.length) {
+    filterSummary.push(`平均佣金率：${avgCommissionRateLabel}`)
+  }
+  if (filterOptions?.contentTypeOptions?.length) {
+    filterSummary.push(`内容类型：${contentTypeLabel}`)
+  }
+  if (filterOptions?.creatorAgencyOptions?.length) {
+    filterSummary.push(`达人机构：${creatorAgencyLabel}`)
+  }
+  if (filterOptions?.fastGrowingOptions?.length) {
+    filterSummary.push(`快速成长榜：${Boolean(creatorFilter.fastGrowing) ? '是' : '否'}`)
+  }
+  if (filterOptions?.notInvitedInPast90DaysOptions?.length) {
+    filterSummary.push(`过去 90 天内未获邀请的达人：${Boolean(creatorFilter.notInvitedInPast90Days) ? '是' : '否'}`)
+  }
+  if (filterOptions?.followerAgeOptions?.length) {
+    filterSummary.push(`粉丝年龄：${fansAgeRange}`)
+  }
+  if (filterOptions?.followerGenderOptions?.length) {
+    filterSummary.push(`粉丝性别：${fansGenderLabel}`)
+  }
+  if (filterOptions?.followerCountPresetOptions?.length) {
+    filterSummary.push(`粉丝数：${fansCountMin} - ${fansCountMax}`)
+  }
+  if (filterOptions?.gmvOptions?.length) {
+    filterSummary.push(`GMV：${gmvRange}`)
+  }
+  if (filterOptions?.itemsSoldOptions?.length) {
+    filterSummary.push(`成交件数：${salesCountRange}`)
+  }
+  if (filterOptions?.avgVideoViewsPresetOptions?.length) {
+    filterSummary.push(`平均每个视频的播放量：${averageViewsPerVideoLabel}`)
+  }
+  if (filterOptions?.avgLiveViewsPresetOptions?.length) {
+    filterSummary.push(`平均每场直播的观看人数：${averageViewersPerLiveLabel}`)
+  }
+  if (filterOptions?.engagementRatePresetOptions?.length) {
+    filterSummary.push(`互动率 (%)：${engagementRateLabel}`)
+  }
+  if (filterOptions?.estPostRateOptions?.length) {
+    filterSummary.push(`预计发布率：${creatorEstimatedPublishRateLabel}`)
+  }
+  if (filterOptions?.showBrandCollaborationFilter) {
+    filterSummary.push(`品牌合作：${coBranding || '（空）'}`)
+  }
+
+  const showCreatorSortSection = Boolean(filterOptions?.sortOptions?.length)
 
   const sourceMessageTemplate =
     source.messageTemplate || {
@@ -362,18 +605,22 @@ const buildDetailFromSource = (source: Record<string, any>, fallbackTask?: TaskI
 
   return {
     taskName: String(source.taskName || fallbackTask?.taskName || '建联任务'),
-    startTime: formatDateTime(source.startTime || fallbackTask?.startTime || '-'),
+    startTime: formatDateTimeToLocal(source.startTime || fallbackTask?.startTime || '-'),
     status: normalizeStatusToUI(source.status || fallbackTask?.status),
     progress: {
       linked: toNumber(source.linkedCount ?? source.realCount ?? source.completedCount ?? fallbackTask?.linkedCount, 0),
       total: toNumber(source.planCount ?? source.plannedCount ?? fallbackTask?.planCount, 0)
     },
     filterSummary,
-    creatorSortLabel:
-      SORT_LABEL_MAP[String(source.creatorSort ?? source.creatorFilter?.sortBy ?? 'OFFICIAL_DEFAULT')] ||
-      String(source.creatorSort ?? source.creatorFilter?.sortBy ?? '官方默认值'),
-    outreachCreatorTypeLabel:
-      OUTREACH_CREATOR_TYPE_LABEL_MAP[creatorType as keyof typeof OUTREACH_CREATOR_TYPE_LABEL_MAP] || '建联所有达人',
+    creatorSortLabel: showCreatorSortSection
+      ? resolveOptionLabel(
+          source.creatorSort ?? source.creatorFilter?.sortBy,
+          filterOptions?.sortOptions,
+          String(source.creatorSort ?? source.creatorFilter?.sortBy ?? '')
+        )
+      : '',
+    showCreatorSortSection,
+    outreachCreatorTypeLabel: CREATOR_TYPE_LABEL_MAP[creatorType] || creatorType || '建联所有达人',
     messageTemplate: {
       firstMessage,
       replyMessage
@@ -382,11 +629,26 @@ const buildDetailFromSource = (source: Record<string, any>, fallbackTask?: TaskI
   }
 }
 
+const lastDetailSource = ref<{ source: Record<string, any>; fallbackTask: TaskInfo | null } | null>(null)
+
+const applyFilterLabelsToDetail = (): void => {
+  if (!detail.value || !lastDetailSource.value) return
+  const next = buildDetailFromSource(lastDetailSource.value.source, lastDetailSource.value.fallbackTask)
+  detail.value = {
+    ...detail.value,
+    filterSummary: next.filterSummary,
+    creatorSortLabel: next.creatorSortLabel,
+    showCreatorSortSection: next.showCreatorSortSection,
+    outreachCreatorTypeLabel: next.outreachCreatorTypeLabel
+  }
+}
+
 const buildDetailFromTask = (task: TaskInfo): TaskDetailData => {
   return buildDetailFromSource(task.raw || {}, task)
 }
 
-const fetchRuntimeRows = async (): Promise<void> => {
+const fetchRuntimeRows = async (options?: { silent?: boolean }): Promise<void> => {
+  const silent = Boolean(options?.silent)
   const taskId = currentTaskId.value
   if (!taskId) {
     runtimeRows.value = []
@@ -394,7 +656,13 @@ const fetchRuntimeRows = async (): Promise<void> => {
     return
   }
 
-  isRuntimeLoading.value = true
+  if (silent) {
+    if (isRuntimePolling.value) return
+    isRuntimePolling.value = true
+  } else {
+    isRuntimeLoading.value = true
+  }
+
   try {
     const result = await getOutreachTaskRecords(taskId, {
       page: runtimePage.value,
@@ -403,47 +671,75 @@ const fetchRuntimeRows = async (): Promise<void> => {
     runtimeRows.value = normalizeRuntimeRows(result.list, taskId)
     runtimeTotal.value = Number(result.total || 0)
   } catch (_error) {
-    runtimeRows.value = []
-    runtimeTotal.value = 0
+    if (!silent) {
+      runtimeRows.value = []
+      runtimeTotal.value = 0
+    }
   } finally {
-    isRuntimeLoading.value = false
+    if (silent) {
+      isRuntimePolling.value = false
+    } else {
+      isRuntimeLoading.value = false
+    }
   }
 }
 
-const fetchTaskDetail = async (): Promise<void> => {
+const fetchTaskDetail = async (options?: { silent?: boolean }): Promise<void> => {
+  const silent = Boolean(options?.silent)
   const taskId = currentTaskId.value
   if (!taskId && !props.task) {
     detail.value = null
+    lastDetailSource.value = null
     errorMessage.value = '未找到任务详情，请返回列表后重试'
     runtimeRows.value = []
     runtimeTotal.value = 0
     return
   }
 
-  isLoading.value = true
-  errorMessage.value = ''
+  if (silent) {
+    if (isDetailPolling.value) return
+    isDetailPolling.value = true
+  } else {
+    isLoading.value = true
+    errorMessage.value = ''
+  }
 
   try {
     if (taskId) {
       const result = await getOutreachTaskDetail(taskId)
       const payload = (result?.data ?? result ?? {}) as Record<string, any>
+      lastDetailSource.value = { source: payload, fallbackTask: props.task }
       detail.value = buildDetailFromSource(payload, props.task)
+      applyFilterLabelsToDetail()
     } else if (props.task) {
+      lastDetailSource.value = { source: props.task.raw || {}, fallbackTask: props.task }
       detail.value = buildDetailFromTask(props.task)
+      applyFilterLabelsToDetail()
     } else {
       detail.value = null
+      lastDetailSource.value = null
       errorMessage.value = '未找到任务详情，请返回列表后重试'
     }
   } catch (_error) {
+    if (silent) {
+      return
+    }
     if (props.task) {
+      lastDetailSource.value = { source: props.task.raw || {}, fallbackTask: props.task }
       detail.value = buildDetailFromTask(props.task)
+      applyFilterLabelsToDetail()
       errorMessage.value = ''
     } else {
       detail.value = null
+      lastDetailSource.value = null
       errorMessage.value = '加载任务详情失败'
     }
   } finally {
-    isLoading.value = false
+    if (silent) {
+      isDetailPolling.value = false
+    } else {
+      isLoading.value = false
+    }
   }
 }
 
@@ -456,9 +752,9 @@ const stopDetailPolling = (): void => {
 const startDetailPolling = (): void => {
   if (detailPollTimer) return
   detailPollTimer = window.setInterval(() => {
-    if (!shouldPollTaskDetail.value || isLoading.value || isRuntimeLoading.value) return
-    void fetchTaskDetail()
-    void fetchRuntimeRows()
+    if (!shouldPollTaskDetail.value) return
+    void fetchTaskDetail({ silent: true })
+    void fetchRuntimeRows({ silent: true })
   }, 3000)
 }
 
@@ -471,6 +767,14 @@ const handleRuntimePageSizeChange = (nextPageSize: number): void => {
   runtimePageSize.value = nextPageSize
   runtimePage.value = 1
 }
+
+watch(
+  resolvedFilterOptions,
+  () => {
+    applyFilterLabelsToDetail()
+  },
+  { deep: true }
+)
 
 watch(
   currentTaskId,
@@ -546,7 +850,7 @@ onUnmounted(() => {
         </NDescriptions>
       </NCard>
 
-      <NCard class="detail-section-card" :bordered="false" size="small" title="筛选达人">
+      <NCard v-if="detail.filterSummary.length" class="detail-section-card" :bordered="false" size="small" title="筛选达人">
         <NList class="summary-list" :bordered="false" hoverable>
           <NListItem v-for="(item, index) in detail.filterSummary" :key="index" class="summary-list-item">
             {{ item }}
@@ -554,7 +858,7 @@ onUnmounted(() => {
         </NList>
       </NCard>
 
-      <NCard class="detail-section-card" :bordered="false" size="small" title="达人排序">
+      <NCard v-if="detail.showCreatorSortSection" class="detail-section-card" :bordered="false" size="small" title="达人排序">
         <NDescriptions label-placement="left" :column="1" size="small">
           <NDescriptionsItem label="排序方式">{{ detail.creatorSortLabel }}</NDescriptionsItem>
         </NDescriptions>
@@ -598,7 +902,6 @@ onUnmounted(() => {
             :bordered="false"
             :single-line="false"
             :row-key="(row) => row.id"
-            :scroll-x="760"
           >
             <template #empty>
               <div class="table-empty">{{ runtimeTableEmptyText }}</div>
@@ -636,7 +939,7 @@ onUnmounted(() => {
 
 .detail-header,
 .detail-section-card {
-  border: 1px solid #dbe5f3;
+  border: 1px solid #dbe3ef;
   border-radius: 10px;
   background: #fff;
   padding: 14px;
@@ -661,21 +964,28 @@ onUnmounted(() => {
 }
 
 .detail-section-card {
+  --n-border-radius: 10px;
   padding: 0;
+  overflow: hidden;
 }
 
 .detail-section-card:deep(.n-card-header) {
   padding: 14px 14px 0;
+  border-bottom: none !important;
+  box-shadow: none !important;
 }
 
 .detail-section-card:deep(.n-card-header__main) {
   color: #1f2d3d;
   font-size: 16px;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .detail-section-card:deep(.n-card__content) {
-  padding: 10px 14px 14px;
+  padding: 12px 14px 14px;
+  border-top: none !important;
+  box-shadow: none !important;
 }
 
 .detail-section-card :deep(.n-descriptions) {
@@ -728,6 +1038,32 @@ onUnmounted(() => {
   overflow-x: auto;
 }
 
+.creator-cell {
+  width: 100%;
+  min-width: 0;
+}
+
+.creator-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #97a3b4;
+}
+
+.creator-name-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 28px;
+}
+
+.creator-name {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  line-height: 1.2;
+}
+
 .runtime-data-table:deep(.n-data-table-th) {
   background: #f8fafc;
   color: #4b5c71;
@@ -736,6 +1072,7 @@ onUnmounted(() => {
 
 .runtime-data-table:deep(.n-data-table-td) {
   color: #334155;
+  vertical-align: middle;
 }
 
 .table-empty {

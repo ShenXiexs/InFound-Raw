@@ -25,6 +25,7 @@ import {
   updateFulfillmentRule,
   type FulfillmentRuleItem as ApiFulfillmentRuleItem
 } from '../api/fulfillment.api'
+import { formatDateTimeToLocal } from '../utils/date-time'
 
 interface FulfillmentRuleItem {
   id: string
@@ -233,7 +234,7 @@ const normalizeReminderItem = (item: Record<string, any>, index: number): Fulfil
     followerCount: toDisplayText(item.followers ?? item.followerCount ?? item.fansCount ?? item.follower_count ?? item.fans_count),
     gmv: toDisplayText(item.gmv ?? item.gmvAmount ?? item.gmv_amount),
     matchedRule: toDisplayText(item.hitRule ?? item.matchedRule ?? item.ruleName ?? item.ruleCode ?? item.rule_code),
-    sentAt: toDisplayText(item.remindAt ?? item.sentAt ?? item.sendTime ?? item.createdAt ?? item.created_at)
+    sentAt: formatDateTimeToLocal(item.remindAt ?? item.sentAt ?? item.sendTime ?? item.createdAt ?? item.created_at)
   }
 }
 

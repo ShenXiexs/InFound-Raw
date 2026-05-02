@@ -1,32 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { NButton, NCard, NCheckbox, NDatePicker, NInput, NModal, NSelect, NTabPane, NTabs, NTag, type SelectOption } from 'naive-ui'
-import { type OutreachCreatorType } from '../constants/outreach-task-display'
+import type { CreateOutreachTaskFilterOptions, OutreachCreatorType } from '../types/outreach-task-form'
+import { formatDateTimeToLocalInput } from '../utils/date-time'
 import FilterFieldLabel from './FilterFieldLabel.vue'
-export interface SelectOptionItem<T = string | number> {
-  label: string
-  value: T
-}
 
-export interface CreateOutreachTaskFilterOptions {
-  productCategoryOptions?: Array<SelectOptionItem<string>>
-  avgCommissionRateOptions?: Array<SelectOptionItem<string>>
-  contentTypeOptions?: Array<SelectOptionItem<string>>
-  creatorAgencyOptions?: Array<SelectOptionItem<string>>
-  followerAgeOptions?: Array<SelectOptionItem<string>>
-  followerGenderOptions?: Array<SelectOptionItem<string>>
-  followerCountPresetOptions?: Array<SelectOptionItem<string>>
-  gmvOptions?: Array<SelectOptionItem<string>>
-  itemsSoldOptions?: Array<SelectOptionItem<string>>
-  avgVideoViewsPresetOptions?: Array<SelectOptionItem<string>>
-  avgLiveViewsPresetOptions?: Array<SelectOptionItem<string>>
-  engagementRatePresetOptions?: Array<SelectOptionItem<string>>
-  estPostRateOptions?: Array<SelectOptionItem<string>>
-  sortOptions?: Array<SelectOptionItem<string | number>>
-  avgVideoViewsToggleLabel?: string
-  avgLiveViewsToggleLabel?: string
-  engagementRateToggleLabel?: string
-}
+export type { CreateOutreachTaskFilterOptions, OutreachCreatorType, SelectOptionItem } from '../types/outreach-task-form'
 
 interface MessageTemplateForm {
   content: string
@@ -151,62 +130,6 @@ const emit = defineEmits<{
   (event: 'dirty-change', value: boolean): void
 }>()
 
-const toSelectOptions = (items: string[]): Array<{ label: string; value: string }> => {
-  return items.map((item) => ({ label: item, value: item }))
-}
-
-const PRODUCT_CATEGORY_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: 'Home Supplies', value: '600001' },
-  { label: 'Kitchenware', value: '600024' },
-  { label: 'Textiles & Soft Furnishings', value: '600154' },
-  { label: 'Household Appliances', value: '600942' },
-  { label: 'Womenswear & Underwear', value: '601152' },
-  { label: 'Shoes', value: '601352' },
-  { label: 'Beauty & Personal Care', value: '601450' },
-  { label: 'Phones & Electronics', value: '601739' },
-  { label: 'Computers & Office Equipment', value: '601755' },
-  { label: 'Pet Supplies', value: '602118' },
-  { label: 'Sports & Outdoor', value: '603014' },
-  { label: 'Toys & Hobbies', value: '604206' },
-  { label: 'Furniture', value: '604453' },
-  { label: 'Tools & Hardware', value: '604579' },
-  { label: 'Home Improvement', value: '604968' },
-  { label: 'Automotive & Motorcycle', value: '605196' },
-  { label: 'Fashion Accessories', value: '605248' },
-  { label: 'Health', value: '700645' },
-  { label: 'Books, Magazines & Audio', value: '801928' },
-  { label: "Kids' Fashion", value: '802184' },
-  { label: 'Menswear & Underwear', value: '824328' },
-  { label: 'Luggage & Bags', value: '824584' },
-  { label: 'Collectibles', value: '951432' },
-  { label: 'Jewelry Accessories & Derivatives', value: '953224' }
-]
-const AVG_COMMISSION_RATE_OPTIONS = ['All', 'Less than 20%', 'Less than 15%', 'Less than 10%', 'Less than 5%']
-const CONTENT_TYPE_OPTIONS = ['All', 'Video', 'LIVE']
-const CREATOR_AGENCY_OPTIONS = ['All', 'Managed by Agency', 'Independent creators']
-const FOLLOWER_AGE_OPTIONS = ['18 - 24', '25 - 34', '35 - 44', '45 - 54', '55+']
-const FOLLOWER_GENDER_OPTIONS = ['All', 'Female', 'Male']
-const FOLLOWER_COUNT_PRESET_OPTIONS = ['0', '10K', '100K', '1M', '10M+']
-const PERFORMANCE_GMV_OPTIONS = ['MX$0-MX$100', 'MX$100-MX$1K', 'MX$1K-MX$10K', 'MX$10K+']
-const PERFORMANCE_ITEMS_SOLD_OPTIONS = ['0-10', '10-100', '100-1K', '1K+']
-const PERFORMANCE_AVG_VIDEO_VIEWS_PRESET_OPTIONS = ['0', '100', '1K', '10K', '100K+']
-const PERFORMANCE_AVG_LIVE_VIEWS_PRESET_OPTIONS = ['0', '100', '1K', '10K', '100K+']
-const PERFORMANCE_ENGAGEMENT_RATE_PRESET_OPTIONS = ['0', '1', '3', '5', '10+']
-const PERFORMANCE_EST_POST_RATE_OPTIONS = ['All', 'OK', 'Good', 'Better']
-const AVG_COMMISSION_RATE_SELECT_OPTIONS = toSelectOptions(AVG_COMMISSION_RATE_OPTIONS)
-const CONTENT_TYPE_SELECT_OPTIONS = toSelectOptions(CONTENT_TYPE_OPTIONS)
-const CREATOR_AGENCY_SELECT_OPTIONS = toSelectOptions(CREATOR_AGENCY_OPTIONS)
-const FOLLOWER_AGE_SELECT_OPTIONS = toSelectOptions(FOLLOWER_AGE_OPTIONS)
-const FOLLOWER_GENDER_SELECT_OPTIONS = toSelectOptions(FOLLOWER_GENDER_OPTIONS)
-const PERFORMANCE_GMV_SELECT_OPTIONS = toSelectOptions(PERFORMANCE_GMV_OPTIONS)
-const PERFORMANCE_ITEMS_SOLD_SELECT_OPTIONS = toSelectOptions(PERFORMANCE_ITEMS_SOLD_OPTIONS)
-const PERFORMANCE_EST_POST_RATE_SELECT_OPTIONS = toSelectOptions(PERFORMANCE_EST_POST_RATE_OPTIONS)
-const SORT_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: '官方默认值', value: 'OFFICIAL_DEFAULT' },
-  { label: '达人GMV降序', value: 'GMV_DESC' },
-  { label: '达人粉丝数降序', value: 'FOLLOWERS_DESC' },
-  { label: '达人佣金率降序', value: 'COMMISSION_DESC' }
-]
 const OUTREACH_CREATOR_OPTIONS: Array<{ label: string; value: OutreachCreatorType }> = [
   { label: '建联所有达人', value: 'ALL' },
   { label: '只建联新达人', value: 'NEW_ONLY' },
@@ -225,33 +148,33 @@ const createDefaultFormState = (): CreateOutreachTaskFormState => ({
   startTime: '',
   planCount: '',
   searchKeyword: '',
-  creatorSort: 'OFFICIAL_DEFAULT',
+  creatorSort: '',
   outreachCreatorType: 'ALL',
   creatorFilters: {
-    productCategorySelections: ['600001'],
-    avgCommissionRate: 'All',
-    contentType: 'All',
-    creatorAgency: 'All',
+    productCategorySelections: [],
+    avgCommissionRate: '',
+    contentType: '',
+    creatorAgency: '',
     spotlightCreator: false,
     fastGrowing: false,
     notInvitedInPast90Days: false
   },
   followerFilters: {
     followerAgeSelections: [],
-    followerGender: 'All',
-    followerCountMin: '0',
-    followerCountMax: '10,000,000+'
+    followerGender: '',
+    followerCountMin: '',
+    followerCountMax: ''
   },
   performanceFilters: {
     gmvSelections: [],
     itemsSoldSelections: [],
-    averageViewsPerVideoMin: '0',
+    averageViewsPerVideoMin: '',
     averageViewsPerVideoShoppableVideosOnly: false,
-    averageViewersPerLiveMin: '0',
+    averageViewersPerLiveMin: '',
     averageViewersPerLiveShoppableLiveOnly: false,
-    engagementRateMinPercent: '0',
+    engagementRateMinPercent: '',
     engagementRateShoppableVideosOnly: false,
-    estPostRate: 'All',
+    estPostRate: '',
     brandCollaborationInput: ''
   },
   firstMessage: createDefaultMessageTemplate(),
@@ -268,11 +191,6 @@ const activeCreatorFilterTab = ref<CreatorFilterTab>('creator')
 const MESSAGE_TAB_OPTIONS: Array<{ label: string; value: MessageSectionType }> = [
   { label: '首次消息', value: 'first' },
   { label: '回复达人消息', value: 'reply' }
-]
-const CREATOR_FILTER_TAB_OPTIONS: Array<{ label: string; value: CreatorFilterTab }> = [
-  { label: '达人', value: 'creator' },
-  { label: '粉丝数', value: 'followers' },
-  { label: '表现', value: 'performance' }
 ]
 type FilterLabelKey =
   | 'searchKeyword'
@@ -361,68 +279,171 @@ const isAllCreatorMode = computed(() => form.value.outreachCreatorType === 'ALL'
 const messageTip = computed(() =>
   isAllCreatorMode.value ? '建联时发送首次消息；达人回复后，发送回复达人消息' : '建联时发送首次消息'
 )
-const productCategoryOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.productCategoryOptions?.length ? props.filterOptions.productCategoryOptions : PRODUCT_CATEGORY_OPTIONS) as SelectOption[]
+const productCategoryOptions = computed<SelectOption[]>(() => (props.filterOptions?.productCategoryOptions ?? []) as SelectOption[])
+const avgCommissionRateOptions = computed<SelectOption[]>(() => (props.filterOptions?.avgCommissionRateOptions ?? []) as SelectOption[])
+const contentTypeOptions = computed<SelectOption[]>(() => (props.filterOptions?.contentTypeOptions ?? []) as SelectOption[])
+const creatorAgencyOptions = computed<SelectOption[]>(() => (props.filterOptions?.creatorAgencyOptions ?? []) as SelectOption[])
+const followerAgeOptions = computed<SelectOption[]>(() => (props.filterOptions?.followerAgeOptions ?? []) as SelectOption[])
+const followerGenderOptions = computed<SelectOption[]>(() => (props.filterOptions?.followerGenderOptions ?? []) as SelectOption[])
+const followerCountPresetOptions = computed<SelectOption[]>(() => (props.filterOptions?.followerCountPresetOptions ?? []) as SelectOption[])
+const gmvOptions = computed<SelectOption[]>(() => (props.filterOptions?.gmvOptions ?? []) as SelectOption[])
+const itemsSoldOptions = computed<SelectOption[]>(() => (props.filterOptions?.itemsSoldOptions ?? []) as SelectOption[])
+const avgVideoViewsPresetOptions = computed<SelectOption[]>(() => (props.filterOptions?.avgVideoViewsPresetOptions ?? []) as SelectOption[])
+const avgLiveViewsPresetOptions = computed<SelectOption[]>(() => (props.filterOptions?.avgLiveViewsPresetOptions ?? []) as SelectOption[])
+const engagementRatePresetOptions = computed<SelectOption[]>(() => (props.filterOptions?.engagementRatePresetOptions ?? []) as SelectOption[])
+const estPostRateOptions = computed<SelectOption[]>(() => (props.filterOptions?.estPostRateOptions ?? []) as SelectOption[])
+const sortOptions = computed<SelectOption[]>(() => (props.filterOptions?.sortOptions ?? []) as SelectOption[])
+const fastGrowingOptions = computed(() => props.filterOptions?.fastGrowingOptions ?? [])
+const notInvitedInPast90DaysOptions = computed(() => props.filterOptions?.notInvitedInPast90DaysOptions ?? [])
+const hasSearchKeywordFilterUi = computed(() => Boolean(props.filterOptions?.showSearchKeywordFilter))
+const hasBrandCollaborationFilterUi = computed(() => Boolean(props.filterOptions?.showBrandCollaborationFilter))
+
+const showCreatorTabPane = computed(
+  () =>
+    productCategoryOptions.value.length > 0 ||
+    avgCommissionRateOptions.value.length > 0 ||
+    contentTypeOptions.value.length > 0 ||
+    creatorAgencyOptions.value.length > 0 ||
+    fastGrowingOptions.value.length > 0 ||
+    notInvitedInPast90DaysOptions.value.length > 0 ||
+    SHOW_SPOTLIGHT_CREATOR_FILTER
 )
-const avgCommissionRateOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.avgCommissionRateOptions?.length ? props.filterOptions.avgCommissionRateOptions : AVG_COMMISSION_RATE_SELECT_OPTIONS) as SelectOption[]
+
+const showFollowersTabPane = computed(
+  () =>
+    followerAgeOptions.value.length > 0 ||
+    followerGenderOptions.value.length > 0 ||
+    followerCountPresetOptions.value.length > 0
 )
-const contentTypeOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.contentTypeOptions?.length ? props.filterOptions.contentTypeOptions : CONTENT_TYPE_SELECT_OPTIONS) as SelectOption[]
+
+const showPerformanceTabPane = computed(
+  () =>
+    gmvOptions.value.length > 0 ||
+    itemsSoldOptions.value.length > 0 ||
+    avgVideoViewsPresetOptions.value.length > 0 ||
+    avgLiveViewsPresetOptions.value.length > 0 ||
+    engagementRatePresetOptions.value.length > 0 ||
+    estPostRateOptions.value.length > 0 ||
+    hasBrandCollaborationFilterUi.value
 )
-const creatorAgencyOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.creatorAgencyOptions?.length ? props.filterOptions.creatorAgencyOptions : CREATOR_AGENCY_SELECT_OPTIONS) as SelectOption[]
+
+const visibleCreatorFilterTabs = computed<Array<{ label: string; value: CreatorFilterTab }>>(() => {
+  const tabs: Array<{ label: string; value: CreatorFilterTab }> = []
+  if (showCreatorTabPane.value) tabs.push({ label: '达人', value: 'creator' })
+  if (showFollowersTabPane.value) tabs.push({ label: '粉丝数', value: 'followers' })
+  if (showPerformanceTabPane.value) tabs.push({ label: '表现', value: 'performance' })
+  return tabs
+})
+
+const showCreatorDiscoveryFiltersSection = computed(
+  () => hasSearchKeywordFilterUi.value || visibleCreatorFilterTabs.value.length > 0
 )
-const followerAgeOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.followerAgeOptions?.length ? props.filterOptions.followerAgeOptions : FOLLOWER_AGE_SELECT_OPTIONS) as SelectOption[]
+
+watch(
+  visibleCreatorFilterTabs,
+  (tabs) => {
+    if (tabs.length === 0) return
+    if (!tabs.some((t) => t.value === activeCreatorFilterTab.value)) {
+      activeCreatorFilterTab.value = tabs[0]!.value
+    }
+  },
+  { immediate: true }
 )
-const followerGenderOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.followerGenderOptions?.length ? props.filterOptions.followerGenderOptions : FOLLOWER_GENDER_SELECT_OPTIONS) as SelectOption[]
-)
-const followerCountPresetOptions = computed<SelectOption[]>(() =>
-  (
-    props.filterOptions?.followerCountPresetOptions?.length
-      ? props.filterOptions.followerCountPresetOptions
-      : toSelectOptions(FOLLOWER_COUNT_PRESET_OPTIONS)
-  ) as SelectOption[]
-)
-const gmvOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.gmvOptions?.length ? props.filterOptions.gmvOptions : PERFORMANCE_GMV_SELECT_OPTIONS) as SelectOption[]
-)
-const itemsSoldOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.itemsSoldOptions?.length ? props.filterOptions.itemsSoldOptions : PERFORMANCE_ITEMS_SOLD_SELECT_OPTIONS) as SelectOption[]
-)
-const avgVideoViewsPresetOptions = computed<SelectOption[]>(() =>
-  (
-    props.filterOptions?.avgVideoViewsPresetOptions?.length
-      ? props.filterOptions.avgVideoViewsPresetOptions
-      : toSelectOptions(PERFORMANCE_AVG_VIDEO_VIEWS_PRESET_OPTIONS)
-  ) as SelectOption[]
-)
-const avgLiveViewsPresetOptions = computed<SelectOption[]>(() =>
-  (
-    props.filterOptions?.avgLiveViewsPresetOptions?.length
-      ? props.filterOptions.avgLiveViewsPresetOptions
-      : toSelectOptions(PERFORMANCE_AVG_LIVE_VIEWS_PRESET_OPTIONS)
-  ) as SelectOption[]
-)
-const engagementRatePresetOptions = computed<SelectOption[]>(() =>
-  (
-    props.filterOptions?.engagementRatePresetOptions?.length
-      ? props.filterOptions.engagementRatePresetOptions
-      : toSelectOptions(PERFORMANCE_ENGAGEMENT_RATE_PRESET_OPTIONS)
-  ) as SelectOption[]
-)
-const estPostRateOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.estPostRateOptions?.length ? props.filterOptions.estPostRateOptions : PERFORMANCE_EST_POST_RATE_SELECT_OPTIONS) as SelectOption[]
-)
-const sortOptions = computed<SelectOption[]>(() =>
-  (props.filterOptions?.sortOptions?.length ? props.filterOptions.sortOptions : SORT_OPTIONS) as SelectOption[]
-)
+
 // 暂未接入后端字段，相关控件先隐藏保留
 // const avgVideoViewsToggleLabel = computed(() => props.filterOptions?.avgVideoViewsToggleLabel || 'Filter by shoppable videos（Average views per video）')
 // const avgLiveViewsToggleLabel = computed(() => props.filterOptions?.avgLiveViewsToggleLabel || 'Filter by shoppable LIVE streams')
 // const engagementRateToggleLabel = computed(() => props.filterOptions?.engagementRateToggleLabel || 'Filter by shoppable videos（Engagement）')
+
+const toOptionValueString = (value: string | number | boolean): string => {
+  if (typeof value === 'boolean') return value ? 'true' : 'false'
+  return String(value)
+}
+
+const buildOptionValueSet = (options: SelectOption[]): Set<string> => {
+  return new Set(options.map((item) => toOptionValueString(item.value as string | number | boolean)))
+}
+
+const pruneSelectionsByOptions = (selections: string[], options: SelectOption[]): string[] => {
+  const allowed = buildOptionValueSet(options)
+  if (allowed.size === 0) return [...selections]
+  return selections.filter((item) => allowed.has(String(item)))
+}
+
+const syncFilterSelectionsWithOptions = (): void => {
+  const state = form.value
+
+  state.creatorFilters.productCategorySelections = pruneSelectionsByOptions(
+    state.creatorFilters.productCategorySelections,
+    productCategoryOptions.value
+  )
+
+  const allowedAvgCommission = buildOptionValueSet(avgCommissionRateOptions.value)
+  if (allowedAvgCommission.size > 0 && !allowedAvgCommission.has(String(state.creatorFilters.avgCommissionRate))) {
+    state.creatorFilters.avgCommissionRate = toOptionValueString(avgCommissionRateOptions.value[0]?.value as string | number | boolean)
+  }
+
+  const allowedContentType = buildOptionValueSet(contentTypeOptions.value)
+  if (allowedContentType.size > 0 && !allowedContentType.has(String(state.creatorFilters.contentType))) {
+    state.creatorFilters.contentType = toOptionValueString(contentTypeOptions.value[0]?.value as string | number | boolean)
+  }
+
+  const allowedCreatorAgency = buildOptionValueSet(creatorAgencyOptions.value)
+  if (allowedCreatorAgency.size > 0 && !allowedCreatorAgency.has(String(state.creatorFilters.creatorAgency))) {
+    state.creatorFilters.creatorAgency = toOptionValueString(creatorAgencyOptions.value[0]?.value as string | number | boolean)
+  }
+
+  state.followerFilters.followerAgeSelections = pruneSelectionsByOptions(
+    state.followerFilters.followerAgeSelections,
+    followerAgeOptions.value
+  )
+
+  const allowedFollowerGender = buildOptionValueSet(followerGenderOptions.value)
+  if (allowedFollowerGender.size > 0 && !allowedFollowerGender.has(String(state.followerFilters.followerGender))) {
+    state.followerFilters.followerGender = toOptionValueString(followerGenderOptions.value[0]?.value as string | number | boolean)
+  }
+
+  const allowedFollowerPresets = buildOptionValueSet(followerCountPresetOptions.value)
+  if (allowedFollowerPresets.size > 0) {
+    if (!allowedFollowerPresets.has(String(state.followerFilters.followerCountMin))) {
+      state.followerFilters.followerCountMin = toOptionValueString(followerCountPresetOptions.value[0]?.value as string | number | boolean)
+    }
+    if (!allowedFollowerPresets.has(String(state.followerFilters.followerCountMax))) {
+      state.followerFilters.followerCountMax = toOptionValueString(followerCountPresetOptions.value[0]?.value as string | number | boolean)
+    }
+  }
+
+  state.performanceFilters.gmvSelections = pruneSelectionsByOptions(state.performanceFilters.gmvSelections, gmvOptions.value)
+  state.performanceFilters.itemsSoldSelections = pruneSelectionsByOptions(
+    state.performanceFilters.itemsSoldSelections,
+    itemsSoldOptions.value
+  )
+
+  const allowedAvgVideoViews = buildOptionValueSet(avgVideoViewsPresetOptions.value)
+  if (allowedAvgVideoViews.size > 0 && !allowedAvgVideoViews.has(String(state.performanceFilters.averageViewsPerVideoMin))) {
+    state.performanceFilters.averageViewsPerVideoMin = toOptionValueString(avgVideoViewsPresetOptions.value[0]?.value as string | number | boolean)
+  }
+
+  const allowedAvgLiveViews = buildOptionValueSet(avgLiveViewsPresetOptions.value)
+  if (allowedAvgLiveViews.size > 0 && !allowedAvgLiveViews.has(String(state.performanceFilters.averageViewersPerLiveMin))) {
+    state.performanceFilters.averageViewersPerLiveMin = toOptionValueString(avgLiveViewsPresetOptions.value[0]?.value as string | number | boolean)
+  }
+
+  const allowedEngagement = buildOptionValueSet(engagementRatePresetOptions.value)
+  if (allowedEngagement.size > 0 && !allowedEngagement.has(String(state.performanceFilters.engagementRateMinPercent))) {
+    state.performanceFilters.engagementRateMinPercent = toOptionValueString(engagementRatePresetOptions.value[0]?.value as string | number | boolean)
+  }
+
+  const allowedEstPostRate = buildOptionValueSet(estPostRateOptions.value)
+  if (allowedEstPostRate.size > 0 && !allowedEstPostRate.has(String(state.performanceFilters.estPostRate))) {
+    state.performanceFilters.estPostRate = toOptionValueString(estPostRateOptions.value[0]?.value as string | number | boolean)
+  }
+
+  if (sortOptions.value.length > 0 && !sortOptions.value.some((item) => item.value === state.creatorSort)) {
+    state.creatorSort = sortOptions.value[0]?.value ?? state.creatorSort
+  }
+}
+
 const ERROR_SCROLL_ORDER = [
   'taskName',
   'startTime',
@@ -520,10 +541,7 @@ const getMessageTemplate = (type: MessageSectionType): MessageTemplateForm => {
 }
 
 const toDateTimeLocal = (value: string): string => {
-  const token = String(value || '').trim()
-  if (!token) return ''
-  const normalized = token.replace(' ', 'T')
-  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized
+  return formatDateTimeToLocalInput(value)
 }
 
 const applyInitialData = (initialData?: Partial<CreateOutreachTaskFormPayload>): void => {
@@ -653,10 +671,8 @@ const handleProductMessageToggle = (type: MessageSectionType): void => {
 
 const initializeForm = (): void => {
   applyInitialData(props.initialData)
-  if (!sortOptions.value.some((item) => item.value === form.value.creatorSort) && sortOptions.value.length > 0) {
-    form.value.creatorSort = sortOptions.value[0]?.value ?? form.value.creatorSort
-  }
-  activeCreatorFilterTab.value = 'creator'
+  syncFilterSelectionsWithOptions()
+  activeCreatorFilterTab.value = visibleCreatorFilterTabs.value[0]?.value ?? 'creator'
   activeMessageTab.value = 'first'
   clearErrors()
   initialSnapshot.value = JSON.stringify(form.value)
@@ -665,7 +681,8 @@ const initializeForm = (): void => {
 
 const resetForm = (): void => {
   form.value = createDefaultFormState()
-  activeCreatorFilterTab.value = 'creator'
+  syncFilterSelectionsWithOptions()
+  activeCreatorFilterTab.value = visibleCreatorFilterTabs.value[0]?.value ?? 'creator'
   activeMessageTab.value = 'first'
   clearErrors()
   initialSnapshot.value = JSON.stringify(form.value)
@@ -863,9 +880,8 @@ watch(
 watch(
   () => props.filterOptions,
   () => {
-    if (!sortOptions.value.some((item) => item.value === form.value.creatorSort) && sortOptions.value.length > 0) {
-      form.value.creatorSort = sortOptions.value[0]?.value ?? form.value.creatorSort
-    }
+    if (!props.visible) return
+    syncFilterSelectionsWithOptions()
   },
   { deep: true }
 )
@@ -940,6 +956,7 @@ watch(
             id="create-task-start-time"
             :value="startTimeValue"
             :is-date-disabled="isStartDateDisabled"
+            :actions="['clear', 'confirm']"
             class="field-input"
             format="yyyy-MM-dd HH:mm"
             time-picker-format="HH:mm"
@@ -952,9 +969,9 @@ watch(
           <p v-if="errors.startTime" class="field-error">{{ errors.startTime }}</p>
         </section>
 
-        <section class="form-block">
+        <section v-if="showCreatorDiscoveryFiltersSection" class="form-block">
           <p class="field-label">3. 筛选达人</p>
-          <label class="field-item full-width search-row">
+          <label v-if="hasSearchKeywordFilterUi" class="field-item full-width search-row">
             <span>{{ getFilterLabel('searchKeyword') }}</span>
             <NInput
               v-model:value="form.searchKeyword"
@@ -964,14 +981,14 @@ watch(
             />
           </label>
 
-          <div class="creator-filter-panel">
+          <div v-if="visibleCreatorFilterTabs.length" class="creator-filter-panel">
             <div class="creator-filter-tabs-wrap">
               <span class="creator-filter-panel-title">{{ getFilterLabel('filterConditions') }}</span>
               <NTabs v-model:value="activeCreatorFilterTab" animated class="creator-filter-tabs" pane-class="creator-filter-tab-panel">
-                <NTabPane v-for="item in CREATOR_FILTER_TAB_OPTIONS" :key="item.value" :name="item.value" :tab="item.label">
+                <NTabPane v-for="item in visibleCreatorFilterTabs" :key="item.value" :name="item.value" :tab="item.label">
                   <template v-if="item.value === 'creator'">
                     <div class="form-grid three-col">
-                      <div class="field-item">
+                      <div v-if="productCategoryOptions.length" class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('productCategory')" :tip-text="FILTER_TIPS.productCategory" />
                         <NSelect
                           v-model:value="form.creatorFilters.productCategorySelections"
@@ -983,7 +1000,7 @@ watch(
                           multiple
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="avgCommissionRateOptions.length" class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('avgCommissionRate')" :tip-text="FILTER_TIPS.avgCommissionRate" />
                         <NSelect
                           v-model:value="form.creatorFilters.avgCommissionRate"
@@ -992,7 +1009,7 @@ watch(
                           class="field-input"
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="contentTypeOptions.length" class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('contentType')" :tip-text="FILTER_TIPS.contentType" />
                         <NSelect
                           v-model:value="form.creatorFilters.contentType"
@@ -1001,7 +1018,7 @@ watch(
                           class="field-input"
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="creatorAgencyOptions.length" class="field-item">
                         <span>{{ getFilterLabel('creatorAgency') }}</span>
                         <NSelect
                           v-model:value="form.creatorFilters.creatorAgency"
@@ -1012,7 +1029,12 @@ watch(
                       </div>
                     </div>
 
-                    <div class="checkbox-row creator-filter-checkbox-row">
+                    <div
+                      v-if="
+                        SHOW_SPOTLIGHT_CREATOR_FILTER || fastGrowingOptions.length || notInvitedInPast90DaysOptions.length
+                      "
+                      class="checkbox-row creator-filter-checkbox-row"
+                    >
                       <!-- 后端未接好时可将 SHOW_SPOTLIGHT_CREATOR_FILTER 设为 false，仅隐藏展示，逻辑与文案已就绪 -->
                       <NCheckbox v-if="SHOW_SPOTLIGHT_CREATOR_FILTER" v-model:checked="form.creatorFilters.spotlightCreator">
                         <FilterFieldLabel
@@ -1020,10 +1042,10 @@ watch(
                           :tip-text="FILTER_TIPS.spotlightCreator"
                         />
                       </NCheckbox>
-                      <NCheckbox v-model:checked="form.creatorFilters.fastGrowing">
+                      <NCheckbox v-if="fastGrowingOptions.length" v-model:checked="form.creatorFilters.fastGrowing">
                         <FilterFieldLabel :label="getFilterLabel('fastGrowing')" :tip-text="FILTER_TIPS.fastGrowing" />
                       </NCheckbox>
-                      <NCheckbox v-model:checked="form.creatorFilters.notInvitedInPast90Days">
+                      <NCheckbox v-if="notInvitedInPast90DaysOptions.length" v-model:checked="form.creatorFilters.notInvitedInPast90Days">
                         <FilterFieldLabel
                           :label="getFilterLabel('notInvitedInPast90Days')"
                           :tip-text="FILTER_TIPS.notInvitedInPast90Days"
@@ -1034,7 +1056,7 @@ watch(
 
                   <template v-else-if="item.value === 'followers'">
                     <div class="form-grid three-col">
-                      <div class="field-item">
+                      <div v-if="followerAgeOptions.length" class="field-item">
                         <span>{{ getFilterLabel('followerAge') }}</span>
                         <NSelect
                           v-model:value="form.followerFilters.followerAgeSelections"
@@ -1046,7 +1068,7 @@ watch(
                           multiple
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="followerGenderOptions.length" class="field-item">
                         <span>{{ getFilterLabel('followerGender') }}</span>
                         <NSelect
                           v-model:value="form.followerFilters.followerGender"
@@ -1055,7 +1077,7 @@ watch(
                           class="field-input"
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="followerCountPresetOptions.length" class="field-item">
                         <span>{{ getFilterLabel('followerCountMin') }}</span>
                         <NInput v-model:value="form.followerFilters.followerCountMin" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1071,7 +1093,7 @@ watch(
                           </NButton>
                         </div>
                       </div>
-                      <div class="field-item">
+                      <div v-if="followerCountPresetOptions.length" class="field-item">
                         <span>{{ getFilterLabel('followerCountMax') }}</span>
                         <NInput v-model:value="form.followerFilters.followerCountMax" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1092,7 +1114,7 @@ watch(
 
                   <template v-else>
                     <div class="form-grid three-col">
-                      <div class="field-item">
+                      <div v-if="gmvOptions.length" class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('gmv')" :tip-text="FILTER_TIPS.gmv" />
                         <NSelect
                           v-model:value="form.performanceFilters.gmvSelections"
@@ -1104,7 +1126,7 @@ watch(
                           multiple
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="itemsSoldOptions.length" class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('itemsSold')" :tip-text="FILTER_TIPS.itemsSold" />
                         <NSelect
                           v-model:value="form.performanceFilters.itemsSoldSelections"
@@ -1116,7 +1138,7 @@ watch(
                           multiple
                         />
                       </div>
-                      <div class="field-item">
+                      <div v-if="avgVideoViewsPresetOptions.length" class="field-item">
                         <span>{{ getFilterLabel('averageViewsPerVideoMin') }}</span>
                         <NInput v-model:value="form.performanceFilters.averageViewsPerVideoMin" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1132,7 +1154,7 @@ watch(
                           </NButton>
                         </div>
                       </div>
-                      <div class="field-item">
+                      <div v-if="avgLiveViewsPresetOptions.length" class="field-item">
                         <span>{{ getFilterLabel('averageViewersPerLiveMin') }}</span>
                         <NInput v-model:value="form.performanceFilters.averageViewersPerLiveMin" class="field-input" type="text" />
                         <div class="preset-option-row">
@@ -1148,7 +1170,7 @@ watch(
                           </NButton>
                         </div>
                       </div>
-                      <div class="field-item">
+                      <div v-if="engagementRatePresetOptions.length" class="field-item">
                         <FilterFieldLabel
                           :label="getFilterLabel('engagementRateMinPercent')"
                           :tip-text="FILTER_TIPS.engagementRateMinPercent"
@@ -1167,7 +1189,7 @@ watch(
                           </NButton>
                         </div>
                       </div>
-                      <div class="field-item">
+                      <div v-if="estPostRateOptions.length" class="field-item">
                         <FilterFieldLabel :label="getFilterLabel('estPostRate')" :tip-text="FILTER_TIPS.estPostRate" />
                         <NSelect
                           v-model:value="form.performanceFilters.estPostRate"
@@ -1176,7 +1198,7 @@ watch(
                           class="field-input"
                         />
                       </div>
-                      <div class="field-item full-span">
+                      <div v-if="hasBrandCollaborationFilterUi" class="field-item full-span">
                         <FilterFieldLabel
                           :label="getFilterLabel('brandCollaborations')"
                           :tip-text="FILTER_TIPS.brandCollaborations"
@@ -1210,7 +1232,7 @@ watch(
           </div>
         </section>
 
-        <section class="form-block">
+        <section v-if="sortOptions.length" class="form-block">
           <label class="field-label" for="create-task-sort">4. 达人排序</label>
           <NSelect id="create-task-sort" v-model:value="form.creatorSort" :options="sortOptions" class="field-input" />
           <p class="field-helper">默认选择官方默认值</p>

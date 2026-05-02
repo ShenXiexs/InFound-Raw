@@ -8,6 +8,6 @@
       "@common/*": ["src/common/*"],
       "@renderer/*": ["src/renderer/src/*"]
     },
-    "types": ["unplugin-icons/types/vue"]
+    "types": ["unplugin-icons/types/vue", "vite/client"]
   }
 }

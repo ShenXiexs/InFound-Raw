@@ -16,7 +16,7 @@ window.addEventListener('keydown', async (e) => {
     // 禁用 Ctrl+U（查看源代码）
     if (e.ctrlKey && e.key === 'U') return e.preventDefault()
   } else {
-    loggerAPI.info(`Key pressed: ${e.key}`)
+    loggerAPI.debug(`Key pressed: ${e.key}`)
 
     const windowId = await ipcAPI.getCurrentBrowserWindowId()
     if (e.key === 'F12') {

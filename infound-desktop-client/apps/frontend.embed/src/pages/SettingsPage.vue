@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { createDiscreteApi, dateZhCN, NButton, NCard, NDescriptions, NDescriptionsItem, NFlex, NForm, NFormItem, NInput, NTabPane, NTabs, zhCN } from 'naive-ui'
 import { changePassword, fetchCurrentUser } from '../api'
 import { isEmbedModalShell, requestCloseEmbedModalShell } from '../utils/embed-modal-shell'
+import { formatDateTimeToLocal } from '../utils/date-time'
 import { rendererStore } from '../store/renderer-store.ts'
 
 type SettingsTab = 'profile' | 'password' | 'permissions' | 'upgrade' | 'contact'
@@ -31,9 +32,10 @@ const isSubmitting = ref(false)
 
 const EMBED_VERSION = rendererStore.currentState.appInfo.version || '1.0'
 const appVersionText = computed(() => `寻达 v${EMBED_VERSION}`)
+const importMetaEnv = (import.meta as any)?.env || {}
 
 const officialSite = computed(() => {
-  const u = import.meta.env.VITE_OFFICIAL_WEBSITE_BASE_URL?.trim()
+  const u = String(importMetaEnv.VITE_OFFICIAL_WEBSITE_BASE_URL || '').trim()
   return u || 'https://www.xunda.club/'
 })
 const supportEmail = 'support@xunda.club'
@@ -76,7 +78,7 @@ const maskPhone = (raw: string | undefined): string => {
   return raw
 }
 
-const formatChinaDate = (raw?: string): string => {
+const formatLocalDate = (raw?: string): string => {
   const text = raw?.trim() || ''
   if (!text) return ''
 
@@ -86,19 +88,12 @@ const formatChinaDate = (raw?: string): string => {
     return dateOnlyMatch?.[1] || text
   }
 
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-    .format(parsed)
-    .replace(/\//g, '-')
+  return formatDateTimeToLocal(parsed).slice(0, 10)
 }
 
 const formatDateRange = (startDate?: string, endDate?: string): string => {
-  const start = formatChinaDate(startDate)
-  const end = formatChinaDate(endDate)
+  const start = formatLocalDate(startDate)
+  const end = formatLocalDate(endDate)
   if (start && end) return `${start} ~ ${end}`
   return start || end || '—'
 }
@@ -307,11 +302,7 @@ onUnmounted(() => {
           <NFlex :size="[20, 20]" class="upgrade-columns" justify="space-between">
             <NFlex :size="12" class="upgrade-col" vertical>
               <span class="upgrade-col-title">微信客服</span>
-              <div aria-hidden="true" class="qr-placeholder" />
-            </NFlex>
-            <NFlex :size="12" class="upgrade-col" vertical>
-              <span class="upgrade-col-title">whatsapp客服</span>
-              <div aria-hidden="true" class="qr-placeholder" />
+              <img alt="微信客服二维码" class="qr-image" src="/customer-service.png" />
             </NFlex>
             <NFlex :size="12" class="upgrade-col" vertical>
               <span class="upgrade-col-title">给我们发邮件</span>
@@ -575,6 +566,13 @@ onUnmounted(() => {
   height: 120px;
   background: #d1d5db;
   border-radius: 8px;
+}
+
+.qr-image {
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 .upgrade-email-hint {
