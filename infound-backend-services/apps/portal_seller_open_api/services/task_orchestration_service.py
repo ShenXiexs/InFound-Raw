@@ -589,6 +589,7 @@ class SellerRpaTaskOrchestrationService:
             user_id=current_user.user_id,
             task_type=task_type,
             task_playload=task_playload,
+            task_payload=task_playload,
             status="PENDING",
             scheduled_time=scheduled_time,
             start_time=None,

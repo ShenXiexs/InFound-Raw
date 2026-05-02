@@ -244,6 +244,7 @@ async def main() -> int:
                 user_id=user_id,
                 task_type=task_type,
                 task_playload=task_playload,
+                task_payload=task_playload,
                 status="PENDING",
                 scheduled_time=utc_now,
                 start_time=None,

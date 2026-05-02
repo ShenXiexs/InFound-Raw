@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.portal_seller_open_api.core.config import Settings
@@ -33,30 +33,6 @@ from shared_domain.models.infound import (
 )
 from shared_domain.models.task_plan_extension import TaskStatus
 
-AVG_COMMISSION_RATE_MAPPING = {
-    "less than 20%": 20,
-    "less than 15%": 15,
-    "less than 10%": 10,
-    "less than 5%": 5,
-}
-CONTENT_TYPE_MAPPING = {
-    "video": 1,
-    "live": 2,
-}
-CREATOR_AGENCY_MAPPING = {
-    "managed by agency": 1,
-    "independent creators": 2,
-}
-FOLLOWER_GENDER_MAPPING = {
-    "female": 1,
-    "male": 2,
-}
-EST_POST_RATE_MAPPING = {
-    "ok": 1,
-    "good": 2,
-    "better": 3,
-}
-
 
 class OutreachResultIngestionService:
     def __init__(self, db_session: AsyncSession, settings: Settings) -> None:
@@ -64,6 +40,7 @@ class OutreachResultIngestionService:
         self.task_orchestration_service = SellerRpaTaskOrchestrationService(
             db_session, settings
         )
+        self._outreach_task_logs_has_sub_task_id: bool | None = None
 
     async def ingest(
             self,
@@ -83,9 +60,15 @@ class OutreachResultIngestionService:
         finished_at = normalize_utc_datetime(payload.finished_at)
         normalized_creators = self._normalize_creators(payload)
         existing_settings = await self._find_settings(task_id)
-        message_send_strategy = normalize_int(payload.message_send_strategy)
-        if message_send_strategy is None and existing_settings is not None:
-            message_send_strategy = normalize_int(existing_settings.message_send_strategy)
+        if existing_settings is None:
+            raise ValueError("outreach settings not found for task_id")
+        if (
+                str(existing_settings.user_id or "").strip() != current_user.user_id
+                or str(existing_settings.shop_id or "").strip() != shop.id
+        ):
+            raise ValueError("task_id does not belong to current shop")
+
+        message_send_strategy = normalize_int(existing_settings.message_send_strategy)
         brand_names = self._resolve_shop_brand_names(shop)
         normalized_creators = await self._apply_message_send_strategy(
             normalized_creators,
@@ -93,9 +76,7 @@ class OutreachResultIngestionService:
             brand_names=brand_names,
         )
 
-        expect_count = normalize_int(payload.expect_count)
-        if expect_count is None and existing_settings is not None:
-            expect_count = normalize_int(existing_settings.expect_count)
+        expect_count = normalize_int(existing_settings.expect_count)
         selected_creators = self._limit_creators_by_expect_count(
             normalized_creators, expect_count
         )
@@ -105,7 +86,7 @@ class OutreachResultIngestionService:
         selected_creator_count = len(selected_creators)
 
         existing_real_count = 0
-        if existing_settings is not None and existing_settings.real_count is not None:
+        if existing_settings.real_count is not None:
             existing_real_count = max(0, int(existing_settings.real_count or 0))
         real_count = min(existing_real_count, selected_creator_count)
 
@@ -116,55 +97,24 @@ class OutreachResultIngestionService:
 
         spend_time = normalize_int(payload.spend_time)
         effective_start_at = started_at
-        if effective_start_at is None and existing_settings is not None:
+        if effective_start_at is None:
             effective_start_at = existing_settings.real_start_at
         has_selected_creators = selected_creator_count > 0
         if spend_time is None:
             if has_selected_creators:
-                spend_time = int(existing_settings.spend_time or 0) if existing_settings else 0
+                spend_time = int(existing_settings.spend_time or 0)
             else:
                 spend_time = duration_seconds(effective_start_at, finished_at or utc_now)
 
-        settings_payload = {
-            "id": task_id,
-            "user_id": current_user.user_id,
-            "shop_id": shop.id,
-            "shop_region_code": clean_text(payload.shop_region_code)
-                                or shop.shop_region_code,
-            "task_name": clean_text(payload.task_name) or f"OUTREACH-{task_id[:8]}",
-            "task_type": clean_text(payload.task_type) or "OUTREACH",
-            "status": TaskStatus.RUNNING.value
-            if has_selected_creators
-            else TaskStatus.COMPLETED.value,
-            "creator_id": current_user.user_id,
-            "creation_time": utc_now,
-            "last_modifier_id": current_user.user_id,
-            "last_modification_time": utc_now,
-            "real_count": real_count,
-            "new_count": new_count,
-            "real_start_at": effective_start_at,
-            "real_end_at": None if has_selected_creators else (finished_at or utc_now),
-        }
-
-        optional_values = {
-            "duplicate_check_type": normalize_int(payload.duplicate_check_type),
-            "duplicate_check_code": clean_text(payload.duplicate_check_code),
-            "message_send_strategy": normalize_int(payload.message_send_strategy),
-            "message": clean_text(payload.message),
-            "search_keywords": clean_text(payload.search_keyword),
-            "first_message": clean_text(payload.first_message),
-            "second_message": clean_text(payload.second_message),
-            "filter_sort_by": normalize_int(payload.filter_sort_by),
-            "plan_execute_time": normalize_int(payload.plan_execute_time),
-            "expect_count": expect_count,
-            "spend_time": spend_time,
-        }
-        settings_payload.update(
-            {key: value for key, value in optional_values.items() if value is not None}
+        existing_settings.status = (
+            TaskStatus.RUNNING.value if has_selected_creators else TaskStatus.COMPLETED.value
         )
-        settings_payload.update(self._build_filter_settings(payload))
-
-        await self._upsert_settings(settings_payload)
+        existing_settings.last_modifier_id = current_user.user_id
+        existing_settings.last_modification_time = utc_now
+        existing_settings.real_count = real_count
+        existing_settings.spend_time = spend_time
+        existing_settings.real_start_at = effective_start_at
+        existing_settings.real_end_at = None if has_selected_creators else (finished_at or utc_now)
 
         inserted_logs = 0
         updated_creator_counts = 0
@@ -176,17 +126,17 @@ class OutreachResultIngestionService:
                 existing_log.last_modification_time = utc_now
                 continue
 
-            self.db_session.add(
-                SellerTkOutreachTaskLogs(
-                    id=generate_bigint_id(),
-                    shop_id=shop.id,
-                    task_id=task_id,
-                    platform_creator_id=creator["platform_creator_id"],
-                    creator_id=current_user.user_id,
-                    creation_time=utc_now,
-                    last_modifier_id=current_user.user_id,
-                    last_modification_time=utc_now,
-                )
+            await self._insert_task_log(
+                id_=generate_bigint_id(),
+                shop_id=shop.id,
+                task_id=task_id,
+                sub_task_id=SellerRpaTaskOrchestrationService.build_outreach_detail_task_id(
+                    task_id,
+                    creator["platform_creator_id"],
+                ),
+                platform_creator_id=creator["platform_creator_id"],
+                actor_id=current_user.user_id,
+                utc_now=utc_now,
             )
             inserted_logs += 1
 
@@ -218,12 +168,11 @@ class OutreachResultIngestionService:
             updated_creator_counts += 1
 
         if new_count is None:
-            if inserted_logs == 0 and existing_settings is not None:
+            if inserted_logs == 0:
                 new_count = int(existing_settings.new_count or 0)
             else:
                 new_count = inferred_new_count
-            settings_payload["new_count"] = new_count
-            await self._upsert_settings(settings_payload)
+        existing_settings.new_count = new_count
 
         derived_task_plans = []
         if selected_creators:
@@ -232,13 +181,13 @@ class OutreachResultIngestionService:
                     current_user,
                     task_id=task_id,
                     shop_id=shop.id,
-                    shop_region_code=clean_text(payload.shop_region_code)
+                    shop_region_code=clean_text(existing_settings.shop_region_code)
                                      or shop.shop_region_code,
                     brand_name=brand_names[0] if brand_names else None,
-                    search_keyword=payload.search_keyword,
-                    message=payload.message,
-                    first_message=payload.first_message,
-                    second_message=payload.second_message,
+                    search_keyword=clean_text(existing_settings.search_keywords),
+                    message=clean_text(existing_settings.first_message),
+                    first_message=clean_text(existing_settings.first_message),
+                    second_message=clean_text(existing_settings.second_message),
                     creator=selected_creators[0],
                 )
             )
@@ -333,166 +282,6 @@ class OutreachResultIngestionService:
             filtered[platform_creator_id] = creator_copy
         return filtered
 
-    def _build_filter_settings(
-            self, payload: OutreachResultIngestionRequest
-    ) -> dict[str, Any]:
-        normalized: dict[str, Any] = {}
-
-        creator_filters = payload.creator_filters
-        if creator_filters is not None:
-            product_categories = self._normalize_selection_list(
-                creator_filters.product_category_selections
-            )
-            if product_categories is not None:
-                normalized["filter_product_categories"] = product_categories
-
-            avg_commission_rate = self._map_option_to_number(
-                creator_filters.avg_commission_rate,
-                AVG_COMMISSION_RATE_MAPPING,
-            )
-            if avg_commission_rate is not None:
-                normalized["filter_avg_commission_rate"] = avg_commission_rate
-
-            content_type = self._map_option_to_number(
-                creator_filters.content_type,
-                CONTENT_TYPE_MAPPING,
-            )
-            if content_type is not None:
-                normalized["filter_content_types"] = content_type
-
-            creator_agency = self._map_option_to_number(
-                creator_filters.creator_agency,
-                CREATOR_AGENCY_MAPPING,
-            )
-            if creator_agency is not None:
-                normalized["filter_creator_agency"] = creator_agency
-
-            if creator_filters.fast_growing is not None:
-                normalized["filter_fast_growth_list"] = (
-                    1 if bool(creator_filters.fast_growing) else 0
-                )
-
-            if creator_filters.not_invited_in_past_90_days is not None:
-                normalized["filter_uninvited_creators_in_90_days"] = (
-                    1 if bool(creator_filters.not_invited_in_past_90_days) else 0
-                )
-
-        follower_filters = payload.follower_filters
-        if follower_filters is not None:
-            follower_ages = self._normalize_selection_list(
-                follower_filters.follower_age_selections
-            )
-            if follower_ages is not None:
-                normalized["filter_fans_age_range"] = follower_ages
-
-            follower_gender = self._map_option_to_number(
-                follower_filters.follower_gender,
-                FOLLOWER_GENDER_MAPPING,
-            )
-            if follower_gender is not None:
-                normalized["filter_fans_gender"] = follower_gender
-
-            follower_count_range = self._normalize_range(
-                follower_filters.follower_count_min,
-                follower_filters.follower_count_max,
-            )
-            if follower_count_range is not None:
-                normalized["filter_fans_count_range"] = follower_count_range
-
-        performance_filters = payload.performance_filters
-        if performance_filters is not None:
-            gmv_range = self._normalize_selection_list(
-                performance_filters.gmv_selections
-            )
-            if gmv_range is not None:
-                normalized["filter_gmv_range"] = gmv_range
-
-            sales_count_range = self._normalize_selection_list(
-                performance_filters.items_sold_selections
-            )
-            if sales_count_range is not None:
-                normalized["filter_sales_count_range"] = sales_count_range
-
-            avg_video_views = self._normalize_positive_int(
-                performance_filters.average_views_per_video_min
-            )
-            if avg_video_views is not None:
-                normalized["filter_min_avg_video_views"] = avg_video_views
-
-            avg_live_views = self._normalize_positive_int(
-                performance_filters.average_viewers_per_live_min
-            )
-            if avg_live_views is not None:
-                normalized["filter_min_avg_live_views"] = avg_live_views
-
-            engagement_rate = self._normalize_positive_int(
-                performance_filters.engagement_rate_min_percent
-            )
-            if engagement_rate is not None:
-                normalized["filter_min_engagement_rate"] = engagement_rate
-
-            estimated_publish_rate = self._map_option_to_number(
-                performance_filters.est_post_rate,
-                EST_POST_RATE_MAPPING,
-            )
-            if estimated_publish_rate is not None:
-                normalized["filter_creator_estimated_publish_rate"] = (
-                    estimated_publish_rate
-                )
-
-            co_branding = self._normalize_selection_list(
-                performance_filters.brand_collaboration_selections
-            )
-            if co_branding is not None:
-                normalized["filter_co_branding"] = co_branding
-
-        return normalized
-
-    @staticmethod
-    def _normalize_selection_list(values: Iterable[Any] | None) -> list[str] | None:
-        if values is None:
-            return None
-        normalized: list[str] = []
-        seen: set[str] = set()
-        for value in values:
-            text = clean_text(value)
-            if not text:
-                continue
-            dedupe_key = text.lower()
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-            normalized.append(text)
-        return normalized or None
-
-    @staticmethod
-    def _map_option_to_number(
-            value: Any,
-            mapping: dict[str, int],
-    ) -> int | None:
-        text = (clean_text(value) or "").lower()
-        if not text or text == "all":
-            return None
-        return mapping.get(text)
-
-    @staticmethod
-    def _normalize_range(min_value: Any, max_value: Any) -> dict[str, int] | None:
-        normalized_min = normalize_int(min_value)
-        normalized_max = normalize_int(max_value)
-        range_payload: dict[str, int] = {}
-        if normalized_min is not None:
-            range_payload["min"] = normalized_min
-        if normalized_max is not None:
-            range_payload["max"] = normalized_max
-        return range_payload or None
-
-    @staticmethod
-    def _normalize_positive_int(value: Any) -> int | None:
-        normalized = normalize_int(value)
-        if normalized is None or normalized <= 0:
-            return None
-        return normalized
-
     @staticmethod
     def _resolve_shop_brand_names(shop: SellerTkShops) -> list[str]:
         normalized: list[str] = []
@@ -519,19 +308,103 @@ class OutreachResultIngestionService:
         )
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-    async def _upsert_settings(self, payload: dict) -> None:
-        stmt = select(SellerTkOutreachSettings).where(
-            SellerTkOutreachSettings.id == payload["id"]
-        )
-        existing = (await self.db_session.execute(stmt)).scalar_one_or_none()
-        if existing is None:
-            self.db_session.add(SellerTkOutreachSettings(**payload))
+    async def _insert_task_log(
+            self,
+            *,
+            id_: int,
+            shop_id: str,
+            task_id: str,
+            sub_task_id: str,
+            platform_creator_id: str,
+            actor_id: str,
+            utc_now: datetime,
+    ) -> None:
+        params = {
+            "id": id_,
+            "shop_id": shop_id,
+            "task_id": task_id,
+            "platform_creator_id": platform_creator_id,
+            "creator_id": actor_id,
+            "creation_time": utc_now,
+            "last_modifier_id": actor_id,
+            "last_modification_time": utc_now,
+        }
+        if await self._has_outreach_task_log_sub_task_id():
+            params["sub_task_id"] = sub_task_id
+            await self.db_session.execute(
+                text(
+                    """
+                    INSERT INTO seller_tk_outreach_task_logs (
+                        id,
+                        shop_id,
+                        task_id,
+                        sub_task_id,
+                        platform_creator_id,
+                        creator_id,
+                        creation_time,
+                        last_modifier_id,
+                        last_modification_time
+                    ) VALUES (
+                        :id,
+                        :shop_id,
+                        :task_id,
+                        :sub_task_id,
+                        :platform_creator_id,
+                        :creator_id,
+                        :creation_time,
+                        :last_modifier_id,
+                        :last_modification_time
+                    )
+                    """
+                ),
+                params,
+            )
             return
 
-        for key, value in payload.items():
-            if key in {"creator_id", "creation_time"}:
-                continue
-            setattr(existing, key, value)
+        await self.db_session.execute(
+            text(
+                """
+                INSERT INTO seller_tk_outreach_task_logs (
+                    id,
+                    shop_id,
+                    task_id,
+                    platform_creator_id,
+                    creator_id,
+                    creation_time,
+                    last_modifier_id,
+                    last_modification_time
+                ) VALUES (
+                    :id,
+                    :shop_id,
+                    :task_id,
+                    :platform_creator_id,
+                    :creator_id,
+                    :creation_time,
+                    :last_modifier_id,
+                    :last_modification_time
+                )
+                """
+            ),
+            params,
+        )
+
+    async def _has_outreach_task_log_sub_task_id(self) -> bool:
+        if self._outreach_task_logs_has_sub_task_id is not None:
+            return self._outreach_task_logs_has_sub_task_id
+
+        result = await self.db_session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'seller_tk_outreach_task_logs'
+                  AND COLUMN_NAME = 'sub_task_id'
+                """
+            )
+        )
+        self._outreach_task_logs_has_sub_task_id = int(result.scalar() or 0) > 0
+        return self._outreach_task_logs_has_sub_task_id
 
     async def _find_settings(self, task_id: str) -> SellerTkOutreachSettings | None:
         stmt = select(SellerTkOutreachSettings).where(
