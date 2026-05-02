@@ -42,7 +42,10 @@ def _normalize_platform_urls(
         if normalized_region == "FR"
         else "https://seller.tiktokshopglobalselling.com"
     )
-    return CROSS_BORDER_LOGIN_URL, f"{origin}/homepage?shop_region={normalized_region}"
+    return (
+        CROSS_BORDER_LOGIN_URL,
+        f"{origin}/homepage?lng=en&region_check=1&shop_region={normalized_region}",
+    )
 
 
 @router.post(

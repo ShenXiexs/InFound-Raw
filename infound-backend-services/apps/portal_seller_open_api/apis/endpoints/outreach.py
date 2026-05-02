@@ -455,6 +455,7 @@ async def _upsert_outreach_rpa_plan(
                 user_id=user_id,
                 task_type="OUTREACH",
                 task_playload=task_playload,
+                task_payload=task_playload,
                 status=TaskStatus.PENDING.value,
                 scheduled_time=scheduled_time,
                 start_time=None,
@@ -471,6 +472,7 @@ async def _upsert_outreach_rpa_plan(
         plan_row.user_id = user_id
         plan_row.task_type = "OUTREACH"
         plan_row.task_playload = task_playload
+        plan_row.task_payload = task_playload
         plan_row.status = TaskStatus.PENDING.value
         plan_row.scheduled_time = scheduled_time
         plan_row.start_time = None
@@ -782,6 +784,7 @@ def _build_transient_outreach_task_plan(
         user_id=user_id,
         task_type="OUTREACH",
         task_playload=task_playload,
+        task_payload=task_playload,
         status=TaskStatus.PENDING.value,
         scheduled_time=scheduled_time,
         start_time=None,
@@ -1121,6 +1124,7 @@ async def create_outreach_task(
         await db.commit()
     except Exception as exc:
         await db.rollback()
+        logger.error("新建建联任务提交数据库失败", exc_info=exc, task_id=task_id, user_id=user_id, shop_id=body.shopId)
         return error_response(message="新建建联任务失败", code=500)
 
     settings = get_settings(request)
