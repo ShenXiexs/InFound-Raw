@@ -29,6 +29,10 @@ export interface OutreachTaskListBody {
   status?: string
 }
 
+export interface OutreachTaskListRequestOptions {
+  suppressPanelInfoLog?: boolean
+}
+
 export interface OutreachTaskListResult {
   total: number
   list: OutreachTaskItem[]
@@ -50,6 +54,8 @@ export interface CreatorFilterTreeOption {
 export interface OutreachCreatorFilterItemsResult {
   creators?: {
     filters?: {
+      /** 响应中存在该字段时，前端展示「搜索关键词」并提交 keyword */
+      keyword?: Record<string, unknown>
       productCategories?: {
         optionTree?: CreatorFilterTreeOption[]
       }
@@ -92,6 +98,8 @@ export interface OutreachCreatorFilterItemsResult {
   }
   performance?: {
     filters?: {
+      /** 响应中存在该字段时，前端展示「品牌合作」并提交 coBranding */
+      coBranding?: Record<string, unknown>
       gmvRange?: {
         options?: CreatorFilterOption<string>[]
       }
@@ -109,6 +117,10 @@ export interface OutreachCreatorFilterItemsResult {
       minEngagementRate?: {
         presetOptions?: CreatorFilterOption<string>[]
         toggleOptionItems?: CreatorFilterOption<boolean>[]
+      }
+      /** GET /outreach/creator-filter-items：预计发布率筛选项 */
+      estPostRate?: {
+        options?: CreatorFilterOption<string>[]
       }
       sortBy?: {
         options?: CreatorFilterOption<number>[]
@@ -140,33 +152,36 @@ const normalizeTaskListResult = (raw: any): OutreachTaskListResult => {
   return { total, list }
 }
 
+/** 仅包含当前店铺筛选项接口实际返回的字段（未返回的不写入请求体） */
+export type CreateOutreachTaskCreatorFilterPayload = {
+  keyword?: string
+  productCategories?: string[]
+  avgCommissionRate?: number
+  contentTypes?: number
+  creatorAgency?: number
+  fastGrowing?: string
+  notInvitedInPast90Days?: string
+  fansAgeRange?: string[]
+  fansGender?: number
+  fansCountRange?: {
+    min: string
+    max: string
+  }
+  gmvRange?: string[]
+  salesCountRange?: string[]
+  minAvgVideoViews?: number
+  minAvgLiveViews?: number
+  minEngagementRate?: number
+  creatorEstimatedPublishRate?: number
+  coBranding?: string[]
+  sortBy?: number
+}
+
 export interface CreateOutreachTaskPayload {
   shopId: string
   taskName: string
   startTime: string
-  creatorFilter: {
-    keyword: string
-    productCategories: string[]
-    avgCommissionRate: number
-    contentTypes: number
-    creatorAgency: number
-    fastGrowing: string
-    notInvitedInPast90Days: string
-    fansAgeRange: string[]
-    fansGender: number
-    fansCountRange: {
-      min: string
-      max: string
-    }
-    gmvRange: string[]
-    salesCountRange: string[]
-    minAvgVideoViews: number
-    minAvgLiveViews: number
-    minEngagementRate: number
-    creatorEstimatedPublishRate: number
-    coBranding: string[]
-    sortBy: number
-  }
+  creatorFilter: CreateOutreachTaskCreatorFilterPayload
   plannedCount: string
   outreachMode: string
   firstMessage: string
@@ -201,7 +216,11 @@ export interface OutreachTaskRecordListResult {
   list: OutreachTaskRecordItem[]
 }
 
-export const getOutreachTaskList = async (params: OutreachTaskListParams, body: OutreachTaskListBody): Promise<OutreachTaskListResult> => {
+export const getOutreachTaskList = async (
+  params: OutreachTaskListParams,
+  body: OutreachTaskListBody,
+  options?: OutreachTaskListRequestOptions
+): Promise<OutreachTaskListResult> => {
   const shopId = body.shopId?.trim() || ''
   if (!shopId) {
     throw new Error('shopId is required')
@@ -210,6 +229,7 @@ export const getOutreachTaskList = async (params: OutreachTaskListParams, body: 
   const result = await request<any>({
     url: OUTREACH_TASK_LIST_BASE_URL,
     method: 'POST',
+    suppressPanelInfoLog: Boolean(options?.suppressPanelInfoLog),
     params: {
       page: params.page,
       pageSize: params.pageSize

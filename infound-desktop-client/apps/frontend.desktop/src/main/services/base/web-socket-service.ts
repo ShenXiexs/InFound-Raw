@@ -227,7 +227,7 @@ export class WebSocketService {
     client.subscribe(
       destination,
       (message: Message) => {
-        logger.info(`📨 收到用户通知: destination=${destination} body=${message.body}`)
+        logger.info(`[WebSocket] 收到用户通知: destination=${destination} body=${message.body}`)
         void this.handleUserNotificationMessage(message)
       },
       {

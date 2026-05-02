@@ -66,7 +66,7 @@ const setupTerminalRPACLI = (rpaController: RPAController): void => {
 
   const printHelp = (): void => {
     logger.info(
-      '终端命令: login | start-simulation | start-simulation-headless | start-simulation-json <payload.json> | stop-simulation | sample-management [tab|tab1,tab2] | sample-management-json <payload.json> | outreach | outreach-demo | outreach-json <payload.json> | chatbot <creator_id> | chatbot-demo | chatbot-json <payload.json> | creator-detail <creator_id> | creator-detail-demo | creator-detail-json <payload.json> | help | exit'
+      '终端命令: login | start-simulation | start-simulation-headless | start-simulation-headed | start-simulation-json <payload.json> | stop-simulation | sample-management [tab|tab1,tab2] | sample-management-json <payload.json> | outreach | outreach-demo | outreach-json <payload.json> | chatbot <creator_id> | chatbot-demo | chatbot-json <payload.json> | creator-detail <creator_id> | creator-detail-demo | creator-detail-json <payload.json> | help | exit'
     )
   }
 
@@ -85,6 +85,8 @@ const setupTerminalRPACLI = (rpaController: RPAController): void => {
         await rpaController.startSimulationSession()
       } else if (command === 'start-simulation-headless') {
         await rpaController.startSimulationSession({ headless: true })
+      } else if (command === 'start-simulation-headed') {
+        await rpaController.startSimulationSession({ headless: false })
       } else if (command === 'start-simulation-json') {
         const payloadPath = trimmedLine.slice(commandToken.length).trim()
         if (!payloadPath) {

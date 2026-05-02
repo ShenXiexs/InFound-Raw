@@ -2,8 +2,9 @@ import axios, { AxiosHeaders, type AxiosError, type AxiosInstance, type AxiosReq
 import { emitNetworkLog } from '../debug/network-log'
 
 const DEFAULT_TIMEOUT = 15000
-const USE_DEV_PROXY = import.meta.env.VITE_USE_DEV_PROXY === 'true'
-const OPENAPI_BASE_URL = USE_DEV_PROXY ? '' : import.meta.env.VITE_OPENAPI_BASE_URL || ''
+const importMetaEnv = (import.meta as any)?.env || {}
+const USE_DEV_PROXY = importMetaEnv.VITE_USE_DEV_PROXY === 'true'
+const OPENAPI_BASE_URL = USE_DEV_PROXY ? '' : importMetaEnv.VITE_OPENAPI_BASE_URL || ''
 
 export const httpClient: AxiosInstance = axios.create({
   baseURL: OPENAPI_BASE_URL,
@@ -30,7 +31,6 @@ const URL_TOKEN_PARAM = 'xundaToken'
 const URL_TOKEN_NAME_PARAM = 'xundaTokenName'
 const URL_DEVICE_ID_PARAM = 'xundaDeviceId'
 const LOG_LIST_SAMPLE_SIZE = 3
-const PANEL_INFO_LOG_SUPPRESSED_URL_PATTERNS = ['/outreach/task-settings']
 
 let requestSequence = 0
 let pendingAuthState: Promise<RuntimeAuthState> | null = null
@@ -43,6 +43,7 @@ interface RequestMeta {
 
 interface RequestConfigWithMeta extends InternalAxiosRequestConfig {
   metadata?: RequestMeta
+  suppressPanelInfoLog?: boolean
 }
 
 const normalizeString = (value: unknown): string => {
@@ -84,6 +85,27 @@ const summarizeListItem = (item: unknown): unknown => {
 
   const record = item as Record<string, unknown>
   const preferredKeys = [
+    'platformCreatorId',
+    'platformCreatorUsername',
+    'platformCreatorDisplayName',
+    'creatorId',
+    'creatorName',
+    'name',
+    'nickname',
+    'creatorAvatar',
+    'avatar',
+    'avatarUrl',
+    'headImgUrl',
+    'headUrl',
+    'followers',
+    'fansCount',
+    'followerCount',
+    'gmv',
+    'gmvRange',
+    'sendTime',
+    'messageTime',
+    'sentAt',
+    'createdAt',
     'taskId',
     'taskName',
     'status',
@@ -176,9 +198,8 @@ const logWithPanel = (level: 'info' | 'error', message: string, payload: Record<
   emitNetworkLog(level, message, payload)
 }
 
-const shouldSuppressPanelInfoLog = (url: string): boolean => {
-  const normalizedUrl = normalizeString(url)
-  return Boolean(normalizedUrl) && PANEL_INFO_LOG_SUPPRESSED_URL_PATTERNS.some((pattern) => normalizedUrl.includes(pattern))
+const shouldSuppressPanelInfoLog = (config: Pick<RequestConfigWithMeta, 'suppressPanelInfoLog'>): boolean => {
+  return Boolean(config.suppressPanelInfoLog)
 }
 
 const getGatewayByChannel = (channel: string): string => {
@@ -355,7 +376,7 @@ httpClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =
 
   const requestUrl = resolveRequestUrl(config)
 
-  if (!shouldSuppressPanelInfoLog(requestUrl)) {
+  if (!shouldSuppressPanelInfoLog(config as RequestConfigWithMeta)) {
     logWithPanel('info', '[Request]', {
       requestId,
       method: normalizeString(config.method).toUpperCase() || 'GET',
@@ -382,7 +403,7 @@ httpClient.interceptors.response.use(
     const durationMs = config.metadata?.startAt ? Date.now() - config.metadata.startAt : undefined
     const requestUrl = resolveRequestUrl(config)
 
-    if (!shouldSuppressPanelInfoLog(requestUrl)) {
+    if (!shouldSuppressPanelInfoLog(config)) {
       logWithPanel('info', '[Response]', {
         requestId,
         method: normalizeString(config.method).toUpperCase() || 'GET',
@@ -427,7 +448,11 @@ httpClient.interceptors.response.use(
   }
 )
 
-export const request = async <T = unknown>(config: AxiosRequestConfig): Promise<T> => {
-  const response = await httpClient.request<T>(config)
+export interface RequestOptions extends AxiosRequestConfig {
+  suppressPanelInfoLog?: boolean
+}
+
+export const request = async <T = unknown>(config: RequestOptions): Promise<T> => {
+  const response = await httpClient.request<T>(config as AxiosRequestConfig)
   return response.data
 }

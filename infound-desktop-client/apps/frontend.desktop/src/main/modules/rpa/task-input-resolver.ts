@@ -272,7 +272,8 @@ const buildSimulationSession = (sessionNode: JsonRecord, taskNode: JsonRecord, p
         payloadNode.shopType ||
         payloadNode.shop_type
     ),
-    headless: true
+    headless: toBoolean(sessionNode.headless) ?? true,
+    tracing: toBoolean(sessionNode.tracing) ?? toBoolean(taskNode.tracing) ?? toBoolean(payloadNode.tracing) ?? false
   }
 
   const storageStatePath = toText(sessionNode.storageStatePath)

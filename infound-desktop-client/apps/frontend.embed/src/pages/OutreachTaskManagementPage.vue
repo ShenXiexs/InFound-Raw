@@ -16,11 +16,8 @@ import {
   zhCN,
   type DataTableColumns
 } from 'naive-ui'
-import CreateOutreachTaskModal, {
-  type CreateOutreachTaskFilterOptions,
-  type CreateOutreachTaskFormPayload,
-  type SelectOptionItem
-} from '../components/CreateOutreachTaskModal.vue'
+import CreateOutreachTaskModal, { type CreateOutreachTaskFormPayload } from '../components/CreateOutreachTaskModal.vue'
+import type { CreateOutreachTaskFilterOptions, SelectOptionItem } from '../types/outreach-task-form'
 import OutreachTaskDetailView from '../components/OutreachTaskDetailView.vue'
 import {
   createOutreachTask,
@@ -30,13 +27,13 @@ import {
   getOutreachTaskList,
   startOutreachTask,
   stopOutreachTask,
-  type CreatorFilterOption,
-  type CreatorFilterTreeOption,
+  type CreateOutreachTaskCreatorFilterPayload,
   type CreateOutreachTaskPayload,
   type EditOutreachTaskPayload,
-  type OutreachCreatorFilterItemsResult,
   type OutreachTaskItem as ApiOutreachTaskItem
 } from '../api/outreach-task.api'
+import { formatDateTimeToLocal } from '../utils/date-time'
+import { buildTaskFilterOptions } from '../utils/outreach-creator-filter-items'
 
 type TaskStatus = '运行中' | '未启动' | '已结束' | '已完成' | '已取消'
 type FilterTaskStatus = '' | '运行中' | '已完成' | '已取消' | '未启动'
@@ -118,9 +115,6 @@ const FILTER_UI_TO_API_STATUS: Record<Exclude<FilterTaskStatus, ''>, string> = {
   已取消: 'CANCELLED',
   未启动: 'PENDING'
 }
-
-const PERFORMANCE_EST_POST_RATE_OPTIONS = ['All', 'OK', 'Good', 'Better']
-const SORT_OPTION_VALUES = ['OFFICIAL_DEFAULT', 'GMV_DESC', 'FOLLOWERS_DESC', 'COMMISSION_DESC']
 
 interface ActionIconNode {
   tag: string
@@ -325,7 +319,8 @@ const taskColumns: DataTableColumns<OutreachTaskItem> = [
   {
     title: '启动时间',
     key: 'startTime',
-    minWidth: 180
+    minWidth: 180,
+    render: (row) => formatDateTimeToLocal(row.startTime)
   },
   {
     title: '建联进度',
@@ -461,72 +456,16 @@ const toCreatorCountRange = (min: string, max: string): { min: string; max: stri
   }
 }
 
-const normalizeSelectOption = <T extends string | number>(option: CreatorFilterOption<T>): SelectOptionItem<T> => ({
-  label: String(option?.label ?? option?.value ?? ''),
-  value: option?.value
-})
-
-const normalizeOptionKey = (value: string): string => String(value || '').replace(/\s+/g, '').toLowerCase()
-
-const dedupeStringOptions = (options: Array<SelectOptionItem<string>>): Array<SelectOptionItem<string>> => {
-  const result = new Map<string, SelectOptionItem<string>>()
-  for (const option of options) {
-    result.set(normalizeOptionKey(String(option.value)), option)
-  }
-  return Array.from(result.values())
-}
-
-const flattenTreeOptions = (options: CreatorFilterTreeOption[] | undefined): Array<SelectOptionItem<string>> => {
-  if (!Array.isArray(options)) return []
-
-  return options.flatMap((item) => {
-    const label = String(item?.raw_label || '').trim()
-    const fallbackLabel = String(item?.label ?? item?.value ?? '')
-    const current: SelectOptionItem<string> = {
-      label: label || fallbackLabel,
-      value: String(item?.value ?? '')
-    }
-    const children = flattenTreeOptions(item?.children)
-    return [current, ...children]
-  })
-}
-
-const buildTaskFilterOptions = (payload: OutreachCreatorFilterItemsResult): CreateOutreachTaskFilterOptions => {
-  const creators = payload.creators?.filters
-  const followers = payload.followers?.filters
-  const performance = payload.performance?.filters
-
-  return {
-    productCategoryOptions: flattenTreeOptions(creators?.productCategories?.optionTree),
-    avgCommissionRateOptions: creators?.avgCommissionRate?.options?.map(normalizeSelectOption) || [],
-    contentTypeOptions: creators?.contentTypes?.options?.map(normalizeSelectOption) || [],
-    creatorAgencyOptions: creators?.creatorAgency?.options?.map(normalizeSelectOption) || [],
-    followerAgeOptions: dedupeStringOptions(followers?.fansAgeRange?.options?.map(normalizeSelectOption) || []),
-    followerGenderOptions: followers?.fansGender?.options?.map(normalizeSelectOption) || [],
-    followerCountPresetOptions: followers?.fansCountRange?.presetOptions?.map(normalizeSelectOption) || [],
-    gmvOptions: performance?.gmvRange?.options?.map(normalizeSelectOption) || [],
-    itemsSoldOptions: performance?.salesCountRange?.options?.map(normalizeSelectOption) || [],
-    avgVideoViewsPresetOptions: performance?.minAvgVideoViews?.presetOptions?.map(normalizeSelectOption) || [],
-    avgLiveViewsPresetOptions: performance?.minAvgLiveViews?.presetOptions?.map(normalizeSelectOption) || [],
-    engagementRatePresetOptions: performance?.minEngagementRate?.presetOptions?.map(normalizeSelectOption) || [],
-    estPostRateOptions: [],
-    sortOptions: performance?.sortBy?.options?.map(normalizeSelectOption) || [],
-    avgVideoViewsToggleLabel: String(performance?.minAvgVideoViews?.toggleOptionItems?.[0]?.label || ''),
-    avgLiveViewsToggleLabel: String(performance?.minAvgLiveViews?.toggleOptionItems?.[1]?.label || performance?.minAvgLiveViews?.toggleOptionItems?.[0]?.label || ''),
-    engagementRateToggleLabel: String(performance?.minEngagementRate?.toggleOptionItems?.[0]?.label || '')
-  }
-}
-
 const toNumericOptionValue = (
   value: string | number,
-  options: Array<SelectOptionItem<string | number>> | undefined,
-  fallback: string[]
+  options: Array<SelectOptionItem<string | number>> | undefined
 ): number => {
-  const effectiveOptions = options?.length ? options : fallback.map((item) => ({ label: item, value: item as string | number }))
-  const selectedIndex = effectiveOptions.findIndex((item) => item.value === value)
+  if (!options?.length) return 0
+
+  const selectedIndex = options.findIndex((item) => item.value === value)
   if (selectedIndex < 0) return 0
 
-  const selected = effectiveOptions[selectedIndex]
+  const selected = options[selectedIndex]
   return typeof selected?.value === 'number' ? selected.value : selectedIndex
 }
 
@@ -540,32 +479,70 @@ const toCreateTaskApiPayload = (shopId: string, payload: CreateOutreachTaskFormP
   const uniqueProductIds = Array.from(new Set(allProductIds.map((item) => String(item).trim()).filter(Boolean)))
   const attachProducts =
     Boolean(firstMessage.productMessageEnabled || replyMessage?.productMessageEnabled) && uniqueProductIds.length > 0
-  const filterOptions = taskFilterOptions.value
+  const fo = taskFilterOptions.value
+
+  const creatorFilter: CreateOutreachTaskCreatorFilterPayload = {}
+
+  if (fo?.showSearchKeywordFilter) {
+    creatorFilter.keyword = payload.filterConfig.searchKeyword
+  }
+  if (fo?.productCategoryOptions?.length) {
+    creatorFilter.productCategories = toTrimmedList(creatorFilters.productCategorySelections)
+  }
+  if (fo?.avgCommissionRateOptions?.length) {
+    creatorFilter.avgCommissionRate = toNumericOptionValue(creatorFilters.avgCommissionRate, fo.avgCommissionRateOptions)
+  }
+  if (fo?.contentTypeOptions?.length) {
+    creatorFilter.contentTypes = toNumericOptionValue(creatorFilters.contentType, fo.contentTypeOptions)
+  }
+  if (fo?.creatorAgencyOptions?.length) {
+    creatorFilter.creatorAgency = toNumericOptionValue(creatorFilters.creatorAgency, fo.creatorAgencyOptions)
+  }
+  if (fo?.fastGrowingOptions?.length) {
+    creatorFilter.fastGrowing = creatorFilters.fastGrowing ? '1' : '0'
+  }
+  if (fo?.notInvitedInPast90DaysOptions?.length) {
+    creatorFilter.notInvitedInPast90Days = creatorFilters.notInvitedInPast90Days ? '1' : '0'
+  }
+  if (fo?.followerAgeOptions?.length) {
+    creatorFilter.fansAgeRange = toTrimmedList(followerFilters.followerAgeSelections)
+  }
+  if (fo?.followerGenderOptions?.length) {
+    creatorFilter.fansGender = toNumericOptionValue(followerFilters.followerGender, fo.followerGenderOptions)
+  }
+  if (fo?.followerCountPresetOptions?.length) {
+    creatorFilter.fansCountRange = toCreatorCountRange(followerFilters.followerCountMin, followerFilters.followerCountMax)
+  }
+  if (fo?.gmvOptions?.length) {
+    creatorFilter.gmvRange = toTrimmedList(performanceFilters.gmvSelections)
+  }
+  if (fo?.itemsSoldOptions?.length) {
+    creatorFilter.salesCountRange = toTrimmedList(performanceFilters.itemsSoldSelections)
+  }
+  if (fo?.avgVideoViewsPresetOptions?.length) {
+    creatorFilter.minAvgVideoViews = toCompactInteger(performanceFilters.averageViewsPerVideoMin)
+  }
+  if (fo?.avgLiveViewsPresetOptions?.length) {
+    creatorFilter.minAvgLiveViews = toCompactInteger(performanceFilters.averageViewersPerLiveMin)
+  }
+  if (fo?.engagementRatePresetOptions?.length) {
+    creatorFilter.minEngagementRate = toCompactInteger(performanceFilters.engagementRateMinPercent)
+  }
+  if (fo?.estPostRateOptions?.length) {
+    creatorFilter.creatorEstimatedPublishRate = toNumericOptionValue(performanceFilters.estPostRate, fo.estPostRateOptions)
+  }
+  if (fo?.showBrandCollaborationFilter) {
+    creatorFilter.coBranding = toTrimmedList(performanceFilters.brandCollaborationSelections)
+  }
+  if (fo?.sortOptions?.length) {
+    creatorFilter.sortBy = toNumericOptionValue(payload.creatorSort, fo.sortOptions)
+  }
 
   return {
     shopId,
     taskName: payload.taskName,
     startTime: String(payload.startTime || ''),
-    creatorFilter: {
-      keyword: payload.filterConfig.searchKeyword,
-      productCategories: toTrimmedList(creatorFilters.productCategorySelections),
-      avgCommissionRate: toNumericOptionValue(creatorFilters.avgCommissionRate, filterOptions?.avgCommissionRateOptions, []),
-      contentTypes: toNumericOptionValue(creatorFilters.contentType, filterOptions?.contentTypeOptions, []),
-      creatorAgency: toNumericOptionValue(creatorFilters.creatorAgency, filterOptions?.creatorAgencyOptions, []),
-      fastGrowing: creatorFilters.fastGrowing ? '1' : '0',
-      notInvitedInPast90Days: creatorFilters.notInvitedInPast90Days ? '1' : '0',
-      fansAgeRange: toTrimmedList(followerFilters.followerAgeSelections),
-      fansGender: toNumericOptionValue(followerFilters.followerGender, filterOptions?.followerGenderOptions, []),
-      fansCountRange: toCreatorCountRange(followerFilters.followerCountMin, followerFilters.followerCountMax),
-      gmvRange: toTrimmedList(performanceFilters.gmvSelections),
-      salesCountRange: toTrimmedList(performanceFilters.itemsSoldSelections),
-      minAvgVideoViews: toCompactInteger(performanceFilters.averageViewsPerVideoMin),
-      minAvgLiveViews: toCompactInteger(performanceFilters.averageViewersPerLiveMin),
-      minEngagementRate: toCompactInteger(performanceFilters.engagementRateMinPercent),
-      creatorEstimatedPublishRate: toNumericOptionValue(performanceFilters.estPostRate, filterOptions?.estPostRateOptions, PERFORMANCE_EST_POST_RATE_OPTIONS),
-      coBranding: toTrimmedList(performanceFilters.brandCollaborationSelections),
-      sortBy: toNumericOptionValue(payload.creatorSort, filterOptions?.sortOptions, SORT_OPTION_VALUES)
-    },
+    creatorFilter,
     plannedCount: String(payload.planCount),
     outreachMode: payload.outreachCreatorType,
     firstMessage: firstMessage.content,
@@ -640,26 +617,17 @@ const toFormInitialData = (task: OutreachTaskItem, forCopy: boolean): Partial<Cr
     taskName: forCopy ? `${sourceTaskName}-副本` : sourceTaskName,
     planCount: Number.isFinite(sourcePlanCount) ? sourcePlanCount : 0,
     startTime: sourceStartTime,
-    creatorSort: task.raw?.creatorSort ?? 'OFFICIAL_DEFAULT',
+    creatorSort: task.raw?.creatorSort ?? task.raw?.creatorFilter?.sortBy ?? '',
     outreachCreatorType: task.raw?.outreachCreatorType || 'ALL',
     filterConfig: task.raw?.filterConfig,
     messageTemplate: task.raw?.messageTemplate
   }
 }
 
-const getStringOptionValue = (
-  value: unknown,
-  options: Array<SelectOptionItem<string | number>> | undefined,
-  fallback: string[]
-): string => {
+const getStringOptionValue = (value: unknown, options: Array<SelectOptionItem<string | number>> | undefined): string => {
   const numericValue = Number(value)
-  if (Number.isInteger(numericValue) && numericValue >= 0) {
-    if (options?.length && numericValue < options.length) {
-      return String(options[numericValue]?.value ?? '')
-    }
-    if (numericValue < fallback.length) {
-      return fallback[numericValue] || ''
-    }
+  if (Number.isInteger(numericValue) && numericValue >= 0 && options?.length && numericValue < options.length) {
+    return String(options[numericValue]?.value ?? '')
   }
 
   return String(value ?? '').trim()
@@ -683,7 +651,7 @@ const toFormInitialDataFromDetail = (
     taskName: forCopy ? `${taskName}-副本` : taskName,
     startTime: String(detailPayload.startTime || fallbackTask?.startTime || ''),
     planCount: Number(detailPayload.plannedCount ?? fallbackTask?.planCount ?? 0) || 0,
-    creatorSort: detailPayload.creatorFilter?.sortBy ?? fallbackTask?.raw?.creatorSort ?? 'OFFICIAL_DEFAULT',
+    creatorSort: detailPayload.creatorFilter?.sortBy ?? fallbackTask?.raw?.creatorSort ?? fallbackTask?.raw?.creatorFilter?.sortBy ?? '',
     outreachCreatorType: outreachMode,
     filterConfig: {
       searchKeyword: String(creatorFilter.keyword || ''),
@@ -691,17 +659,9 @@ const toFormInitialDataFromDetail = (
         productCategorySelections: Array.isArray(creatorFilter.productCategories)
           ? creatorFilter.productCategories.map((item: unknown) => String(item)).filter(Boolean)
           : [],
-        avgCommissionRate: getStringOptionValue(
-          creatorFilter.avgCommissionRate,
-          filterOptions?.avgCommissionRateOptions,
-          ['All', 'Less than 20%', 'Less than 15%', 'Less than 10%', 'Less than 5%']
-        ),
-        contentType: getStringOptionValue(creatorFilter.contentTypes, filterOptions?.contentTypeOptions, ['All', 'Video', 'LIVE']),
-        creatorAgency: getStringOptionValue(
-          creatorFilter.creatorAgency,
-          filterOptions?.creatorAgencyOptions,
-          ['All', 'Managed by Agency', 'Independent creators']
-        ),
+        avgCommissionRate: getStringOptionValue(creatorFilter.avgCommissionRate, filterOptions?.avgCommissionRateOptions),
+        contentType: getStringOptionValue(creatorFilter.contentTypes, filterOptions?.contentTypeOptions),
+        creatorAgency: getStringOptionValue(creatorFilter.creatorAgency, filterOptions?.creatorAgencyOptions),
         spotlightCreator: false,
         fastGrowing: Boolean(creatorFilter.fastGrowing),
         notInvitedInPast90Days: Boolean(creatorFilter.notInvitedInPast90Days)
@@ -710,7 +670,7 @@ const toFormInitialDataFromDetail = (
         followerAgeSelections: Array.isArray(creatorFilter.fansAgeRange)
           ? creatorFilter.fansAgeRange.map((item: unknown) => String(item)).filter(Boolean)
           : [],
-        followerGender: getStringOptionValue(creatorFilter.fansGender, filterOptions?.followerGenderOptions, ['All', 'Female', 'Male']),
+        followerGender: getStringOptionValue(creatorFilter.fansGender, filterOptions?.followerGenderOptions),
         followerCountMin: String(creatorFilter.fansCountRange?.min ?? ''),
         followerCountMax: String(creatorFilter.fansCountRange?.max ?? '')
       },
@@ -725,7 +685,7 @@ const toFormInitialDataFromDetail = (
         averageViewersPerLiveShoppableLiveOnly: false,
         engagementRateMinPercent: String(creatorFilter.minEngagementRate ?? ''),
         engagementRateShoppableVideosOnly: false,
-        estPostRate: String(creatorFilter.creatorEstimatedPublishRate ?? 'All'),
+        estPostRate: getStringOptionValue(creatorFilter.creatorEstimatedPublishRate, filterOptions?.estPostRateOptions),
         brandCollaborationSelections: Array.isArray(creatorFilter.coBranding)
           ? creatorFilter.coBranding.map((item: unknown) => String(item)).filter(Boolean)
           : []
@@ -957,13 +917,17 @@ const fetchTaskList = async (showLoading: boolean = true): Promise<void> => {
         shopId,
         keyword: keywordQuery.value || undefined,
         status: apiStatus
+      },
+      {
+        // 仅轮询请求隐藏网络日志面板中的 info 日志，手动/首屏请求仍显示
+        suppressPanelInfoLog: !showLoading
       }
     )
 
     const normalized = result.list.map(normalizeTaskItem)
     const filtered = applyTaskFilters(normalized)
     taskList.value = filtered
-    total.value = filtered.length
+    total.value = result.total
     errorMessage.value = ''
     emptyMessage.value = '暂无建联任务，点击右上角新增任务'
   } catch (error: any) {
@@ -1002,8 +966,8 @@ const fetchTaskFilterOptions = async (): Promise<void> => {
   try {
     const result = await getOutreachCreatorFilterItems(shopId)
     taskFilterOptions.value = buildTaskFilterOptions(result)
-  } catch (_error) {
-    taskFilterOptions.value = undefined
+  } catch (error: any) {
+    showActionMessage(error?.message || '筛选配置加载失败，请稍后重试', 'error')
   }
 }
 
@@ -1449,7 +1413,14 @@ watch(totalPages, (value) => {
         </template>
 
         <div class="detail-modal-body">
-          <OutreachTaskDetailView :task="activeTask" :task-id="activeTaskId" @edit="handleDetailEdit" @end="handleDetailEnd" />
+          <OutreachTaskDetailView
+            :task="activeTask"
+            :task-id="activeTaskId"
+            :shop-id="shopId"
+            :filter-options="taskFilterOptions"
+            @edit="handleDetailEdit"
+            @end="handleDetailEnd"
+          />
         </div>
       </NCard>
     </NModal>
